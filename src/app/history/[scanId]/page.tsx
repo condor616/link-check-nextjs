@@ -1,0 +1,218 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, AlertCircle, ArrowLeft, Trash2 } from 'lucide-react';
+import { ScanResult } from '@/lib/scanner';
+import ScanResults from '@/components/ScanResults';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+// Define the expected structure from the saved scan
+interface SavedScan {
+  id: string;
+  scanUrl: string;
+  scanDate: string;
+  durationSeconds: number;
+  config: {
+    depth: number;
+    scanSameLinkOnce: boolean;
+    concurrency: number;
+  };
+  results: ScanResult[];
+}
+
+export default function ScanDetailsPage() {
+  const router = useRouter();
+  const params = useParams();
+  const scanId = params.scanId as string;
+  
+  const [scan, setScan] = useState<SavedScan | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  
+  useEffect(() => {
+    // Fetch the scan data
+    const fetchScan = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch(`/api/history/${scanId}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || `Failed to fetch scan data (${response.status})`);
+        }
+        
+        setScan(data);
+      } catch (err: unknown) {
+        console.error(`Failed to fetch scan ${scanId}:`, err);
+        setError(
+          err instanceof Error 
+            ? err.message 
+            : 'Failed to load scan details'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchScan();
+  }, [scanId]);
+  
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
+  };
+  
+  // Delete the scan
+  const deleteScan = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/history/${scanId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || `Failed to delete scan (${response.status})`);
+      }
+      
+      router.push('/history');
+    } catch (err: unknown) {
+      console.error(`Failed to delete scan ${scanId}:`, err);
+      setError(
+        err instanceof Error 
+          ? err.message 
+          : 'Failed to delete scan'
+      );
+      setIsDeleting(false);
+    }
+  };
+  
+  // Filter broken links
+  const brokenLinks = scan?.results?.filter(r => r.status === 'broken' || r.status === 'error') || [];
+  
+  return (
+    <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
+      <Card className="w-full max-w-6xl">
+        <CardHeader>
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="ghost" className="p-0" asChild>
+              <Link href="/history">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to History
+              </Link>
+            </Button>
+            
+            {scan && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={isDeleting}>
+                    {isDeleting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete this scan record. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={deleteScan}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+          
+          <CardTitle className="text-2xl flex items-center gap-2">
+            Scan Details
+            {scan && (
+              <span className="text-sm font-normal text-muted-foreground">
+                ({scan.scanUrl.replace(/^https?:\/\//, '')})
+              </span>
+            )}
+          </CardTitle>
+          
+          {scan && (
+            <CardDescription>
+              Scanned on {formatDate(scan.scanDate)} • 
+              Duration: {scan.durationSeconds.toFixed(2)}s •
+              Found {scan.results.length} links ({brokenLinks.length} broken)
+            </CardDescription>
+          )}
+        </CardHeader>
+        
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : scan ? (
+            <div className="space-y-8">
+              {/* Configuration Summary */}
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                <div>
+                  <span className="font-medium">Scan Depth:</span> {scan.config.depth === 0 ? 'Unlimited' : scan.config.depth}
+                </div>
+                <div>
+                  <span className="font-medium">Scan Same URL Once:</span> {scan.config.scanSameLinkOnce ? 'Yes' : 'No'}
+                </div>
+                <div>
+                  <span className="font-medium">Concurrency:</span> {scan.config.concurrency || 'N/A'}
+                </div>
+              </div>
+              
+              {/* Scan Results Component */}
+              <ScanResults results={scan.results} scanUrl={scan.scanUrl} />
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Scan not found.</p>
+              <Button asChild className="mt-4">
+                <Link href="/history">Return to History</Link>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </main>
+  );
+} 
