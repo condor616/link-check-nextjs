@@ -22,8 +22,7 @@ interface ApiScanResponse {
 export default function HomePage() {
   const [url, setUrl] = useState<string>("");
   const [depth, setDepth] = useState<number>(0);
-  const [scanSameLinkOnce, setScanSameLinkOnce] = useState<boolean>(true);
-  const [concurrency, setConcurrency] = useState<number>(10); // Add concurrency state
+  const [concurrency, setConcurrency] = useState<number>(10);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -52,8 +51,9 @@ export default function HomePage() {
 
     const config: ScanConfig = {
       depth: depth,
-      scanSameLinkOnce: scanSameLinkOnce,
+      scanSameLinkOnce: true,
       concurrency: concurrency,
+      itemsPerPage: 10,
       // TODO: Add exclusions from advanced options later
     };
 
@@ -98,12 +98,13 @@ export default function HomePage() {
       // Prepare the payload for saving
       const savePayload = {
         scanUrl: url,
-        scanDate: new Date().toISOString(), // Current time when saving
+        scanDate: new Date().toISOString(),
         durationSeconds: scanResponse.durationSeconds,
         config: {
           depth,
-          scanSameLinkOnce,
+          scanSameLinkOnce: true,
           concurrency,
+          itemsPerPage: 10, // Add default itemsPerPage
         },
         results: scanResponse.results,
       };
@@ -187,15 +188,6 @@ export default function HomePage() {
                     disabled={isLoading}
                   />
                 </div>
-                 <div className="flex items-center space-x-2 pt-6 sm:pt-8"> {/* Adjust alignment */} 
-                   <Checkbox 
-                    id="scanTwice" 
-                    checked={!scanSameLinkOnce} // Checkbox means "Allow re-scanning" 
-                    onCheckedChange={(checked) => setScanSameLinkOnce(!checked)} 
-                    disabled={isLoading} 
-                   />
-                   <Label htmlFor="scanTwice">Re-scan same link multiple times</Label>
-                 </div>
              </div>
              {/* Button to toggle advanced options */}
              <Button variant="link" className="p-0 h-auto" onClick={() => setShowAdvanced(!showAdvanced)} disabled={isLoading}>
@@ -207,17 +199,19 @@ export default function HomePage() {
           {showAdvanced && (
             <div className="space-y-4 p-4 border rounded bg-card-foreground/5">
                 <h3 className="text-lg font-medium">Advanced Configuration</h3>
-                <div className="space-y-2">
-                    <Label htmlFor="concurrency">Concurrency (Max simultaneous requests)</Label>
-                    <Input
-                        id="concurrency"
-                        type="number"
-                        min="1"
-                        max="50" // Set a reasonable max
-                        value={concurrency}
-                        onChange={(e) => setConcurrency(parseInt(e.target.value, 10) || 1)}
-                        disabled={isLoading}
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                      <Label htmlFor="concurrency">Concurrency (Max simultaneous requests)</Label>
+                      <Input
+                          id="concurrency"
+                          type="number"
+                          min="1"
+                          max="50" // Set a reasonable max
+                          value={concurrency}
+                          onChange={(e) => setConcurrency(parseInt(e.target.value, 10) || 1)}
+                          disabled={isLoading}
+                      />
+                  </div>
                 </div>
                 {/* TODO: Add UI for exclusions (URL, Regex, CSS Selector) */}
                 <p className="text-sm text-muted-foreground">Exclusion rules (URL, Regex, CSS) coming soon...</p>
@@ -299,19 +293,112 @@ export default function HomePage() {
             </>
            )}
 
-           {/* Show list of broken links */} 
+           {/* Show list of broken links with enhanced details */} 
            {brokenLinks && brokenLinks.length > 0 && (
             <div className="mt-4 border-t pt-4">
-                <h4 className="font-semibold mb-2">Broken / Error Links:</h4>
-                <ul className="list-disc pl-5 space-y-1 max-h-60 overflow-y-auto">
-                    {brokenLinks.map(link => (
-                        <li key={link.url} className="text-sm">
-                            <code className="text-destructive break-all">{link.url}</code>
-                            <span className="text-muted-foreground"> (Status: {link.statusCode || link.status}{link.errorMessage ? ` - ${link.errorMessage}` : ''})</span>
-                            {/* TODO: Show foundOn pages */} 
-                        </li>
-                    ))}
-                </ul>
+                <h4 className="font-semibold mb-2 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-destructive mr-1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    Broken / Error Links ({brokenLinks.length}):
+                </h4>
+                <div className="max-h-96 overflow-y-auto border rounded-md">
+                    {brokenLinks.map((link, index) => {
+                        // Convert foundOn from Set to Array
+                        const foundOnPages = Array.from(link.foundOn || []);
+                        // Extract domain for display
+                        const urlDomain = (() => {
+                            try {
+                                return new URL(link.url).hostname;
+                            } catch {
+                                return link.url;
+                            }
+                        })();
+                        
+                        return (
+                            <div 
+                                key={link.url} 
+                                className={`p-3 text-sm ${index !== brokenLinks.length - 1 ? 'border-b' : ''}`}
+                            >
+                                <div className="flex justify-between items-start gap-2 mb-1.5">
+                                    <div className="flex items-start gap-1.5">
+                                        {link.statusCode ? (
+                                            <span className="bg-destructive text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5">
+                                                {link.statusCode}
+                                            </span>
+                                        ) : (
+                                            <span className="bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5">
+                                                ERR
+                                            </span>
+                                        )}
+                                        <code className="text-destructive font-medium break-all">
+                                            {urlDomain}{link.url.replace(/^https?:\/\/[^\/]+/, '')}
+                                        </code>
+                                    </div>
+                                    <button 
+                                        onClick={() => navigator.clipboard.writeText(link.url)}
+                                        className="text-muted-foreground hover:text-foreground shrink-0"
+                                        title="Copy URL"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                                    </button>
+                                </div>
+                                
+                                {link.errorMessage && (
+                                    <div className="text-muted-foreground mb-2">
+                                        <span className="inline-flex items-center bg-destructive/10 text-destructive px-2 py-0.5 rounded text-xs">
+                                            {link.errorMessage}
+                                        </span>
+                                    </div>
+                                )}
+                                
+                                {foundOnPages.length > 0 && (
+                                    <div className="mt-2 bg-muted/40 p-2 rounded-sm">
+                                        <p className="text-xs text-muted-foreground mb-1.5 flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                                            Found on:
+                                        </p>
+                                        <ul className="space-y-1.5 pl-4 text-xs">
+                                            {foundOnPages.map((page, i) => {
+                                                // Format found-on page display
+                                                let displayText = page;
+                                                try {
+                                                    if (page !== 'initial') {
+                                                        const url = new URL(page);
+                                                        displayText = url.pathname || url.hostname;
+                                                    } else {
+                                                        displayText = 'Initial scan page';
+                                                    }
+                                                } catch {
+                                                    // Keep original if parsing fails
+                                                }
+                                                
+                                                return (
+                                                    <li key={i} className="list-disc">
+                                                        {page === 'initial' ? (
+                                                            <span className="text-muted-foreground">
+                                                                {displayText}
+                                                            </span>
+                                                        ) : (
+                                                            <a
+                                                                href={page}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-blue-600 hover:underline inline-flex items-center"
+                                                                title={page}
+                                                            >
+                                                                {displayText}
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                                                            </a>
+                                                        )}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
            )}
 

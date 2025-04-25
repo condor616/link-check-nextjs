@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Link Checker
+
+A web application for scanning websites and identifying broken links. This tool crawls a website, checks all links, and produces a detailed report of any broken or problematic links found.
+
+## Features
+
+- **Website Scanning**: Enter any URL to scan for broken links
+- **Customizable Depth**: Set how deep the crawler should go
+- **Progress Tracking**: Monitor the scanning progress with status updates
+- **Export Options**: Export results in JSON, CSV, or HTML formats
+- **History Tracking**: Save scans for later reference
+- **Responsive Design**: Works on desktop and mobile devices
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Node.js 18.x or later
+- npm or yarn
+
+### Installation
+
+1. Clone the repository
+```bash
+git clone https://github.com/your-username/link-check.git
+cd link-check
+```
+
+2. Install dependencies
+```bash
+npm install
+# or 
+yarn install
+```
+
+3. Start the development server
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Building for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+# or
+yarn build
+yarn start
+```
 
-## Learn More
+## Docker Deployment
 
-To learn more about Next.js, take a look at the following resources:
+The application can be containerized using Docker for easy deployment.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Building the Docker Image
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker build -t link-checker .
+```
 
-## Deploy on Vercel
+### Running the Container
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Run with ephemeral storage (scan history will be lost when container is removed)
+docker run -p 3000:3000 link-checker
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Run with persistent storage for scan history
+docker run -p 3000:3000 -v $(pwd)/scan_history:/app/.scan_history link-checker
+```
+
+Then access the application at [http://localhost:3000](http://localhost:3000)
+
+## Usage
+
+1. Enter a website URL in the input field
+2. Set the scan depth (how many clicks from the starting URL to follow)
+3. Optionally configure advanced settings
+4. Click "Start Scan" to begin the scan
+5. View results, filter by link status (broken, ok, external, skipped)
+6. Export or save results as needed
+
+## Technologies Used
+
+- Next.js
+- React
+- TypeScript
+- TailwindCSS
+- Cheerio (for HTML parsing)
+- Radix UI (for accessible components)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- TailwindCSS UI for design inspiration
+- Radix UI for accessible components
+- Cheerio for HTML parsing

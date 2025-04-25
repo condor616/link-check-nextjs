@@ -21,6 +21,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// Define SerializedScanResult for JSON storage
+interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
+  foundOn: string[]; // Instead of Set<string>
+  htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
+}
+
 // Define the expected structure from the saved scan
 interface SavedScan {
   id: string;
@@ -31,8 +37,9 @@ interface SavedScan {
     depth: number;
     scanSameLinkOnce: boolean;
     concurrency: number;
+    itemsPerPage?: number;
   };
-  results: ScanResult[];
+  results: SerializedScanResult[];
 }
 
 export default function ScanDetailsPage() {
@@ -198,10 +205,20 @@ export default function ScanDetailsPage() {
                 <div>
                   <span className="font-medium">Concurrency:</span> {scan.config.concurrency || 'N/A'}
                 </div>
+                {scan.config.itemsPerPage && (
+                  <div>
+                    <span className="font-medium">Items Per Page:</span> {scan.config.itemsPerPage}
+                  </div>
+                )}
               </div>
               
               {/* Scan Results Component */}
-              <ScanResults results={scan.results} scanUrl={scan.scanUrl} />
+              <ScanResults 
+                results={scan.results} 
+                scanUrl={scan.scanUrl} 
+                itemsPerPage={scan.config.itemsPerPage || 10} 
+                scanId={scanId}
+              />
             </div>
           ) : (
             <div className="text-center py-12">

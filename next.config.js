@@ -5,6 +5,8 @@ const nextConfig = {
     // Warning: only disable this when you're confident your code is working
     ignoreDuringBuilds: true,
   },
+  // Add standalone output for Docker deployment
+  output: 'standalone',
 }
 
 module.exports = nextConfig 
