@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScanConfig, ScanResult } from '@/lib/scanner';
-import { AlertCircle, CheckCircle2, Loader2, Save, Check } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Save, Check, Plus, X, Clock } from 'lucide-react';
 import Link from 'next/link';
 
 // Define the structure for results returned by the API (matching API response)
@@ -23,7 +23,12 @@ export default function HomePage() {
   const [url, setUrl] = useState<string>("");
   const [depth, setDepth] = useState<number>(0);
   const [concurrency, setConcurrency] = useState<number>(10);
+  const [requestTimeout, setRequestTimeout] = useState<number>(10); // In seconds
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  
+  // New states for regex and CSS selector exclusions
+  const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
+  const [cssSelectors, setCssSelectors] = useState<string[]>([""]);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,38 +54,73 @@ export default function HomePage() {
       return;
     }
 
+    // Filter out empty entries
+    const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
+    const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
+
     const config: ScanConfig = {
       depth: depth,
       scanSameLinkOnce: true,
       concurrency: concurrency,
       itemsPerPage: 10,
-      // TODO: Add exclusions from advanced options later
+      regexExclusions: filteredRegexExclusions,
+      cssSelectors: filteredCssSelectors,
+      requestTimeout: requestTimeout * 1000, // Convert to milliseconds
     };
 
     try {
+      // Add timeout to the main API fetch request as well
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for the API call itself
+      
       const response = await fetch('/api/scan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url, config }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
-      const data = await response.json();
-
+      // Check for response status first
       if (!response.ok) {
-        throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        let errorMessage;
+        try {
+          // Try to parse as JSON
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || `HTTP error: ${response.status} ${response.statusText}`;
+        } catch {
+          // If not JSON, use the raw text
+          errorMessage = errorText || `HTTP error: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
+      const data = await response.json();
       setScanResponse(data as ApiScanResponse);
 
     } catch (err: unknown) {
       console.error("Scan API call failed:", err);
-      setError(
-        err instanceof Error 
-          ? err.message 
-          : "An unexpected error occurred."
-      );
+      
+      // Handle different types of errors
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        setError(
+          "Network error: Could not connect to the server. Please check your internet connection and try again."
+        );
+      } else if (err instanceof DOMException && err.name === 'AbortError') {
+        setError(
+          "The scan request timed out after 60 seconds. The server might be busy or the website might be too large to scan quickly."
+        );
+      } else {
+        setError(
+          err instanceof Error 
+            ? err.message 
+            : "An unexpected error occurred."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +135,10 @@ export default function HomePage() {
     setSaveError(null);
     
     try {
+      // Filter out empty entries
+      const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
+      const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
+      
       // Prepare the payload for saving
       const savePayload = {
         scanUrl: url,
@@ -105,9 +149,16 @@ export default function HomePage() {
           scanSameLinkOnce: true,
           concurrency,
           itemsPerPage: 10, // Add default itemsPerPage
+          regexExclusions: filteredRegexExclusions,
+          cssSelectors: filteredCssSelectors,
+          requestTimeout: requestTimeout * 1000, // Convert to milliseconds
         },
         results: scanResponse.results,
       };
+      
+      // Add timeout to the save fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       const response = await fetch('/api/save-scan', {
         method: 'POST',
@@ -115,24 +166,50 @@ export default function HomePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(savePayload),
+        signal: controller.signal
       });
       
-      const data = await response.json();
+      clearTimeout(timeoutId);
       
+      // Check for response status first
       if (!response.ok) {
-        throw new Error(data.error || `Failed to save scan (${response.status})`);
+        const errorText = await response.text();
+        let errorMessage;
+        try {
+          // Try to parse as JSON
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || `Failed to save scan (${response.status})`;
+        } catch {
+          // If not JSON, use the raw text
+          errorMessage = errorText || `Failed to save scan (${response.status})`;
+        }
+        throw new Error(errorMessage);
       }
+      
+      const data = await response.json();
       
       setSaveSuccess(true);
       console.log('Scan saved successfully:', data.scanId);
       
     } catch (err: unknown) {
       console.error('Failed to save scan:', err);
-      setSaveError(
-        err instanceof Error 
-          ? err.message 
-          : 'Failed to save scan to history'
-      );
+      
+      // Handle different types of errors
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        setSaveError(
+          "Network error: Could not connect to the server. Please check your internet connection and try again."
+        );
+      } else if (err instanceof DOMException && err.name === 'AbortError') {
+        setSaveError(
+          "The save request timed out. The server might be busy or the scan data might be too large."
+        );
+      } else {
+        setSaveError(
+          err instanceof Error 
+            ? err.message 
+            : 'Failed to save scan to history'
+        );
+      }
     } finally {
       setIsSaving(false);
     }
@@ -140,6 +217,31 @@ export default function HomePage() {
 
   // Filter results for display (e.g., only broken links)
   const brokenLinks = scanResponse?.results?.filter(r => r.status === 'broken' || r.status === 'error');
+
+  // Handlers for adding/removing regex and CSS selector inputs
+  const addRegexExclusion = () => setRegexExclusions([...regexExclusions, ""]);
+  const removeRegexExclusion = (index: number) => {
+    if (regexExclusions.length <= 1) return; // Always keep at least one input
+    setRegexExclusions(regexExclusions.filter((_, i) => i !== index));
+  };
+  
+  const updateRegexExclusion = (index: number, value: string) => {
+    const updated = [...regexExclusions];
+    updated[index] = value;
+    setRegexExclusions(updated);
+  };
+  
+  const addCssSelector = () => setCssSelectors([...cssSelectors, ""]);
+  const removeCssSelector = (index: number) => {
+    if (cssSelectors.length <= 1) return; // Always keep at least one input
+    setCssSelectors(cssSelectors.filter((_, i) => i !== index));
+  };
+  
+  const updateCssSelector = (index: number, value: string) => {
+    const updated = [...cssSelectors];
+    updated[index] = value;
+    setCssSelectors(updated);
+  };
 
   return (
     <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
@@ -199,7 +301,7 @@ export default function HomePage() {
           {showAdvanced && (
             <div className="space-y-4 p-4 border rounded bg-card-foreground/5">
                 <h3 className="text-lg font-medium">Advanced Configuration</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                       <Label htmlFor="concurrency">Concurrency (Max simultaneous requests)</Label>
                       <Input
@@ -212,10 +314,103 @@ export default function HomePage() {
                           disabled={isLoading}
                       />
                   </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="requestTimeout">Request Timeout (seconds)</Label>
+                      <Input
+                          id="requestTimeout"
+                          type="number"
+                          min="1"
+                          max="60" // 60 seconds max
+                          value={requestTimeout}
+                          onChange={(e) => setRequestTimeout(parseInt(e.target.value, 10) || 10)}
+                          disabled={isLoading}
+                      />
+                  </div>
                 </div>
-                {/* TODO: Add UI for exclusions (URL, Regex, CSS Selector) */}
-                <p className="text-sm text-muted-foreground">Exclusion rules (URL, Regex, CSS) coming soon...</p>
-                {/* TODO: Add UI for Output Format selection ? (Maybe only on export?) */}
+                
+                {/* Regex Exclusion Rules */}
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Links matching these patterns will be skipped during scanning
+                  </p>
+                  
+                  {regexExclusions.map((regex, index) => (
+                    <div key={`regex-${index}`} className="flex gap-2 items-center mb-2">
+                      <Input
+                        value={regex}
+                        onChange={(e) => updateRegexExclusion(index, e.target.value)}
+                        placeholder="e.g. \/assets\/.*\.pdf$"
+                        disabled={isLoading}
+                      />
+                      
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeRegexExclusion(index)}
+                        disabled={isLoading || regexExclusions.length <= 1}
+                        className="shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addRegexExclusion}
+                    disabled={isLoading}
+                    className="mt-1"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Pattern
+                  </Button>
+                </div>
+                
+                {/* CSS Selector Exclusions */}
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Links within these CSS selectors will be skipped
+                  </p>
+                  
+                  {cssSelectors.map((selector, index) => (
+                    <div key={`selector-${index}`} className="flex gap-2 items-center mb-2">
+                      <Input
+                        value={selector}
+                        onChange={(e) => updateCssSelector(index, e.target.value)}
+                        placeholder="e.g. .footer, #navigation, [data-skip]"
+                        disabled={isLoading}
+                      />
+                      
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeCssSelector(index)}
+                        disabled={isLoading || cssSelectors.length <= 1}
+                        className="shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <Button
+                    type="button" 
+                    variant="outline"
+                    size="sm"
+                    onClick={addCssSelector}
+                    disabled={isLoading}
+                    className="mt-1"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Selector
+                  </Button>
+                </div>
             </div>
           )}
 

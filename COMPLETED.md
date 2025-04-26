@@ -12,6 +12,11 @@
   - OK, external, and skipped links as simplified list views
   - Context details for broken links showing where they appear
   
+- **Advanced Filtering Options**
+  - Regex pattern exclusions for URLs
+  - CSS selector exclusions to skip links within specific elements
+  - Configurable concurrency settings
+
 - **Export Functionality**
   - Export results in JSON, CSV, and HTML formats
   - Professional HTML report for sharing
@@ -40,7 +45,6 @@
 ## Next Steps
 
 1. **Enhanced Scanner Capabilities**
-   - Support for more advanced exclusion rules
    - Authentication for multi-user support
    - Custom request headers and cookies for authenticated sites
 

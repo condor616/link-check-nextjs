@@ -6,6 +6,9 @@ A web application for scanning websites and identifying broken links. This tool 
 
 - **Website Scanning**: Enter any URL to scan for broken links
 - **Customizable Depth**: Set how deep the crawler should go
+- **Advanced Filtering**:
+  - Exclude links matching regex patterns
+  - Skip links within specific CSS selectors
 - **Progress Tracking**: Monitor the scanning progress with status updates
 - **Export Options**: Export results in JSON, CSV, or HTML formats
 - **History Tracking**: Save scans for later reference
@@ -78,10 +81,26 @@ Then access the application at [http://localhost:3000](http://localhost:3000)
 
 1. Enter a website URL in the input field
 2. Set the scan depth (how many clicks from the starting URL to follow)
-3. Optionally configure advanced settings
+3. Optionally configure advanced settings:
+   - Set concurrency (number of simultaneous requests)
+   - Add regex patterns to exclude matching URLs from scanning
+   - Add CSS selectors to skip links contained within matching elements
 4. Click "Start Scan" to begin the scan
 5. View results, filter by link status (broken, ok, external, skipped)
 6. Export or save results as needed
+
+### Regex Exclusion Examples
+
+- `\/assets\/.*\.pdf$` - Exclude all PDF files in the assets directory
+- `example\.com\/newsletter` - Skip all URLs containing "example.com/newsletter"
+- `\/archive\/\d{4}\/` - Exclude archive URLs with year patterns
+
+### CSS Selector Examples
+
+- `.footer` - Skip all links within footer elements
+- `#navigation` - Exclude links in the navigation area
+- `[data-noindex]` - Skip links in elements with the data-noindex attribute
+- `.sidebar, .ads` - Exclude links in both sidebar and ads elements
 
 ## Technologies Used
 

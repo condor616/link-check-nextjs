@@ -47,7 +47,8 @@ import {
   ChevronRight, 
   ChevronsLeft, 
   ChevronsRight,
-  ListFilter
+  ListFilter,
+  Clock
 } from 'lucide-react';
 import * as cheerio from 'cheerio';
 import { PopoverAnchor } from '@radix-ui/react-popover';
@@ -81,14 +82,25 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const [currentItemsPerPage, setCurrentItemsPerPage] = useState<number>(itemsPerPage);
   
   // Filter results by status
-  const brokenLinks = results.filter(r => r.status === 'broken');
+  const brokenLinks = results.filter(r => r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400));
   const errorLinks = results.filter(r => r.status === 'error');
   const skippedLinks = results.filter(r => r.status === 'skipped');
   const externalLinks = results.filter(r => r.status === 'external');
-  const okLinks = results.filter(r => r.status === 'ok');
+  const okLinks = results.filter(r => {
+    // Only include links that are:
+    // 1. Marked as "ok" status
+    // 2. Have no status code, or a status code < 400
+    // 3. Not already included in brokenLinks (double check)
+    return r.status === 'ok' && 
+           (r.statusCode === undefined || r.statusCode < 400) &&
+           !brokenLinks.some(link => link.url === r.url);
+  });
   
   // Combined problematic links (broken + error)
-  const problematicLinks = [...brokenLinks, ...errorLinks];
+  const problematicLinks = [...brokenLinks, ...errorLinks.filter(link => 
+    // Avoid duplicates from links that may be in both arrays
+    !brokenLinks.some(broken => broken.url === link.url)
+  )];
 
   // Group links by URL for pagination calculation
   const getGroupedLinks = (links: SerializedScanResult[]) => {
@@ -314,19 +326,25 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     let icon = null;
     let className = "flex items-center";
     
-    switch (status) {
+    // Always consider any status code >= 400 as "broken" regardless of status value
+    const isBroken = code !== undefined && code >= 400;
+    const displayStatus = isBroken ? 'broken' : status;
+    
+    switch (displayStatus) {
       case 'broken':
         variant = 'destructive';
         icon = <XCircle className="h-3 w-3 mr-1" />;
+        className += " bg-destructive/90 text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground";
         break;
       case 'error':
         variant = 'destructive';
         icon = <AlertTriangle className="h-3 w-3 mr-1" />;
+        className += " bg-destructive/90 text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground";
         break;
       case 'ok':
         variant = 'secondary';
         icon = <CheckCircle2 className="h-3 w-3 mr-1" />;
-        className += " bg-green-500/20 text-green-700 hover:bg-green-500/20 hover:text-green-700";
+        className += " bg-green-500/90 text-white hover:bg-green-500/90 hover:text-white";
         break;
       case 'external':
         variant = 'secondary';
@@ -340,7 +358,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     return (
       <Badge variant={variant} className={className}>
         {icon}
-        {status}{code ? ` (${code})` : ''}
+        {displayStatus}{code ? ` (${code})` : ''}
       </Badge>
     );
   };
@@ -448,9 +466,17 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     const uniqueLinks = getGroupedLinks(links);
     const paginatedItems = uniqueLinks.slice(startIndex, endIndex);
     
-    // Split links into problematic and non-problematic
-    const problematicItems = paginatedItems.filter(link => link.status === 'broken' || link.status === 'error');
-    const nonProblematicItems = paginatedItems.filter(link => link.status !== 'broken' && link.status !== 'error');
+    // Make sure to check each item's status code when filtering
+    const problematicItems = paginatedItems.filter(link => 
+      link.status === 'broken' || 
+      link.status === 'error' || 
+      (link.statusCode !== undefined && link.statusCode >= 400)
+    );
+    
+    const nonProblematicItems = paginatedItems.filter(link => 
+      (link.status !== 'broken' && link.status !== 'error') && 
+      (link.statusCode === undefined || link.statusCode < 400)
+    );
     
     // If we're in the "All" tab, we need to handle both types
     const isAllTab = activeTab === 'all';
@@ -542,8 +568,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                             {link.statusCode}
                           </span>
                         ) : (
-                          <span className="bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5">
-                            ERR
+                          <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${
+                            link.errorMessage?.toLowerCase().includes('timeout') ? 
+                            'bg-amber-500' : 
+                            'bg-destructive'
+                          }`}>
+                            {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
                           </span>
                         )}
                         <code className="text-destructive font-medium break-all">
@@ -586,8 +616,20 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                     
                     {link.errorMessage && (
                       <div className="text-muted-foreground mt-1.5">
-                        <span className="inline-flex items-center bg-destructive/10 text-destructive px-2 py-0.5 rounded text-xs">
-                          {link.errorMessage}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
+                          link.errorMessage.toLowerCase().includes('timeout') ?
+                          'bg-amber-500/10 text-amber-700' :
+                          'bg-destructive/10 text-destructive'
+                        }`}>
+                          {link.errorMessage.toLowerCase().includes('timeout') ? (
+                            <>
+                              <Clock className="h-3 w-3 mr-1" />
+                              {link.errorMessage}
+                              <span className="ml-1 text-xs opacity-75">(Try increasing timeout in advanced settings)</span>
+                            </>
+                          ) : (
+                            link.errorMessage
+                          )}
                         </span>
                       </div>
                     )}
@@ -764,8 +806,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           {link.statusCode}
                         </span>
                       ) : (
-                        <span className="bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5">
-                          ERR
+                        <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${
+                          link.errorMessage?.toLowerCase().includes('timeout') ? 
+                          'bg-amber-500' : 
+                          'bg-destructive'
+                        }`}>
+                          {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
                         </span>
                       )}
                       <code className="text-destructive font-medium break-all">
@@ -808,8 +854,20 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                   
                   {link.errorMessage && (
                     <div className="text-muted-foreground mt-1.5">
-                      <span className="inline-flex items-center bg-destructive/10 text-destructive px-2 py-0.5 rounded text-xs">
-                        {link.errorMessage}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
+                        link.errorMessage.toLowerCase().includes('timeout') ?
+                        'bg-amber-500/10 text-amber-700' :
+                        'bg-destructive/10 text-destructive'
+                      }`}>
+                        {link.errorMessage.toLowerCase().includes('timeout') ? (
+                          <>
+                            <Clock className="h-3 w-3 mr-1" />
+                            {link.errorMessage}
+                            <span className="ml-1 text-xs opacity-75">(Try increasing timeout in advanced settings)</span>
+                          </>
+                        ) : (
+                          link.errorMessage
+                        )}
                       </span>
                     </div>
                   )}
@@ -953,7 +1011,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-4">
-        <Tabs defaultValue="problematic" className="w-full" onValueChange={handleTabChange}>
+        <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
             <TabsList>
               <TabsTrigger value="problematic" className="flex items-center gap-1">
@@ -983,7 +1041,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
           </div>
         </Tabs>
       </div>
-      <Tabs defaultValue="problematic" className="w-full" onValueChange={handleTabChange}>
+      <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
         <TabsContent value="problematic" className="mt-4">
           {renderLinksList(problematicLinks, true)}
         </TabsContent>

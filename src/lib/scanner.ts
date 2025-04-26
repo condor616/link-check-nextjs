@@ -10,9 +10,10 @@ export interface ScanConfig {
     scanSameLinkOnce?: boolean;
     concurrency?: number; // Max concurrent requests
     itemsPerPage?: number; // Items per page for results pagination
-    // TODO: Add exclusions (urls: string[], regex: string[], selectors: string[])
+    regexExclusions?: string[]; // Array of regex patterns for URLs to exclude
+    cssSelectors?: string[]; // Array of CSS selectors - links inside these elements will be excluded
+    requestTimeout?: number; // Timeout in milliseconds for each request (default: 10000)
     // TODO: Add User-Agent
-    // TODO: Add request timeout
 }
 
 // Define result structure (will evolve)
@@ -44,7 +45,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage'> & ScanConfig>;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'cssSelectors' | 'requestTimeout'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -68,11 +69,18 @@ class Scanner {
             scanSameLinkOnce: config.scanSameLinkOnce ?? true,
             concurrency: config.concurrency ?? 10, // Default concurrency
             itemsPerPage: config.itemsPerPage ?? 10, // Default to 10 items per page
+            regexExclusions: config.regexExclusions ?? [], // Default to empty array
+            cssSelectors: config.cssSelectors ?? [], // Default to empty array
+            requestTimeout: config.requestTimeout ?? 10000, // Default to 10 seconds
             ...config, // Include any other passed config options
         };
 
         if (this.config.concurrency <= 0) {
              throw new Error("Concurrency must be a positive number.");
+        }
+
+        if (this.config.requestTimeout <= 0) {
+            throw new Error("Request timeout must be a positive number.");
         }
 
         this.visitedLinks = new Set<string>();
@@ -175,13 +183,14 @@ class Scanner {
             const response = await fetch(urlToProcess, {
                 headers: { 'User-Agent': 'LinkCheckerProBot/1.0' },
                 redirect: 'follow',
-                signal: AbortSignal.timeout(10000), // 10 second timeout
+                signal: AbortSignal.timeout(this.config.requestTimeout), // Use configurable timeout
             });
 
             const status = response.status;
             const contentType = response.headers.get('content-type') || '';
             const isBroken = status >= 400;
 
+            // Always mark links with status >= 400 as broken, no exceptions
             currentResult.status = isBroken ? 'broken' : 'ok';
             currentResult.statusCode = status;
             currentResult.contentType = contentType;
@@ -197,11 +206,15 @@ class Scanner {
             }
         } catch (error: any) {
             console.error(`Error scanning ${urlToProcess}:`, error.name, error.message);
-            currentResult.status = 'error';
-            if (error.name === 'TimeoutError') {
+            
+            // Properly handle timeout errors with a specific message
+            if (error.name === 'TimeoutError' || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
                 currentResult.status = 'broken';
+                currentResult.errorMessage = `Request timed out after ${this.config.requestTimeout/1000} seconds`;
+            } else {
+                currentResult.status = 'error';
+                currentResult.errorMessage = error.message || 'Unknown error occurred';
             }
-            currentResult.errorMessage = error.message;
         }
     }
 
@@ -210,8 +223,29 @@ class Scanner {
         if (!this.limit) return; // Safety check
 
         const $ = cheerio.load(html);
+        
+        // Get all links that are not in excluded CSS selectors
+        let links = $('a[href]');
+        
+        // Filter out links based on CSS selectors if configured
+        if (this.config.cssSelectors && this.config.cssSelectors.length > 0) {
+            // For each CSS selector, mark links that should be excluded
+            this.config.cssSelectors.forEach(selector => {
+                try {
+                    $(selector).find('a[href]').each((_, el) => {
+                        // Mark elements to be excluded
+                        $(el).attr('data-link-checker-exclude', 'true');
+                    });
+                } catch (error) {
+                    console.warn(`Invalid CSS selector: ${selector}`);
+                }
+            });
+            
+            // Filter out the marked links
+            links = links.filter((_, el) => !$(el).attr('data-link-checker-exclude'));
+        }
 
-        $('a[href]').each((_, element) => {
+        links.each((_, element) => {
             const href = $(element).attr('href')?.trim();
             if (!href) return;
 
@@ -249,21 +283,39 @@ class Scanner {
             if (result.status === 'external') result.status = 'skipped';
             return true;
         }
-        
-        // 2. Depth limit exceeded?
+
+        // 2. Check max depth (if configured)
         const maxDepth = this.config.depth;
-        if (maxDepth !== 0 && depth > maxDepth) {
-            console.log(`Skipping due to depth limit (${depth} > ${maxDepth}): ${url}`);
+        if (maxDepth > 0 && depth > maxDepth) {
             result.status = 'skipped';
+            result.errorMessage = `Exceeded max depth (${maxDepth})`;
             return true;
         }
+
+        // 3. Check if external (different hostname)
+        const urlObj = new URL(url);
+        const isExternal = !url.startsWith(this.baseUrl);
         
-        // 3. External URL?
-        if (!url.startsWith(this.baseUrl)) {
+        if (isExternal) {
             result.status = 'external';
-            return true;
         }
-        
+
+        // 4. Check regex exclusions
+        if (this.config.regexExclusions && this.config.regexExclusions.length > 0) {
+            for (const pattern of this.config.regexExclusions) {
+                try {
+                    const regex = new RegExp(pattern);
+                    if (regex.test(url)) {
+                        result.status = 'skipped';
+                        result.errorMessage = `Matched regex exclusion: ${pattern}`;
+                        return true;
+                    }
+                } catch (error) {
+                    console.warn(`Invalid regex pattern: ${pattern}`);
+                }
+            }
+        }
+
         return false;
     }
 
@@ -413,6 +465,11 @@ class ScannerWithCallbacks extends Scanner {
     
     // Get the processed result
     const result = this.results.get(urlToProcess);
+    
+    // Double-check the result status based on status code
+    if (result && result.statusCode !== undefined && result.statusCode >= 400) {
+      result.status = 'broken'; // Ensure consistent status
+    }
     
     // Call the onResult callback if result exists
     if (result && this.callbacks.onResult) {
