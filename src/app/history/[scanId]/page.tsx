@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,34 @@ interface SavedScan {
   results: SerializedScanResult[];
 }
 
-export default function ScanDetailsPage() {
+// Loading fallback for Suspense
+function ScanDetailsLoading() {
+  return (
+    <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
+      <Card className="w-full max-w-6xl">
+        <CardHeader>
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="ghost" className="p-0" asChild>
+              <Link href="/history">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to History
+              </Link>
+            </Button>
+          </div>
+          <CardTitle className="text-2xl">Loading Scan Details...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+
+// Main content component that uses useParams
+function ScanDetailsContent() {
   const router = useRouter();
   const params = useParams();
   const scanId = params.scanId as string;
@@ -200,36 +227,35 @@ export default function ScanDetailsPage() {
                   <span className="font-medium">Scan Depth:</span> {scan.config.depth === 0 ? 'Unlimited' : scan.config.depth}
                 </div>
                 <div>
-                  <span className="font-medium">Scan Same URL Once:</span> {scan.config.scanSameLinkOnce ? 'Yes' : 'No'}
+                  <span className="font-medium">Scan Unique URLs Only:</span> {scan.config.scanSameLinkOnce ? 'Yes' : 'No'}
                 </div>
                 <div>
-                  <span className="font-medium">Concurrency:</span> {scan.config.concurrency || 'N/A'}
+                  <span className="font-medium">Concurrency:</span> {scan.config.concurrency}
                 </div>
-                {scan.config.itemsPerPage && (
-                  <div>
-                    <span className="font-medium">Items Per Page:</span> {scan.config.itemsPerPage}
-                  </div>
-                )}
               </div>
               
-              {/* Scan Results Component */}
-              <ScanResults 
-                results={scan.results} 
-                scanUrl={scan.scanUrl} 
-                itemsPerPage={scan.config.itemsPerPage || 10} 
-                scanId={scanId}
-              />
+              {/* Scan Results */}
+              <div>
+                <ScanResults 
+                  results={scan.results} 
+                  scanUrl={scan.scanUrl} 
+                  itemsPerPage={scan.config.itemsPerPage || 10}
+                  scanId={scan.id}
+                />
+              </div>
             </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Scan not found.</p>
-              <Button asChild className="mt-4">
-                <Link href="/history">Return to History</Link>
-              </Button>
-            </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+// Main page component with Suspense
+export default function ScanDetailsPage() {
+  return (
+    <Suspense fallback={<ScanDetailsLoading />}>
+      <ScanDetailsContent />
+    </Suspense>
   );
 } 

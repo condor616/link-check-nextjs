@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -54,7 +54,27 @@ interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContext
   htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
 }
 
-export default function ScanPage() {
+// Loading fallback for Suspense
+function ScannerLoading() {
+  return (
+    <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
+      <Card className="w-full max-w-6xl">
+        <CardHeader>
+          <CardTitle className="text-2xl">Loading Scan...</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-lg">Initializing...</span>
+          </div>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+
+// The main scanner component that uses useSearchParams
+function ScannerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const scanUrl = searchParams.get('url');
@@ -413,5 +433,14 @@ export default function ScanPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+// Main page component with Suspense
+export default function ScanPage() {
+  return (
+    <Suspense fallback={<ScannerLoading />}>
+      <ScannerContent />
+    </Suspense>
   );
 } 
