@@ -23,7 +23,7 @@ export default function HomePage() {
   const [url, setUrl] = useState<string>("");
   const [depth, setDepth] = useState<number>(0);
   const [concurrency, setConcurrency] = useState<number>(10);
-  const [requestTimeout, setRequestTimeout] = useState<number>(10); // In seconds
+  const [requestTimeout, setRequestTimeout] = useState<number>(30); // Increase default from 10 to 30 seconds
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   
   // New states for regex and CSS selector exclusions
@@ -71,7 +71,7 @@ export default function HomePage() {
     try {
       // Add timeout to the main API fetch request as well
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for the API call itself
+      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minute timeout for the API call itself (up from 60 seconds)
       
       const response = await fetch('/api/scan', {
         method: 'POST',
@@ -112,7 +112,7 @@ export default function HomePage() {
         );
       } else if (err instanceof DOMException && err.name === 'AbortError') {
         setError(
-          "The scan request timed out after 60 seconds. The server might be busy or the website might be too large to scan quickly."
+          "The scan request timed out after 5 minutes. The server might be busy or the website might be too large to scan quickly. Try scanning a smaller section or increasing the timeout."
         );
       } else {
         setError(
@@ -319,12 +319,13 @@ export default function HomePage() {
                       <Input
                           id="requestTimeout"
                           type="number"
-                          min="1"
-                          max="60" // 60 seconds max
+                          min="5"
+                          max="180" // Allow up to 3 minutes per request (up from 60 seconds)
                           value={requestTimeout}
-                          onChange={(e) => setRequestTimeout(parseInt(e.target.value, 10) || 10)}
+                          onChange={(e) => setRequestTimeout(parseInt(e.target.value, 10) || 30)}
                           disabled={isLoading}
                       />
+                      <p className="text-xs text-muted-foreground">Time before giving up on a single URL request (5-180 seconds)</p>
                   </div>
                 </div>
                 

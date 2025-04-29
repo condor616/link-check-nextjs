@@ -71,7 +71,7 @@ class Scanner {
             itemsPerPage: config.itemsPerPage ?? 10, // Default to 10 items per page
             regexExclusions: config.regexExclusions ?? [], // Default to empty array
             cssSelectors: config.cssSelectors ?? [], // Default to empty array
-            requestTimeout: config.requestTimeout ?? 10000, // Default to 10 seconds
+            requestTimeout: config.requestTimeout ?? 30000, // Default to 30 seconds (up from 10)
             ...config, // Include any other passed config options
         };
 

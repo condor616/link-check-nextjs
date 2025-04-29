@@ -134,6 +134,11 @@ function ScannerContent() {
       const startTime = Date.now();
       
       try {
+        // Add a long timeout for the fetch request - 10 minutes
+        // This is much longer than the default browser timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 minute timeout
+        
         const response = await fetch('/api/scan', {
           method: 'POST',
           headers: {
@@ -143,7 +148,10 @@ function ScannerContent() {
             url: scanUrl,
             config: scanConfig
           }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         const data = await response.json();
         
@@ -176,11 +184,20 @@ function ScannerContent() {
       } catch (error) {
         console.error('Error during scan:', error);
         
+        // Handle different error types appropriately
+        let errorMessage = 'Unknown scan error';
+        
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          errorMessage = 'The scan request timed out after 10 minutes. The website might be too large to scan in one go. Try scanning a specific section or increase the timeout.';
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        
         setScanStatus(prev => ({
           ...prev,
           status: 'error',
           message: 'Scan error',
-          error: error instanceof Error ? error.message : 'Unknown scan error'
+          error: errorMessage
         }));
       } finally {
         setIsScanning(false);
@@ -213,13 +230,20 @@ function ScannerContent() {
         results,
       };
       
+      // Add timeout for the save request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minute timeout
+      
       const response = await fetch('/api/save-scan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(savePayload),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const data = await response.json();
       
@@ -233,11 +257,17 @@ function ScannerContent() {
       
     } catch (err: unknown) {
       console.error('Failed to save scan:', err);
-      setSaveError(
-        err instanceof Error 
-          ? err.message 
-          : 'Failed to save scan to history'
-      );
+      
+      // Handle different error types
+      let errorMessage = 'Failed to save scan to history';
+      
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        errorMessage = 'The save request timed out. The scan data might be too large.';
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      setSaveError(errorMessage);
     } finally {
       setIsSaving(false);
     }
