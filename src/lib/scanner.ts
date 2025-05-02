@@ -18,6 +18,8 @@ export interface ScanConfig {
         password: string;
     }; // HTTP Basic Authentication credentials
     useAuthForAllDomains?: boolean; // Use auth headers for all domains instead of just the same domain
+    processHtml?: boolean; // Whether to process HTML content for links (default: true)
+    skipExternalDomains?: boolean; // Whether to skip external domains (default: true for re-scans)
     // TODO: Add User-Agent
 }
 
@@ -32,6 +34,8 @@ export interface ScanResult {
     errorMessage?: string;
     // Map of page URLs to arrays of HTML snippets containing this link
     htmlContexts?: Map<string, string[]>;
+    // Flag to indicate if HTTP Basic Auth was used for this URL
+    usedAuth?: boolean;
 }
 
 /**
@@ -50,7 +54,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'cssSelectors' | 'requestTimeout' | 'useAuthForAllDomains'>> & ScanConfig;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'cssSelectors' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -60,9 +64,9 @@ class Scanner {
     // Use the inferred type for the limiter instance
     protected limit: LimitFunction | null = null;
     // Cache for auth headers to avoid recomputing for each request
-    private authHeadersCache: Record<string, string> | null = null;
+    protected authHeadersCache: Record<string, string> | null = null;
     // Domain cache to optimize hostname lookups
-    private domainCache: Map<string, string> = new Map();
+    protected domainCache: Map<string, string> = new Map();
 
     constructor(startUrl: string, config: ScanConfig = {}) {
         const normalizedStart = this.normalizeUrl(startUrl, startUrl);
@@ -82,6 +86,8 @@ class Scanner {
             cssSelectors: config.cssSelectors ?? [], // Default to empty array
             requestTimeout: config.requestTimeout ?? 30000, // Default to 30 seconds (up from 10)
             useAuthForAllDomains: config.useAuthForAllDomains ?? false,
+            processHtml: config.processHtml ?? true,
+            skipExternalDomains: config.skipExternalDomains ?? true,
             ...config, // Include any other passed config options
         };
 
@@ -115,7 +121,7 @@ class Scanner {
         this.addOrUpdateResultWithContext(this.startUrl, 'initial', '');
     }
 
-    private normalizeUrl(url: string, baseUrl: string): string | null {
+    protected normalizeUrl(url: string, baseUrl: string): string | null {
         // Quick check for common non-HTTP protocols
         if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('javascript:')) {
             return null;
@@ -149,7 +155,7 @@ class Scanner {
     }
 
     // Helper method to determine if a URL is from the same domain as the base URL
-    private isSameDomain(url: string): boolean {
+    protected isSameDomain(url: string): boolean {
         try {
             const urlObj = new URL(url);
             const baseObj = new URL(this.baseUrl);
@@ -160,7 +166,7 @@ class Scanner {
     }
 
     // Helper to add or update link results with HTML context
-    private addOrUpdateResultWithContext(linkUrl: string, sourceUrl: string, htmlContext: string, partialResult: Partial<Omit<ScanResult, 'url' | 'foundOn' | 'htmlContexts'>> = {}) {
+    protected addOrUpdateResultWithContext(linkUrl: string, sourceUrl: string, htmlContext: string, partialResult: Partial<Omit<ScanResult, 'url' | 'foundOn' | 'htmlContexts'>> = {}) {
         let entry = this.results.get(linkUrl);
         if (entry) {
             if (sourceUrl !== 'initial') {
@@ -260,7 +266,7 @@ class Scanner {
             currentResult.contentType = contentType;
 
             // Parse HTML and queue new links if applicable
-            if (!isBroken && contentType.includes('text/html')) {
+            if (!isBroken && contentType.includes('text/html') && this.config.processHtml) {
                 // Check depth is within limits for recursive scanning
                 const maxDepth = this.config.depth;
                 if (maxDepth === 0 || depth < maxDepth) {
@@ -283,7 +289,7 @@ class Scanner {
     }
 
     // Extract and process links from a page
-    private processPageLinks(html: string, pageUrl: string, currentDepth: number): void {
+    protected processPageLinks(html: string, pageUrl: string, currentDepth: number): void {
         if (!this.limit) return; // Safety check
 
         const $ = cheerio.load(html);
@@ -319,36 +325,56 @@ class Scanner {
             const nextUrl = this.normalizeUrl(href, pageUrl);
             if (!nextUrl) return;
 
-            // Capture the HTML context (the <a> tag and its content)
-            // Streamlined context capture for better performance
+            // Only process links from the same domain as the start URL
+            if (!this.isSameDomain(nextUrl)) {
+                // Create a basic result entry for external links but don't queue them for processing
+                this.addOrUpdateResultWithContext(nextUrl, pageUrl, $.html(element), { status: 'external' });
+                return;
+            }
+
+            // Capture the HTML context
             let htmlContext = '';
             try {
-                // Just grab the immediate parent for context - reduces processing time
                 const parent = $(element).parent();
                 htmlContext = parent.length ? 
-                    $.html(parent).substring(0, 200) : // Smaller context size
+                    $.html(parent).substring(0, 200) : 
                     $.html(element);
             } catch (e) {
-                // Fallback to just the element itself if there's an error
                 htmlContext = $.html(element);
             }
 
-            // Add to batch instead of processing immediately
+            // Add to batch
             linkBatch.push({ url: nextUrl, context: htmlContext });
         });
 
-        // Process the batch of links all at once
+        // Process the batch of links all at once (only same-domain links)
         for (const { url, context } of linkBatch) {
             // Add or update result entry with HTML context
             this.addOrUpdateResultWithContext(url, pageUrl, context);
 
-            // Queue for processing if meets criteria
+            // Queue for processing
             this.queueLinkForProcessing(url, currentDepth + 1);
         }
     }
 
+    // Queue a link for processing if it meets criteria
+    protected queueLinkForProcessing(url: string, depth: number): void {
+        // Skip if already queued
+        if (this.queuedLinks.has(url)) return;
+        
+        // Add to queue set to prevent duplicates
+        this.queuedLinks.add(url);
+        
+        // Schedule processing with the limiter
+        if (this.limit) {
+            this.limit(() => this.processUrl(url, depth)).catch(error => {
+                console.error(`Error processing ${url}:`, error);
+            });
+        }
+    }
+
     // Determines if a URL should be processed or skipped
-    private shouldSkipUrl(url: string, depth: number, result: ScanResult): boolean {
+    protected shouldSkipUrl(url: string, depth: number, result: ScanResult): boolean {
         // 1. Already fetched/processed?
         if (this.config.scanSameLinkOnce && this.visitedLinks.has(url)) {
             if (result.status === 'external') result.status = 'skipped';
@@ -378,7 +404,7 @@ class Scanner {
                     const regex = new RegExp(pattern);
                     if (regex.test(url)) {
                         result.status = 'skipped';
-                        result.errorMessage = `Matched regex exclusion: ${pattern}`;
+                        result.errorMessage = `URL matches exclusion pattern: ${pattern}`;
                         return true;
                     }
                 } catch (error) {
@@ -389,183 +415,175 @@ class Scanner {
 
         return false;
     }
-
-    // Adds a link to the processing queue if eligible
-    private queueLinkForProcessing(url: string, depth: number): void {
-        if (!this.limit) return;
-        
-        // Don't requeue already visited or queued links if scanSameLinkOnce is true
-        if (this.config.scanSameLinkOnce && (this.visitedLinks.has(url) || this.queuedLinks.has(url))) {
-            return;
-        }
-        
-        // Skip external links
-        if (!url.startsWith(this.baseUrl)) {
-            return;
-        }
-        
-        // Skip if beyond depth limit
-        const maxDepth = this.config.depth;
-        if (maxDepth !== 0 && depth > maxDepth) {
-            return;
-        }
-        
-        // Mark as queued and add to processing queue
-        this.queuedLinks.add(url);
-        this.limit(() => this.processUrl(url, depth));
-    }
-
-    async run(): Promise<Map<string, ScanResult>> {
-        if (this.isRunning) {
-            throw new Error("Scan already in progress.");
-        }
-        this.isRunning = true;
-        
-        // Adjust concurrency for authenticated requests if needed
-        const effectiveConcurrency = this.config.auth 
-            ? Math.min(this.config.concurrency, 15) // Limit concurrent auth requests to prevent server throttling
-            : this.config.concurrency;
-            
-        this.limit = pLimit(effectiveConcurrency);
-        console.log(`Starting concurrent scan (concurrency: ${effectiveConcurrency}) for ${this.startUrl}`);
-
-        // Queue the initial URL
-        this.queuedLinks.add(this.startUrl);
-        this.limit(() => this.processUrl(this.startUrl, 0));
-
-        // Wait for the queue to become idle
-        await new Promise<void>(resolve => {
-            const checkIdle = () => {
-                // Add null check for this.limit before accessing properties
-                if (this.limit && this.limit.activeCount === 0 && this.limit.pendingCount === 0) {
-                    resolve();
-                } else {
-                    // Check again shortly
-                    setTimeout(checkIdle, 100);
-                }
-            };
-            checkIdle();
-        });
-
-        console.log('Scan finished.');
-        this.isRunning = false;
-        this.limit = null; // Clean up limiter
-        return this.results;
-    }
 }
 
 /**
- * Starts the website scan by instantiating and running the Scanner.
- * @param startUrl The initial URL to start scanning from.
- * @param config Scan configuration.
- * @returns A promise that resolves with the scan results (Map<string, ScanResult>).
- */
-export async function startScan(startUrl: string, config: ScanConfig = {}): Promise<Map<string, ScanResult>> {
-    const scanner = new Scanner(startUrl, config);
-    return scanner.run();
-}
-
-/**
- * Starts a website scan with real-time updates via callbacks
+ * Main function to scan a website and collect link information
  * @param startUrl The URL to start scanning from
- * @param config Scan configuration options
- * @param callbacks Callbacks for real-time updates
- * @returns A promise that resolves when the scan is complete
+ * @param config Configuration options for the scan
+ * @returns A promise that resolves to an array of ScanResult objects
  */
-export async function scanWebsite(
-  startUrl: string, 
-  config: ScanConfig = {}, 
-  callbacks: ScanCallbacks = {}
-): Promise<ScanResult[]> {
-  try {
-    // Create a scanner instance
-    const scanner = new ScannerWithCallbacks(startUrl, config, callbacks);
+export async function scanWebsite(startUrl: string, config: ScanConfig = {}): Promise<ScanResult[]> {
+    // Create a new scanner instance with domain filtering enabled by default
+    const scanner = new WebsiteScanner(startUrl, {
+        ...config,
+        // By default, enable domain filtering for re-scans
+        skipExternalDomains: config.skipExternalDomains !== undefined ? config.skipExternalDomains : true
+    });
     
     // Run the scan
-    const resultsMap = await scanner.run();
-    
-    // Convert results map to array
-    const resultsArray = Array.from(resultsMap.values());
-    
-    // Call the completion callback
-    if (callbacks.onComplete) {
-      callbacks.onComplete(resultsArray);
-    }
-    
-    return resultsArray;
-  } catch (error) {
-    // Call the error callback
-    if (callbacks.onError && error instanceof Error) {
-      callbacks.onError(error);
-    }
-    
-    throw error; // Re-throw to allow caller to handle it
-  }
+    return await scanner.scan();
 }
 
 /**
- * Extended Scanner class that supports callbacks for real-time updates
+ * Extension of the base Scanner class with a public scan method
+ * and improved domain filtering
  */
-class ScannerWithCallbacks extends Scanner {
-  private readonly callbacks: ScanCallbacks;
-  private processedCount: number = 0;
-  
-  constructor(startUrl: string, config: ScanConfig = {}, callbacks: ScanCallbacks = {}) {
-    super(startUrl, config);
-    this.callbacks = callbacks;
-  }
-  
-  // Override the run method to add callback support
-  async run(): Promise<Map<string, ScanResult>> {
-    // Estimate the number of URLs based on depth
-    const estimatedUrls = this.estimateUrlCount();
-    
-    // Call the onStart callback
-    if (this.callbacks.onStart) {
-      this.callbacks.onStart(estimatedUrls);
+class WebsiteScanner extends Scanner {
+    /**
+     * Runs the scan and returns the results
+     * @returns A promise that resolves to an array of ScanResult objects
+     */
+    public async scan(): Promise<ScanResult[]> {
+        // Initialize the limiter
+        this.limit = pLimit(this.config.concurrency);
+        this.isRunning = true;
+
+        console.log(`Starting scan of ${this.startUrl} with domain filtering ${this.config.skipExternalDomains ? 'enabled' : 'disabled'}`);
+
+        try {
+            // Start scanning from the initial URL at depth 0
+            await this.processUrl(this.startUrl, 0);
+            
+            // Create a timer to check periodically if all tasks are complete
+            const waitForComplete = () => {
+                return new Promise<void>(resolve => {
+                    const checkComplete = () => {
+                        // If there are no active or pending tasks, we're done
+                        if (this.limit && this.limit.activeCount === 0 && this.limit.pendingCount === 0) {
+                            resolve();
+                        } else {
+                            setTimeout(checkComplete, 100);
+                        }
+                    };
+                    checkComplete();
+                });
+            };
+            
+            // Wait for all tasks to complete
+            await waitForComplete();
+            
+            // Convert results map to array
+            return Array.from(this.results.values());
+        } finally {
+            this.isRunning = false;
+        }
     }
-    
-    // Run the original scan
-    return await super.run();
-  }
-  
-  // Override the processUrl method to add progress updates
-  protected async processUrl(urlToProcess: string, depth: number): Promise<void> {
-    // Call the onProgress callback
-    if (this.callbacks.onProgress) {
-      this.processedCount++;
-      this.callbacks.onProgress(this.processedCount, urlToProcess);
+
+    /**
+     * Override the processUrl method to implement domain filtering
+     * Only process HTML content for links from the same domain
+     */
+    protected async processUrl(urlToProcess: string, depth: number): Promise<void> {
+        if (!this.limit) throw new Error("Scanner not running"); // Should not happen
+
+        const currentResult = this.results.get(urlToProcess);
+        // Should always exist as it's added before queuing, but check defensively
+        if (!currentResult) {
+            console.error(`Error: Result object missing for ${urlToProcess} at depth ${depth}`);
+            return;
+        }
+
+        // Check if URL should be processed
+        if (this.shouldSkipUrl(urlToProcess, depth, currentResult)) {
+            return;
+        }
+
+        // Check if it's an external domain and we should skip it
+        if (this.config.skipExternalDomains && !this.isSameDomain(urlToProcess) && urlToProcess !== this.startUrl) {
+            console.log(`Skipping external domain: ${urlToProcess} (not scanning for content)`);
+            currentResult.status = 'external';
+            return;
+        }
+
+        // Mark as visited *before* fetching to prevent race conditions in queuing
+        this.visitedLinks.add(urlToProcess);
+        
+        // Use optional chaining for limit properties in log
+        console.log(`[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
+
+        // Fetch and process
+        try {
+            // Determine if this URL is from the same domain as the start URL
+            const isSameDomainUrl = this.isSameDomain(urlToProcess);
+            const shouldUseAuth = isSameDomainUrl || this.config.useAuthForAllDomains;
+            
+            // Log authentication decision
+            if (this.config.auth) {
+                if (shouldUseAuth) {
+                    console.log(`Using HTTP Basic Auth for ${urlToProcess} (same domain as scan URL)`);
+                } else {
+                    console.log(`Skipping HTTP Basic Auth for ${urlToProcess} (different domain than scan URL)`);
+                }
+            }
+            
+            // Choose appropriate timeout based on whether it's same domain
+            const timeoutDuration = isSameDomainUrl ? 
+                this.config.requestTimeout : 
+                Math.min(this.config.requestTimeout, 15000); // 15s max for external domains
+            
+            const fetchOptions: RequestInit = {
+                headers: shouldUseAuth ? this.authHeadersCache || {
+                    'User-Agent': 'LinkCheckerProBot/1.0',
+                    'Connection': 'keep-alive'
+                } : {
+                    'User-Agent': 'LinkCheckerProBot/1.0',
+                    'Connection': 'keep-alive'
+                },
+                redirect: 'follow',
+                signal: AbortSignal.timeout(timeoutDuration),
+                cache: 'no-store',
+                keepalive: true
+            };
+            
+            const response = await fetch(urlToProcess, fetchOptions);
+
+            const status = response.status;
+            const contentType = response.headers.get('content-type') || '';
+            const isBroken = status >= 400;
+
+            // Always mark links with status >= 400 as broken, no exceptions
+            currentResult.status = isBroken ? 'broken' : 'ok';
+            currentResult.statusCode = status;
+            currentResult.contentType = contentType;
+            currentResult.usedAuth = shouldUseAuth && !!this.config.auth;
+
+            // Parse HTML and queue new links if applicable
+            // Only process HTML for links from the same domain or if skipExternalDomains is false
+            const shouldProcessHtml = !isBroken && 
+                contentType.includes('text/html') && 
+                this.config.processHtml && 
+                (!this.config.skipExternalDomains || isSameDomainUrl);
+
+            if (shouldProcessHtml) {
+                // Check depth is within limits for recursive scanning
+                const maxDepth = this.config.depth;
+                if (maxDepth === 0 || depth < maxDepth) {
+                    const html = await response.text();
+                    this.processPageLinks(html, urlToProcess, depth);
+                }
+            }
+        } catch (error: any) {
+            console.error(`Error scanning ${urlToProcess}:`, error.name, error.message);
+            
+            // Properly handle timeout errors with a specific message
+            if (error.name === 'TimeoutError' || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
+                currentResult.status = 'broken';
+                currentResult.errorMessage = `Request timed out after ${this.config.requestTimeout/1000} seconds`;
+            } else {
+                currentResult.status = 'error';
+                currentResult.errorMessage = error.message || 'Unknown error occurred';
+            }
+        }
     }
-    
-    // Process the URL as usual
-    await super.processUrl(urlToProcess, depth);
-    
-    // Get the processed result
-    const result = this.results.get(urlToProcess);
-    
-    // Double-check the result status based on status code
-    if (result && result.statusCode !== undefined && result.statusCode >= 400) {
-      result.status = 'broken'; // Ensure consistent status
-    }
-    
-    // Call the onResult callback if result exists
-    if (result && this.callbacks.onResult) {
-      this.callbacks.onResult(result);
-    }
-  }
-  
-  // Add a method to estimate the number of URLs that will be processed
-  private estimateUrlCount(): number {
-    const depth = this.config.depth;
-    
-    // Use a simple formula based on depth
-    // This is just a rough estimate
-    if (depth === 0) {
-      return 1000; // Arbitrary number for unlimited depth
-    } else {
-      // Estimate with a branching factor of ~5 links per page
-      return Math.min(1000, Math.pow(5, depth + 1));
-    }
-  }
 }
- 

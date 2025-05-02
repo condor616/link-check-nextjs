@@ -1,0 +1,19 @@
+{
+  "url": "https://stg1.novartis.com",
+  "config": {
+    "depth": 3,
+    "scanSameLinkOnce": true,
+    "concurrency": 10,
+    "itemsPerPage": 10,
+    "regexExclusions": [],
+    "cssSelectors": [
+      ".language-selector-desktop"
+    ],
+    "requestTimeout": 50000,
+    "auth": {
+      "username": "nvscore",
+      "password": "csq2wU*h6=3"
+    },
+    "useAuthForAllDomains": true
+  }
+}
