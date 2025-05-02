@@ -13,6 +13,7 @@ export interface ScanConfig {
     regexExclusions?: string[]; // Array of regex patterns for URLs to exclude
     wildcardExclusions?: string[]; // Array of wildcard patterns for URLs to exclude (e.g., "example.com/about/*", "*/privacy/", "https://*.example.org")
     cssSelectors?: string[]; // Array of CSS selectors - links inside these elements will be excluded
+    cssSelectorsForceExclude?: boolean; // Whether links in CSS selectors should be excluded entirely, even if found elsewhere
     requestTimeout?: number; // Timeout in milliseconds for each request (default: 10000)
     auth?: {
         username: string;
@@ -55,7 +56,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains'>> & ScanConfig;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'cssSelectorsForceExclude' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -86,6 +87,7 @@ class Scanner {
             regexExclusions: config.regexExclusions ?? [], // Default to empty array
             wildcardExclusions: config.wildcardExclusions ?? [], // Default to empty array
             cssSelectors: config.cssSelectors ?? [], // Default to empty array
+            cssSelectorsForceExclude: config.cssSelectorsForceExclude ?? false, // Default to false
             requestTimeout: config.requestTimeout ?? 30000, // Default to 30 seconds (up from 10)
             useAuthForAllDomains: config.useAuthForAllDomains ?? false,
             processHtml: config.processHtml ?? true,
@@ -342,6 +344,12 @@ class Scanner {
                                         errorMessage: 'Excluded by CSS selector' 
                                     }
                                 );
+
+                                // If cssSelectorsForceExclude is enabled, update the shouldSkipUrls logic by
+                                // adding the URL to visitedLinks to prevent it from being scanned anywhere
+                                if (this.config.cssSelectorsForceExclude) {
+                                    this.visitedLinks.add(nextUrl);
+                                }
                             }
                         }
                     });

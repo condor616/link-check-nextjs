@@ -913,9 +913,14 @@ function ScanForm() {
   const router = useRouter();
   const [url, setUrl] = useState<string>("");
   const [depth, setDepth] = useState<number>(0);
+  const [scanSameLinkOnce, setScanSameLinkOnce] = useState<boolean>(true);
   const [concurrency, setConcurrency] = useState<number>(10);
-  const [requestTimeout, setRequestTimeout] = useState<number>(30);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [requestTimeout, setRequestTimeout] = useState<number>(30);
+  const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
+  const [cssSelectors, setCssSelectors] = useState<string[]>([""]);
+  const [cssSelectorsForceExclude, setCssSelectorsForceExclude] = useState<boolean>(false);
+  const [wildcardExclusions, setWildcardExclusions] = useState<string[]>([""]);
   const [isCreatingScan, setIsCreatingScan] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string | null>(null);
   
@@ -925,11 +930,6 @@ function ScanForm() {
   const [password, setPassword] = useState<string>("");
   const [authEnabled, setAuthEnabled] = useState<boolean>(false);
   const [useAuthForAllDomains, setUseAuthForAllDomains] = useState<boolean>(true);
-  
-  // Exclusion states
-  const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
-  const [wildcardExclusions, setWildcardExclusions] = useState<string[]>([""]);
-  const [cssSelectors, setCssSelectors] = useState<string[]>([""]);
   
   const handleScan = async () => {
     // Basic URL validation
@@ -949,12 +949,13 @@ function ScanForm() {
       
       const config: any = {
         depth: depth,
-        scanSameLinkOnce: true,
+        scanSameLinkOnce: scanSameLinkOnce,
         concurrency: concurrency,
         itemsPerPage: 10,
         regexExclusions: filteredRegexExclusions,
-        wildcardExclusions: filteredWildcardExclusions,
         cssSelectors: filteredCssSelectors,
+        cssSelectorsForceExclude: cssSelectorsForceExclude,
+        wildcardExclusions: filteredWildcardExclusions,
         requestTimeout: requestTimeout * 1000, // Convert to milliseconds
       };
       
@@ -1137,7 +1138,7 @@ function ScanForm() {
             
             {/* Advanced options */}
             {showAdvanced && (
-              <div className="border border-border rounded-lg p-4 space-y-4 mt-2">
+              <div className="border border-border rounded-lg p-4 space-y-6 mt-2">
                 <div className="space-y-2">
                   <Label htmlFor="requestTimeout">Request Timeout (seconds)</Label>
                   <Input
@@ -1151,6 +1152,8 @@ function ScanForm() {
                   <p className="text-xs text-muted-foreground">Time before giving up on a single URL (5-180 seconds)</p>
                 </div>
                 
+                <div className="border-t border-border pt-6"></div>
+                
                 {/* Wildcard Exclusion Rules */}
                 <div className="space-y-2">
                   <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
@@ -1160,36 +1163,53 @@ function ScanForm() {
                   
                   {wildcardExclusions.map((pattern, index) => (
                     <div key={`wildcard-${index}`} className="flex gap-2 items-center mb-2">
+                      <div className="w-1.5 h-10 bg-yellow-400 rounded-sm mr-1"></div>
                       <Input
                         value={pattern}
                         onChange={(e) => updateWildcardExclusion(index, e.target.value)}
                         placeholder="e.g. example.com/about/*"
+                        className="flex-1"
                       />
                       
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeWildcardExclusion(index)}
-                        disabled={wildcardExclusions.length <= 1}
-                        className="shrink-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {index === wildcardExclusions.length - 1 ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeWildcardExclusion(index)}
+                            disabled={wildcardExclusions.length <= 1}
+                            className="shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={addWildcardExclusion}
+                            className="shrink-0"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeWildcardExclusion(index)}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   ))}
-                  
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addWildcardExclusion}
-                    className="mt-1"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Pattern
-                  </Button>
                 </div>
+                
+                <div className="border-t border-border pt-6"></div>
                 
                 {/* Regex Exclusion Rules */}
                 <div className="space-y-2">
@@ -1200,36 +1220,53 @@ function ScanForm() {
                   
                   {regexExclusions.map((regex, index) => (
                     <div key={`regex-${index}`} className="flex gap-2 items-center mb-2">
+                      <div className="w-1.5 h-10 bg-blue-400 rounded-sm mr-1"></div>
                       <Input
                         value={regex}
                         onChange={(e) => updateRegexExclusion(index, e.target.value)}
                         placeholder="e.g. \/assets\/.*\.pdf$"
+                        className="flex-1"
                       />
                       
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeRegexExclusion(index)}
-                        disabled={regexExclusions.length <= 1}
-                        className="shrink-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {index === regexExclusions.length - 1 ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeRegexExclusion(index)}
+                            disabled={regexExclusions.length <= 1}
+                            className="shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={addRegexExclusion}
+                            className="shrink-0"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeRegexExclusion(index)}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   ))}
-                  
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addRegexExclusion}
-                    className="mt-1"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Pattern
-                  </Button>
                 </div>
+                
+                <div className="border-t border-border pt-6"></div>
                 
                 {/* CSS Selector Exclusions */}
                 <div className="space-y-2">
@@ -1240,35 +1277,61 @@ function ScanForm() {
                   
                   {cssSelectors.map((selector, index) => (
                     <div key={`selector-${index}`} className="flex gap-2 items-center mb-2">
+                      <div className="w-1.5 h-10 bg-green-400 rounded-sm mr-1"></div>
                       <Input
                         value={selector}
                         onChange={(e) => updateCssSelector(index, e.target.value)}
                         placeholder="e.g. .footer, #navigation, [data-skip]"
+                        className="flex-1"
                       />
                       
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeCssSelector(index)}
-                        disabled={cssSelectors.length <= 1}
-                        className="shrink-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {index === cssSelectors.length - 1 ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeCssSelector(index)}
+                            disabled={cssSelectors.length <= 1}
+                            className="shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={addCssSelector}
+                            className="shrink-0"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeCssSelector(index)}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   ))}
                   
-                  <Button
-                    type="button" 
-                    variant="outline"
-                    size="sm"
-                    onClick={addCssSelector}
-                    className="mt-1"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Selector
-                  </Button>
+                  <div className="flex items-center space-x-2 pt-4">
+                    <Checkbox
+                      id="cssSelectorsForceExclude"
+                      checked={cssSelectorsForceExclude}
+                      onCheckedChange={(checked) => setCssSelectorsForceExclude(!!checked)}
+                    />
+                    <Label htmlFor="cssSelectorsForceExclude" className="cursor-pointer text-sm font-normal">
+                      Force Exclude - Links in CSS selectors are excluded entirely, even if found elsewhere on the page
+                    </Label>
+                  </div>
                 </div>
               </div>
             )}
