@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScanConfig, ScanResult } from '@/lib/scanner';
-import { AlertCircle, CheckCircle2, Loader2, Save, Check, Plus, X, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Save, Check, Plus, X, Clock, Key } from 'lucide-react';
 import Link from 'next/link';
 
 // Define the structure for results returned by the API (matching API response)
@@ -25,6 +25,13 @@ export default function HomePage() {
   const [concurrency, setConcurrency] = useState<number>(10);
   const [requestTimeout, setRequestTimeout] = useState<number>(30); // Increase default from 10 to 30 seconds
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  
+  // New states for basic auth
+  const [showAuthDialog, setShowAuthDialog] = useState<boolean>(false);
+  const [username, setUsername] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [authEnabled, setAuthEnabled] = useState<boolean>(false);
+  const [useAuthForAllDomains, setUseAuthForAllDomains] = useState<boolean>(true);
   
   // New states for regex and CSS selector exclusions
   const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
@@ -68,6 +75,17 @@ export default function HomePage() {
       requestTimeout: requestTimeout * 1000, // Convert to milliseconds
     };
 
+    // Add auth credentials if enabled
+    const requestBody: any = { url, config };
+    if (authEnabled && username && password) {
+      requestBody.auth = {
+        username,
+        password
+      };
+      // Add useAuthForAllDomains flag if auth is enabled
+      requestBody.config.useAuthForAllDomains = useAuthForAllDomains;
+    }
+
     try {
       // Add timeout to the main API fetch request as well
       const controller = new AbortController();
@@ -78,7 +96,7 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url, config }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal
       });
       
@@ -243,6 +261,29 @@ export default function HomePage() {
     setCssSelectors(updated);
   };
 
+  // NEW: Function to toggle auth dialog
+  const toggleAuthDialog = () => {
+    setShowAuthDialog(!showAuthDialog);
+  };
+  
+  // NEW: Function to save auth credentials
+  const saveAuthCredentials = () => {
+    if (username.trim() || password.trim()) {
+      setAuthEnabled(true);
+    } else {
+      setAuthEnabled(false);
+    }
+    setShowAuthDialog(false);
+  };
+  
+  // NEW: Function to clear auth credentials
+  const clearAuthCredentials = () => {
+    setUsername("");
+    setPassword("");
+    setAuthEnabled(false);
+    setShowAuthDialog(false);
+  };
+
   return (
     <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
       <Card className="w-full max-w-3xl">
@@ -265,14 +306,32 @@ export default function HomePage() {
           {/* URL Input */}
           <div className="space-y-2">
             <Label htmlFor="url">Website URL</Label>
-            <Input
-              id="url"
-              type="url"
-              placeholder="https://example.com"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={isLoading}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="url"
+                type="url"
+                placeholder="https://example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button 
+                variant={authEnabled ? "secondary" : "outline"} 
+                size="icon" 
+                onClick={toggleAuthDialog}
+                title="HTTP Basic Authentication"
+                disabled={isLoading}
+              >
+                <Key className="h-4 w-4" />
+              </Button>
+            </div>
+            {authEnabled && (
+              <div className="text-xs text-muted-foreground mt-1 flex items-center">
+                <Check className="h-3 w-3 mr-1 text-green-500" />
+                Basic Auth credentials set
+              </div>
+            )}
           </div>
 
           {/* Basic Configuration */}
@@ -296,6 +355,62 @@ export default function HomePage() {
                 {showAdvanced ? 'Hide' : 'Show'} Advanced Options
              </Button>
           </div>
+
+          {/* Auth Dialog */}
+          {showAuthDialog && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-background rounded-lg p-6 w-full max-w-md">
+                <h3 className="text-lg font-medium mb-4">HTTP Basic Authentication</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Password"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="useAuthForAllDomains"
+                      checked={useAuthForAllDomains}
+                      onCheckedChange={(checked) => setUseAuthForAllDomains(!!checked)}
+                    />
+                    <Label htmlFor="useAuthForAllDomains" className="cursor-pointer text-sm font-normal">
+                      Use auth for all domains (may improve performance)
+                    </Label>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Performance tip: Using auth for all domains reduces connection setup time. 
+                    Only disable if external sites don't accept the credentials.
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-6">
+                  <Button variant="outline" onClick={clearAuthCredentials}>
+                    Clear
+                  </Button>
+                  <Button variant="ghost" onClick={() => setShowAuthDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveAuthCredentials}>
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Advanced Configuration (Conditionally Rendered) */}
           {showAdvanced && (

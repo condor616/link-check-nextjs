@@ -104,6 +104,9 @@ function ScannerContent() {
   // Parse the scan config
   const scanConfig = scanConfigString ? JSON.parse(decodeURIComponent(scanConfigString)) : null;
   
+  // Extract auth credentials if present in the config
+  const authCredentials = scanConfig?.auth;
+  
   // Calculate progress percentage
   const progressPercentage = scanStatus.progress.total > 0 
     ? Math.min(100, Math.round((scanStatus.progress.processed / scanStatus.progress.total) * 100)) 
@@ -139,15 +142,30 @@ function ScannerContent() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 minute timeout
         
+        // Prepare request body
+        const requestBody: any = {
+          url: scanUrl,
+          config: scanConfig
+        };
+        
+        // Add auth credentials if present
+        if (authCredentials?.username && authCredentials?.password) {
+          requestBody.auth = {
+            username: authCredentials.username,
+            password: authCredentials.password
+          };
+          // Pass the useAuthForAllDomains flag if present
+          if ('useAuthForAllDomains' in scanConfig) {
+            requestBody.config.useAuthForAllDomains = scanConfig.useAuthForAllDomains;
+          }
+        }
+        
         const response = await fetch('/api/scan', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            url: scanUrl,
-            config: scanConfig
-          }),
+          body: JSON.stringify(requestBody),
           signal: controller.signal
         });
         
@@ -205,7 +223,7 @@ function ScannerContent() {
     };
     
     startScan();
-  }, [scanUrl, scanConfig, scanConfigString, router]);
+  }, [scanUrl, scanConfig, scanConfigString, router, authCredentials]);
   
   // Save scan results
   const handleSaveScan = async () => {
@@ -229,6 +247,17 @@ function ScannerContent() {
         },
         results,
       };
+      
+      // Add auth credentials if present
+      if (authCredentials?.username && authCredentials?.password) {
+        savePayload.config = {
+          ...savePayload.config,
+          auth: {
+            username: authCredentials.username,
+            password: authCredentials.password
+          }
+        };
+      }
       
       // Add timeout for the save request
       const controller = new AbortController();

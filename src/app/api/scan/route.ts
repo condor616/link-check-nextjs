@@ -5,6 +5,10 @@ import { scanWebsite, ScanConfig, ScanResult } from '@/lib/scanner';
 interface ScanApiRequest {
   url: string;
   config?: ScanConfig; // Use the imported ScanConfig type
+  auth?: {
+    username: string;
+    password: string;
+  };
 }
 
 // Helper function to serialize results for JSON
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    const { url, config } = body;
+    const { url, config, auth } = body;
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'URL is required and must be a string' }, { status: 400 });
@@ -48,13 +52,25 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`API received scan request for: ${url}`, config);
+    
+    // Log auth presence without showing credentials
+    if (auth) {
+      console.log('Basic auth credentials provided');
+    }
 
     console.log("Initiating scan...");
     const startTime = Date.now();
 
     try {
       // Use scanWebsite instead of startScan to get the array of results directly
-      const results = await scanWebsite(url, config);
+      // Pass auth credentials if provided
+      const results = await scanWebsite(url, {
+        ...config,
+        auth: auth ? {
+          username: auth.username,
+          password: auth.password
+        } : undefined
+      });
 
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
