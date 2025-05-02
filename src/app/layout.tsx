@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import Link from 'next/link';
 import "./globals.css";
+import { 
+  AlertCircle, 
+  History, 
+  Settings, 
+  LogOut 
+} from 'lucide-react';
+import { PageTransition } from "@/components/PageTransition";
+import { TransitionLink } from "@/components/TransitionLink";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,20 +26,61 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${geistSans.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} antialiased bg-gradient-to-br from-purple-300 to-purple-500 min-h-screen`}
       >
-        <header className="border-b mb-4">
-          <nav className="container mx-auto flex justify-between items-center p-4">
-            <Link href="/" className="text-xl font-bold">Link Checker Pro</Link>
-            <div className="space-x-4">
-              <Link href="/" className="hover:underline">New Scan</Link>
-              <Link href="/history" className="hover:underline">History</Link>
+        <div className="flex h-screen">
+          {/* Sidebar */}
+          <div className="w-64 bg-purple-900 text-white p-4 flex flex-col">
+            <div className="mb-8 mt-2">
+              <TransitionLink href="/" className="text-2xl font-bold text-white hover:text-purple-200 transition-colors">Link Checker Pro</TransitionLink>
             </div>
-          </nav>
-        </header>
-        {children}
+            
+            <nav className="space-y-1 flex-1">
+              <TransitionLink 
+                href="/scan" 
+                className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
+                activeClassName="bg-purple-800"
+              >
+                <AlertCircle size={20} />
+                <span>New Scan</span>
+              </TransitionLink>
+              <TransitionLink 
+                href="/history" 
+                className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
+                activeClassName="bg-purple-800"
+              >
+                <History size={20} />
+                <span>History</span>
+              </TransitionLink>
+              <TransitionLink 
+                href="/settings" 
+                className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
+                activeClassName="bg-purple-800"
+              >
+                <Settings size={20} />
+                <span>Settings</span>
+              </TransitionLink>
+            </nav>
+            
+            <div className="mt-auto space-y-1 pt-4 border-t border-purple-800">
+              <button className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors">
+                <LogOut size={20} />
+                <span>Log out</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* Main content */}
+          <div className="flex-1 overflow-auto p-6">
+            <div className="bg-white rounded-xl shadow-lg p-6 min-h-full">
+              <PageTransition>
+                {children}
+              </PageTransition>
+            </div>
+          </div>
+        </div>
       </body>
     </html>
   );
