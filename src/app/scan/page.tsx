@@ -1304,6 +1304,13 @@ function ScanForm() {
   const [authEnabled, setAuthEnabled] = useState<boolean>(false);
   const [useAuthForAllDomains, setUseAuthForAllDomains] = useState<boolean>(true);
   
+  // Save configuration states
+  const [showSaveDialog, setShowSaveDialog] = useState<boolean>(false);
+  const [configName, setConfigName] = useState<string>("");
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  
   const handleScan = async () => {
     // Basic URL validation
     if (!url || !url.startsWith('http')) {
@@ -1375,8 +1382,132 @@ function ScanForm() {
     }
   };
   
+  // Save scan configuration
+  const saveConfiguration = async () => {
+    // Validate configuration name
+    if (!configName.trim()) {
+      setSaveError('Please provide a name for this scan');
+      return;
+    }
+    
+    // Validate URL
+    if (!url) {
+      setSaveError('Please provide a URL');
+      return;
+    }
+    
+    try {
+      // Try to parse URL to ensure it's valid
+      const urlObj = new URL(url);
+      
+      // Must be http or https
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        setSaveError('URL must use HTTP or HTTPS protocol');
+        return;
+      }
+    } catch (e) {
+      setSaveError('Please provide a valid URL (e.g., https://example.com)');
+      return;
+    }
+    
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+    
+    try {
+      // Filter out empty entries
+      const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
+      const filteredWildcardExclusions = wildcardExclusions.filter(pattern => pattern.trim() !== "");
+      const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
+      
+      // Create config object with proper typing
+      const config: {
+        depth: number;
+        scanSameLinkOnce: boolean;
+        concurrency: number;
+        itemsPerPage: number;
+        regexExclusions: string[];
+        cssSelectors: string[];
+        cssSelectorsForceExclude: boolean;
+        wildcardExclusions: string[];
+        requestTimeout: number;
+        auth?: { username: string; password: string };
+        useAuthForAllDomains?: boolean;
+      } = {
+        depth: depth,
+        scanSameLinkOnce: scanSameLinkOnce,
+        concurrency: concurrency,
+        itemsPerPage: 10,
+        regexExclusions: filteredRegexExclusions,
+        cssSelectors: filteredCssSelectors,
+        cssSelectorsForceExclude: cssSelectorsForceExclude,
+        wildcardExclusions: filteredWildcardExclusions,
+        requestTimeout: requestTimeout * 1000, // Convert to milliseconds
+      };
+      
+      // Always include auth credentials if they exist
+      if (authEnabled && username && password) {
+        config.auth = {
+          username,
+          password
+        };
+        config.useAuthForAllDomains = useAuthForAllDomains;
+      }
+      
+      // Send to API
+      const response = await fetch('/api/saved-configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: configName,
+          url: url,
+          config: config
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save scan configuration');
+      }
+      
+      setSaveSuccess(true);
+      setConfigName('');
+      
+      // Close dialog after a short delay
+      setTimeout(() => {
+        setShowSaveDialog(false);
+        setSaveSuccess(false);
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving scan configuration:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save scan configuration');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
   const toggleAuthDialog = () => {
     setShowAuthDialog(!showAuthDialog);
+  };
+  
+  // Toggle save configuration dialog
+  const toggleSaveDialog = () => {
+    setShowSaveDialog(!showSaveDialog);
+    setSaveError(null);
+    setSaveSuccess(false);
+    
+    // Generate a default name based on URL domain
+    if (!configName && url) {
+      try {
+        const urlObj = new URL(url);
+        setConfigName(`Scan for ${urlObj.hostname}`);
+      } catch (e) {
+        setConfigName('New Scan');
+      }
+    }
   };
   
   const saveAuthCredentials = () => {
@@ -1432,7 +1563,7 @@ function ScanForm() {
     newExclusions[index] = value;
     setWildcardExclusions(newExclusions);
   };
-  
+
   return (
     <div className="space-y-6 mx-auto container p-4 max-w-none">
       <h1 className="text-2xl font-bold">New Scan</h1>
@@ -1723,12 +1854,21 @@ function ScanForm() {
             )}
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex justify-between">
+          <Button
+            variant="outline"
+            type="button"
+            onClick={toggleSaveDialog}
+            disabled={!url}
+          >
+            <Save className="mr-2 h-4 w-4" /> Save Scan
+          </Button>
+          
           <Button
             variant="default"
             size="lg"
             onClick={handleScan}
-            className="w-full bg-purple-600 hover:bg-purple-700"
+            className="bg-purple-600 hover:bg-purple-700"
             disabled={isCreatingScan}
           >
             {isCreatingScan ? (
@@ -1757,56 +1897,126 @@ function ScanForm() {
       </Card>
       
       {/* Auth Dialog */}
-      {showAuthDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium mb-4">HTTP Basic Authentication</h3>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Username"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                />
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox
-                  id="useAuthForAllDomains"
-                  checked={useAuthForAllDomains}
-                  onCheckedChange={(checked) => setUseAuthForAllDomains(!!checked)}
-                />
-                <Label htmlFor="useAuthForAllDomains" className="cursor-pointer text-sm font-normal">
-                  Use auth for all domains
-                </Label>
-              </div>
+      <AlertDialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>HTTP Basic Authentication</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
+              />
             </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={clearAuthCredentials}>
-                Clear
-              </Button>
-              <Button variant="ghost" onClick={() => setShowAuthDialog(false)}>
-                Cancel
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+              />
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="useAuthForAllDomains"
+                checked={useAuthForAllDomains}
+                onCheckedChange={(checked) => setUseAuthForAllDomains(!!checked)}
+              />
+              <Label htmlFor="useAuthForAllDomains" className="cursor-pointer text-sm font-normal">
+                Use auth for all domains
+              </Label>
+            </div>
+          </div>
+          <AlertDialogFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={clearAuthCredentials}
+              className="mr-auto"
+            >
+              Clear
+            </Button>
+            <div>
+              <AlertDialogCancel className="mr-2">Cancel</AlertDialogCancel>
               <Button variant="default" onClick={saveAuthCredentials}>
                 Save
               </Button>
             </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Save Configuration Dialog */}
+      <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Scan</AlertDialogTitle>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="configName">Scan Name</Label>
+              <Input
+                id="configName"
+                type="text"
+                placeholder="My website scan"
+                value={configName}
+                onChange={(e) => setConfigName(e.target.value)}
+              />
+            </div>
+            
+            <div className="text-sm text-muted-foreground">
+              This will save your current scan settings including URL, exclusions, and authentication for future use.
+            </div>
+            
+            {authEnabled && (
+              <div className="text-sm bg-green-50 p-3 rounded border border-green-200 text-green-800">
+                <p className="font-medium mb-1">Authentication Included:</p>
+                <p className="text-xs">Username: {username}</p>
+                <p className="text-xs">Password saved</p>
+                <p className="text-xs mt-1">{useAuthForAllDomains ? "Applied to all domains" : "Applied to main domain only"}</p>
+              </div>
+            )}
+            
+            {saveError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{saveError}</AlertDescription>
+              </Alert>
+            )}
+            
+            {saveSuccess && (
+              <Alert className="bg-green-50 text-green-800 border-green-200">
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>Scan saved successfully!</AlertDescription>
+              </Alert>
+            )}
           </div>
-        </div>
-      )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+            <Button 
+              onClick={saveConfiguration} 
+              disabled={isSaving || !configName.trim() || !url}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Scan'
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 
