@@ -524,8 +524,12 @@ class Scanner {
 
         // 4. Check for subdomains that should be excluded
         if (this.config.excludeSubdomains) {
+            // Extract the root domain from the base URL
             const baseHostname = new URL(this.startUrl).hostname;
-            if (isSubdomain(urlObj.hostname, baseHostname)) {
+            const rootDomain = extractRootDomain(baseHostname);
+            
+            // Check if the URL is a subdomain of the root domain, but not the same as the base hostname
+            if (urlObj.hostname !== baseHostname && isSubdomainOfRoot(urlObj.hostname, rootDomain)) {
                 result.status = 'skipped';
                 result.errorMessage = `Skipped subdomain: ${urlObj.hostname}`;
                 return true;
@@ -742,6 +746,26 @@ class WebsiteScanner extends Scanner {
     }
 }
 
+// Extract the root domain from a hostname (e.g., "www.example.com" -> "example.com")
+function extractRootDomain(hostname: string): string {
+    const parts = hostname.split('.');
+    // If we have a standard domain like example.com
+    if (parts.length === 2) return hostname;
+    // For domains like www.example.com, or sub.example.com
+    // Return just the main domain (example.com)
+    return parts.slice(-2).join('.');
+}
+
+// Check if hostname is a subdomain of the root domain
+function isSubdomainOfRoot(hostname: string, rootDomain: string): boolean {
+    // Not a subdomain if it's the same as the root
+    if (hostname === rootDomain) return false;
+    
+    // Check if the hostname ends with the root domain
+    return hostname.endsWith('.' + rootDomain);
+}
+
+// Original isSubdomain function is no longer used for subdomain checking
 function isSubdomain(subdomain: string, parentDomain: string): boolean {
     // Skip identical domains
     if (subdomain === parentDomain) {
