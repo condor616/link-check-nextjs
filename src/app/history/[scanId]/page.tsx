@@ -188,6 +188,15 @@ function ScanDetailsContent() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
+            
+            {scan && (
+              <Link href={`/scan?id=${scanId}`} className="ml-2">
+                <Button variant="outline" size="sm" className="text-purple-600 border-purple-200 hover:bg-purple-50">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Scan again
+                </Button>
+              </Link>
+            )}
           </div>
           
           <CardTitle className="text-2xl flex items-center gap-2">

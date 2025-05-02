@@ -289,6 +289,13 @@ export default function HistoryPage() {
                           </Button>
                         </Link>
                         
+                        <Link href={`/scan?id=${scan.id}`}>
+                          <Button variant="outline" size="sm" className="text-purple-600 border-purple-200 hover:bg-purple-50">
+                            <AlertCircle className="h-4 w-4 mr-1" />
+                            Scan again
+                          </Button>
+                        </Link>
+                        
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button 

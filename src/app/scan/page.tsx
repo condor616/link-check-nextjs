@@ -105,11 +105,20 @@ function ScannerLoading() {
 }
 
 // The main scanner component that uses useSearchParams
-function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanConfigString: string | null }) {
+function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: string, scanConfigString?: string | null, scanId?: string }) {
   const router = useRouter();
   
   // Use ref to track if we've already initiated a scan for this URL/config combination
   const hasInitiatedScan = useRef(false);
+  
+  // Add states for loading scan parameters from ID
+  const [paramUrl, setParamUrl] = useState<string | undefined>(scanUrl);
+  const [paramConfigString, setParamConfigString] = useState<string | null>(scanConfigString || null);
+  const [isLoadingParams, setIsLoadingParams] = useState<boolean>(!!scanId);
+  const [loadParamsError, setLoadParamsError] = useState<string | null>(null);
+  
+  // Add confirmation state to prevent automatic scan on page refresh
+  const [scanConfirmed, setScanConfirmed] = useState<boolean>(false);
   
   const [scanStatus, setScanStatus] = useState<ScanStatus>({
     status: 'initializing',
@@ -144,14 +153,14 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
   
   // Parse the scan config - use useMemo to avoid creating new objects on every render
   const scanConfig = useMemo(() => {
-    if (!scanConfigString) return null;
+    if (!paramConfigString) return null;
     try {
-      return JSON.parse(decodeURIComponent(scanConfigString));
+      return JSON.parse(decodeURIComponent(paramConfigString));
     } catch (e) {
       console.error('Failed to parse scan config:', e);
       return null;
     }
-  }, [scanConfigString]);
+  }, [paramConfigString]);
   
   // Extract auth credentials if present in the config - use useMemo to prevent recreation on every render
   const authCredentials = useMemo(() => {
@@ -170,10 +179,45 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
   
-  // Start scan when component mounts
+  // Add useEffect to load parameters from scanId
+  useEffect(() => {
+    if (!scanId) return;
+    
+    const fetchScanParams = async () => {
+      setIsLoadingParams(true);
+      setLoadParamsError(null);
+      
+      try {
+        const response = await fetch(`/api/scan-params/${scanId}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch scan parameters');
+        }
+        
+        // Set the parameters for the scan
+        setParamUrl(data.url);
+        setParamConfigString(JSON.stringify(data.config));
+        setIsLoadingParams(false);
+      } catch (err) {
+        console.error('Error fetching scan parameters:', err);
+        setLoadParamsError(err instanceof Error ? err.message : 'Failed to load scan parameters');
+        setIsLoadingParams(false);
+      }
+    };
+    
+    fetchScanParams();
+  }, [scanId]);
+  
+  // Modify the useEffect that starts the scan to check for both loading and confirmation
   useEffect(() => {    
     // Exit early if already scanning or if we've already initiated a scan for this URL
     if (isScanning || hasInitiatedScan.current) {
+      return;
+    }
+    
+    // Don't start scan until confirmed and params are loaded
+    if (!scanConfirmed || isLoadingParams || !paramUrl) {
       return;
     }
     
@@ -198,7 +242,7 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
         
         // Prepare request body
         const requestBody: any = {
-          url: scanUrl,
+          url: paramUrl,
           config: scanConfig
         };
         
@@ -280,7 +324,7 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
     };
     
     startScan();
-  }, [scanUrl, scanConfig, authCredentials]);
+  }, [paramUrl, scanConfig, authCredentials, scanConfirmed, isLoadingParams]);
   
   // Add a separate useEffect for auto-saving that triggers when scan status changes to 'completed'
   useEffect(() => {
@@ -315,7 +359,7 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
   useEffect(() => {
     hasInitiatedScan.current = false;
     hasAttemptedAutoSave.current = false;
-  }, [scanUrl, scanConfigString]);
+  }, [paramUrl, paramConfigString]);
   
   // Modify the save scan function to be more reliable
   const handleSaveScan = async () => {
@@ -336,10 +380,10 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
     setSaveError(null);
     
     try {
-      console.log('Preparing save payload for URL:', scanUrl);
+      console.log('Preparing save payload for URL:', paramUrl);
       // Prepare the payload for saving
       const savePayload = {
-        scanUrl,
+        scanUrl: paramUrl,
         scanDate: new Date().toISOString(),
         durationSeconds: scanStatus.elapsedSeconds,
         config: scanConfig || {
@@ -463,6 +507,129 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
     }
   };
   
+  // Add a function to handle confirmation
+  const handleConfirmScan = () => {
+    setScanConfirmed(true);
+  };
+  
+  // Modify the confirmation dialog to include scanId info and handle loading states
+  if (isLoadingParams) {
+    return (
+      <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="w-full max-w-6xl"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">Loading Scan Parameters...</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 animate-spin text-primary" />
+                <span className="ml-2">Loading scan parameters...</span>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </main>
+    );
+  }
+  
+  if (loadParamsError) {
+    return (
+      <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="w-full max-w-6xl"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">Error Loading Scan</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{loadParamsError}</AlertDescription>
+              </Alert>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={() => router.push('/')}>
+                Return to Home
+              </Button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      </main>
+    );
+  }
+  
+  if (!scanConfirmed) {
+    return (
+      <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="w-full max-w-6xl"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">Confirm Scan</CardTitle>
+              <CardDescription>You're about to scan the following URL</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert variant="default" className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertTitle className="text-yellow-600">Scan Confirmation Required</AlertTitle>
+                <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+                  For security reasons, please confirm that you want to scan this URL.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="p-4 border rounded-md bg-muted/50">
+                <p className="font-medium break-all">{paramUrl}</p>
+                {paramConfigString && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    <p>With configuration:</p>
+                    <pre className="p-2 bg-muted rounded-md mt-1 overflow-auto max-h-40 text-xs">
+                      {JSON.stringify(scanConfig, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {scanId && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    <p>Scan ID: {scanId}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/')}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" /> Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmScan} 
+                className="gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Confirm Scan
+              </Button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      </main>
+    );
+  }
+  
   return (
     <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
       <Card className="w-full max-w-6xl">
@@ -478,9 +645,9 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
           
           <CardTitle className="text-2xl flex items-center gap-2">
             Scan Progress
-            {scanUrl && (
+            {paramUrl && (
               <span className="text-sm font-normal text-muted-foreground">
-                ({scanUrl.replace(/^https?:\/\//, '')})
+                ({paramUrl.replace(/^https?:\/\//, '')})
               </span>
             )}
           </CardTitle>
@@ -649,7 +816,7 @@ function ScannerContent({ scanUrl, scanConfigString }: { scanUrl: string, scanCo
               
               <ScanResults 
                 results={results} 
-                scanUrl={scanUrl || ''} 
+                scanUrl={paramUrl || ''} 
                 itemsPerPage={10}
               />
             </div>
@@ -748,15 +915,29 @@ export default function ScanPage() {
 // Intermediate component to handle the decision between scan form and results
 function ScanPageContent() {
   const searchParams = useSearchParams();
-  const scanUrl = searchParams.get('url');
+  const router = useRouter();
   
-  // If no URL parameter is provided, show the scan form
-  if (!scanUrl) {
+  const scanUrl = searchParams.get('url');
+  const scanId = searchParams.get('id');
+  const scanConfigString = searchParams.get('config');
+  
+  // If no URL parameter or scanId provided, show the scan form
+  if (!scanUrl && !scanId) {
     return <ScanForm />;
   }
   
-  // If URL is provided, show the scanner content
-  return <ScannerContent scanUrl={scanUrl} scanConfigString={searchParams.get('config')} />;
+  // If we have a scanId, pass it directly to ScannerContent
+  if (scanId) {
+    return <ScannerContent scanId={scanId} />;
+  }
+  
+  // If we have scanUrl and config, pass them directly
+  if (scanUrl) {
+    return <ScannerContent scanUrl={scanUrl} scanConfigString={scanConfigString} />;
+  }
+  
+  // Fallback - shouldn't reach here in normal flow
+  return <ScanForm />;
 }
 
 // New ScanForm component for initiating a scan
@@ -767,6 +948,8 @@ function ScanForm() {
   const [concurrency, setConcurrency] = useState<number>(10);
   const [requestTimeout, setRequestTimeout] = useState<number>(30);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [isCreatingScan, setIsCreatingScan] = useState<boolean>(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   
   // Auth states
   const [showAuthDialog, setShowAuthDialog] = useState<boolean>(false);
@@ -779,41 +962,72 @@ function ScanForm() {
   const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
   const [cssSelectors, setCssSelectors] = useState<string[]>([""]);
   
-  const handleScan = () => {
+  const handleScan = async () => {
     // Basic URL validation
     if (!url || !url.startsWith('http')) {
       alert("Please enter a valid URL (starting with http or https).");
       return;
     }
     
-    // Filter out empty entries
-    const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
-    const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
+    setIsCreatingScan(true);
+    setScanError(null);
     
-    const config: any = {
-      depth: depth,
-      scanSameLinkOnce: true,
-      concurrency: concurrency,
-      itemsPerPage: 10,
-      regexExclusions: filteredRegexExclusions,
-      cssSelectors: filteredCssSelectors,
-      requestTimeout: requestTimeout * 1000, // Convert to milliseconds
-    };
-    
-    // Add auth credentials if enabled
-    if (authEnabled && username && password) {
-      config.auth = {
-        username,
-        password
+    try {
+      // Filter out empty entries
+      const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
+      const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
+      
+      const config: any = {
+        depth: depth,
+        scanSameLinkOnce: true,
+        concurrency: concurrency,
+        itemsPerPage: 10,
+        regexExclusions: filteredRegexExclusions,
+        cssSelectors: filteredCssSelectors,
+        requestTimeout: requestTimeout * 1000, // Convert to milliseconds
       };
-      config.useAuthForAllDomains = useAuthForAllDomains;
+      
+      // Add auth credentials if enabled
+      if (authEnabled && username && password) {
+        config.auth = {
+          username,
+          password
+        };
+        config.useAuthForAllDomains = useAuthForAllDomains;
+      }
+      
+      // Create a new temporary scan ID for this scan
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(2, 10);
+      const newScanId = `temp_${timestamp}_${randomId}`;
+      
+      // Save the config to a new endpoint that will create a mapping
+      const response = await fetch('/api/save-scan-params', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: newScanId,
+          url: url,
+          config: config
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create scan configuration');
+      }
+      
+      const result = await response.json();
+      
+      // Navigate to the scan page with only the ID parameter
+      router.push(`/scan?id=${result.id || newScanId}`);
+    } catch (error) {
+      console.error('Error creating scan:', error);
+      setScanError(error instanceof Error ? error.message : 'An error occurred while creating the scan');
+      setIsCreatingScan(false);
     }
-    
-    // Encode the config object for the URL
-    const configParam = encodeURIComponent(JSON.stringify(config));
-    
-    // Navigate to the scan page with parameters
-    router.push(`/scan?url=${encodeURIComponent(url)}&config=${configParam}`);
   };
   
   const toggleAuthDialog = () => {
@@ -1041,11 +1255,31 @@ function ScanForm() {
             size="lg"
             onClick={handleScan}
             className="w-full bg-purple-600 hover:bg-purple-700"
+            disabled={isCreatingScan}
           >
-            <AlertCircle className="mr-2" />
-            Start Scan
+            {isCreatingScan ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating Scan...
+              </>
+            ) : (
+              <>
+                <AlertCircle className="mr-2" />
+                Start Scan
+              </>
+            )}
           </Button>
         </CardFooter>
+        
+        {scanError && (
+          <div className="mt-4 p-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{scanError}</AlertDescription>
+            </Alert>
+          </div>
+        )}
       </Card>
       
       {/* Auth Dialog */}
