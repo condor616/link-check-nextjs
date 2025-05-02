@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScanResult } from '@/lib/scanner';
 import {
   Tabs,
@@ -48,7 +48,12 @@ import {
   ChevronsLeft, 
   ChevronsRight,
   ListFilter,
-  Clock
+  Clock,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle,
+  Lock as LockIcon,
 } from 'lucide-react';
 import * as cheerio from 'cheerio';
 import { PopoverAnchor } from '@radix-ui/react-popover';
@@ -61,32 +66,44 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import ExportScanButton from './ExportScanButton';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 // Update the ScanResult interface for serialized HTML contexts
 interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
   foundOn: string[]; // Instead of Set<string>
   htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
+  usedAuth?: boolean; // Include the usedAuth flag from ScanResult
 }
 
 interface ScanResultsProps {
   results: SerializedScanResult[];
   scanUrl: string;
-  itemsPerPage?: number; // Add itemsPerPage prop
+  itemsPerPage?: number;
   scanId?: string;
+  scanConfig?: any; // Add scanConfig to receive the original scan configuration
 }
 
-export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId }: ScanResultsProps) {
+export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId, scanConfig }: ScanResultsProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [currentItemsPerPage, setCurrentItemsPerPage] = useState<number>(itemsPerPage);
+  const [recheckingUrls, setRecheckingUrls] = useState<Set<string>>(new Set());
+  const [recheckErrors, setRecheckErrors] = useState<Map<string, string>>(new Map());
+  const [recheckSuccess, setRecheckSuccess] = useState<Map<string, string>>(new Map());
+  const [localResults, setLocalResults] = useState<SerializedScanResult[]>(results);
   
+  // Update local results when props change
+  useEffect(() => {
+    setLocalResults(results);
+  }, [results]);
+
   // Filter results by status
-  const brokenLinks = results.filter(r => r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400));
-  const errorLinks = results.filter(r => r.status === 'error');
-  const skippedLinks = results.filter(r => r.status === 'skipped');
-  const externalLinks = results.filter(r => r.status === 'external');
-  const okLinks = results.filter(r => {
+  const brokenLinks = localResults.filter(r => r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400));
+  const errorLinks = localResults.filter(r => r.status === 'error');
+  const skippedLinks = localResults.filter(r => r.status === 'skipped');
+  const externalLinks = localResults.filter(r => r.status === 'external');
+  const okLinks = localResults.filter(r => {
     // Only include links that are:
     // 1. Marked as "ok" status
     // 2. Have no status code, or a status code < 400
@@ -321,7 +338,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   };
   
   // Status badge component
-  const StatusBadge = ({ status, code }: { status: string, code?: number }) => {
+  const StatusBadge = ({ status, code, usedAuth }: { status: string, code?: number, usedAuth?: boolean }) => {
     let variant: 'default' | 'destructive' | 'secondary' | 'outline' = 'default';
     let icon = null;
     let className = "flex items-center";
@@ -356,10 +373,27 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     }
     
     return (
-      <Badge variant={variant} className={className}>
-        {icon}
-        {displayStatus}{code ? ` (${code})` : ''}
-      </Badge>
+      <div className="flex items-center gap-1">
+        <Badge variant={variant} className={className}>
+          {icon}
+          {displayStatus}{code ? ` (${code})` : ''}
+        </Badge>
+        {usedAuth && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1">
+                  <LockIcon className="h-2.5 w-2.5 mr-0.5" />
+                  Auth
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">HTTP Basic Auth was used</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
     );
   };
   
@@ -451,6 +485,92 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     );
   };
   
+  // Handle re-check for a URL
+  const handleRecheck = async (url: string) => {
+    if (recheckingUrls.has(url) || !scanId) return;
+
+    // Add URL to rechecking set
+    setRecheckingUrls(prev => new Set([...prev, url]));
+    // Clear any previous error and success messages for this URL
+    setRecheckErrors(prev => {
+      const newErrors = new Map(prev);
+      newErrors.delete(url);
+      return newErrors;
+    });
+    setRecheckSuccess(prev => {
+      const newSuccess = new Map(prev);
+      newSuccess.delete(url);
+      return newSuccess;
+    });
+
+    try {
+      // Extract auth credentials from the original scan config if they exist
+      const auth = scanConfig?.auth ? {
+        username: scanConfig.auth.username,
+        password: scanConfig.auth.password
+      } : undefined;
+
+      const response = await fetch('/api/recheck', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url,
+          scanId,
+          auth, // Include auth credentials if they exist
+          config: {
+            requestTimeout: scanConfig?.requestTimeout
+          }
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to re-check URL');
+      }
+
+      // Update the local results with the new result
+      setLocalResults(prev => {
+        const newResults = [...prev];
+        const index = newResults.findIndex(r => r.url === url);
+        if (index !== -1 && data.result) {
+          newResults[index] = {
+            ...data.result,
+            foundOn: newResults[index].foundOn, // Preserve foundOn from original scan
+            htmlContexts: newResults[index].htmlContexts, // Preserve htmlContexts from original scan
+            usedAuth: data.result.usedAuth // Use the usedAuth value from the re-check result
+          };
+        }
+        return newResults;
+      });
+
+      // Set success message
+      const statusMessage = data.result.status === 'ok' 
+        ? `Link is now working!${data.authMessage ? ` (${data.authMessage})` : ''}` 
+        : data.result.status === 'broken' 
+          ? `Link is broken (Status code: ${data.result.statusCode || 'unknown'})${
+              data.authMessage ? ` - ${data.authMessage}` : ''
+            }` 
+          : `Link check result: ${data.result.status}${
+              data.authMessage ? ` - ${data.authMessage}` : ''
+            }`;
+      
+      setRecheckSuccess(prev => new Map([...prev, [url, statusMessage]]));
+
+    } catch (error) {
+      console.error('Error re-checking URL:', error);
+      setRecheckErrors(prev => new Map([...prev, [url, error instanceof Error ? error.message : 'Failed to re-check URL']]));
+    } finally {
+      setRecheckingUrls(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(url);
+        return newSet;
+      });
+    }
+  };
+  
   // Render a list of links with collapsible items
   const renderLinksList = (links: SerializedScanResult[], isProblematic = false) => {
     if (links.length === 0) {
@@ -493,7 +613,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2 truncate max-w-[80%]">
-                  <StatusBadge status={link.status} code={link.statusCode} />
+                  <StatusBadge status={link.status} code={link.statusCode} usedAuth={link.usedAuth} />
                   <span className="truncate font-medium">{link.url.replace(/^https?:\/\//, '')}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -503,6 +623,31 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                     {link.status === 'skipped' && 'Skipped link'}
                   </span>
                   <div className="flex">
+                    {scanId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`h-8 px-3 shrink-0 ${
+                          recheckingUrls.has(link.url) 
+                            ? 'bg-purple-100 text-purple-700' 
+                            : ''
+                        }`}
+                        onClick={() => handleRecheck(link.url)}
+                        disabled={recheckingUrls.has(link.url)}
+                      >
+                        {recheckingUrls.has(link.url) ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Checking...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Re-check
+                          </>
+                        )}
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -534,6 +679,52 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                   </div>
                 </div>
               </div>
+              {recheckErrors.has(link.url) && (
+                <div className="mt-2">
+                  <Alert variant="destructive" className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Re-check failed</AlertTitle>
+                    <AlertDescription>{recheckErrors.get(link.url)}</AlertDescription>
+                  </Alert>
+                </div>
+              )}
+              {recheckSuccess.has(link.url) && (
+                <div className="mt-2">
+                  <Alert variant="default" className="py-2 bg-green-50 text-green-800 border-green-200">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Re-check completed</AlertTitle>
+                    <AlertDescription>
+                      {/* Split the message into main message and auth info */}
+                      {(() => {
+                        const message = recheckSuccess.get(link.url) || '';
+                        // Check if there's an auth message in parentheses or after a dash
+                        const authStart = message.indexOf(' (HTTP Basic Auth') !== -1 
+                          ? message.indexOf(' (HTTP Basic Auth') 
+                          : message.indexOf(' - HTTP Basic Auth');
+                        
+                        if (authStart !== -1) {
+                          const mainMessage = message.substring(0, authStart);
+                          const authMessage = message.substring(authStart);
+                          
+                          return (
+                            <>
+                              {mainMessage}
+                              <span className="block mt-1 text-blue-700 text-xs">
+                                <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
+                                {authMessage.startsWith(' - ') ? authMessage.substring(3) : 
+                                 authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) : 
+                                 authMessage}
+                              </span>
+                            </>
+                          );
+                        }
+                        
+                        return message;
+                      })()}
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
             </div>
           ))}
           
@@ -576,14 +767,50 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                             {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
                           </span>
                         )}
-                        <code className="text-destructive font-medium break-all">
-                          {urlDomain}{link.url.replace(/^https?:\/\/[^\/]+/, '')}
-                        </code>
+                        <div className="flex flex-col">
+                          <code className="text-destructive font-medium break-all">
+                            {urlDomain}{link.url.replace(/^https?:\/\/[^\/]+/, '')}
+                          </code>
+                          {link.usedAuth && (
+                            <span className="flex items-center gap-0.5 text-xs text-blue-600 mt-0.5">
+                              <LockIcon className="h-3 w-3" />
+                              HTTP Basic Auth
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-1 items-center">
                         <span className="text-xs text-muted-foreground mr-2">
                           {uniquePages.length} page{uniquePages.length !== 1 ? 's' : ''}
                         </span>
+                        {scanId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`h-8 px-3 shrink-0 ${
+                              recheckingUrls.has(link.url) 
+                                ? 'bg-purple-100 text-purple-700' 
+                                : ''
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRecheck(link.url);
+                            }}
+                            disabled={recheckingUrls.has(link.url)}
+                          >
+                            {recheckingUrls.has(link.url) ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                Checking...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                Re-check
+                              </>
+                            )}
+                          </Button>
+                        )}
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -814,14 +1041,50 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
                         </span>
                       )}
-                      <code className="text-destructive font-medium break-all">
-                        {urlDomain}{link.url.replace(/^https?:\/\/[^\/]+/, '')}
-                      </code>
+                      <div className="flex flex-col">
+                        <code className="text-destructive font-medium break-all">
+                          {urlDomain}{link.url.replace(/^https?:\/\/[^\/]+/, '')}
+                        </code>
+                        {link.usedAuth && (
+                          <span className="flex items-center gap-0.5 text-xs text-blue-600 mt-0.5">
+                            <LockIcon className="h-3 w-3" />
+                            HTTP Basic Auth
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-1 items-center">
                       <span className="text-xs text-muted-foreground mr-2">
                         {uniquePages.length} page{uniquePages.length !== 1 ? 's' : ''}
                       </span>
+                      {scanId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={`h-8 px-3 shrink-0 ${
+                            recheckingUrls.has(link.url) 
+                              ? 'bg-purple-100 text-purple-700' 
+                              : ''
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRecheck(link.url);
+                          }}
+                          disabled={recheckingUrls.has(link.url)}
+                        >
+                          {recheckingUrls.has(link.url) ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Checking...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Re-check
+                            </>
+                          )}
+                        </Button>
+                      )}
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -869,6 +1132,52 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           link.errorMessage
                         )}
                       </span>
+                    </div>
+                  )}
+                  {recheckErrors.has(link.url) && (
+                    <div className="mt-2">
+                      <Alert variant="destructive" className="py-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Re-check failed</AlertTitle>
+                        <AlertDescription>{recheckErrors.get(link.url)}</AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
+                  {recheckSuccess.has(link.url) && (
+                    <div className="mt-2">
+                      <Alert variant="default" className="py-2 bg-green-50 text-green-800 border-green-200">
+                        <CheckCircle className="h-4 w-4" />
+                        <AlertTitle>Re-check completed</AlertTitle>
+                        <AlertDescription>
+                          {/* Split the message into main message and auth info */}
+                          {(() => {
+                            const message = recheckSuccess.get(link.url) || '';
+                            // Check if there's an auth message in parentheses or after a dash
+                            const authStart = message.indexOf(' (HTTP Basic Auth') !== -1 
+                              ? message.indexOf(' (HTTP Basic Auth') 
+                              : message.indexOf(' - HTTP Basic Auth');
+                            
+                            if (authStart !== -1) {
+                              const mainMessage = message.substring(0, authStart);
+                              const authMessage = message.substring(authStart);
+                              
+                              return (
+                                <>
+                                  {mainMessage}
+                                  <span className="block mt-1 text-blue-700 text-xs">
+                                    <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
+                                    {authMessage.startsWith(' - ') ? authMessage.substring(3) : 
+                                     authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) : 
+                                     authMessage}
+                                  </span>
+                                </>
+                              );
+                            }
+                            
+                            return message;
+                          })()}
+                        </AlertDescription>
+                      </Alert>
                     </div>
                   )}
                 </div>
@@ -1006,6 +1315,17 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   
   const handleCheckLink = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  // Add this function to compare domains
+  const isDifferentDomain = (url: string, baseUrl: string): boolean => {
+    try {
+      const urlDomain = new URL(url).hostname;
+      const baseUrlDomain = new URL(baseUrl).hostname;
+      return urlDomain !== baseUrlDomain;
+    } catch {
+      return false;
+    }
   };
 
   return (

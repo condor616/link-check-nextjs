@@ -248,8 +248,8 @@ function ScanDetailsContent() {
                 <ScanResults 
                   results={scan.results} 
                   scanUrl={scan.scanUrl} 
-                  itemsPerPage={scan.config.itemsPerPage || 10}
-                  scanId={scan.id}
+                  scanId={scanId}
+                  scanConfig={scan.config}
                 />
               </div>
             </div>
