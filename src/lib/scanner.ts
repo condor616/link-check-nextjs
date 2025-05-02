@@ -22,6 +22,7 @@ export interface ScanConfig {
     useAuthForAllDomains?: boolean; // Use auth headers for all domains instead of just the same domain
     processHtml?: boolean; // Whether to process HTML content for links (default: true)
     skipExternalDomains?: boolean; // Whether to skip external domains (default: true for re-scans)
+    excludeSubdomains?: boolean; // Whether to exclude subdomains (default: true)
     // TODO: Add User-Agent
 }
 
@@ -56,7 +57,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'cssSelectorsForceExclude' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains'>> & ScanConfig;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'cssSelectorsForceExclude' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains' | 'excludeSubdomains'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -92,6 +93,7 @@ class Scanner {
             useAuthForAllDomains: config.useAuthForAllDomains ?? false,
             processHtml: config.processHtml ?? true,
             skipExternalDomains: config.skipExternalDomains ?? true,
+            excludeSubdomains: config.excludeSubdomains ?? true,
             ...config, // Include any other passed config options
         };
 
@@ -520,7 +522,17 @@ class Scanner {
             result.status = 'external';
         }
 
-        // 4. Check wildcard exclusions (new feature)
+        // 4. Check for subdomains that should be excluded
+        if (this.config.excludeSubdomains) {
+            const baseHostname = new URL(this.startUrl).hostname;
+            if (isSubdomain(urlObj.hostname, baseHostname)) {
+                result.status = 'skipped';
+                result.errorMessage = `Skipped subdomain: ${urlObj.hostname}`;
+                return true;
+            }
+        }
+
+        // 5. Check wildcard exclusions (new feature)
         if (this.config.wildcardExclusions && this.config.wildcardExclusions.length > 0) {
             // Wildcard exclusions allow easy URL filtering without complex regex
             // Examples of wildcard patterns:
@@ -536,7 +548,7 @@ class Scanner {
             }
         }
 
-        // 5. Check regex exclusions
+        // 6. Check regex exclusions
         if (this.config.regexExclusions && this.config.regexExclusions.length > 0) {
             for (const pattern of this.config.regexExclusions) {
                 try {
@@ -728,4 +740,32 @@ class WebsiteScanner extends Scanner {
             }
         }
     }
+}
+
+function isSubdomain(subdomain: string, parentDomain: string): boolean {
+    // Skip identical domains
+    if (subdomain === parentDomain) {
+        return false;
+    }
+    
+    // Extract domain parts
+    const subdomainParts = subdomain.split('.');
+    const parentDomainParts = parentDomain.split('.');
+    
+    // Subdomain must have more parts
+    if (subdomainParts.length <= parentDomainParts.length) {
+        return false;
+    }
+    
+    // Check if the subdomain ends with the parent domain
+    // For example, "reporting.novartis.com" should be a subdomain of "novartis.com"
+    const parentLength = parentDomainParts.length;
+    for (let i = 0; i < parentLength; i++) {
+        const subIdx = subdomainParts.length - parentLength + i;
+        if (subdomainParts[subIdx] !== parentDomainParts[i]) {
+            return false;
+        }
+    }
+    
+    return true;
 }

@@ -79,6 +79,7 @@ export default function SavedScansPage() {
   const [editCssSelectorsForceExclude, setEditCssSelectorsForceExclude] = useState<boolean>(false);
   const [editWildcardExclusions, setEditWildcardExclusions] = useState<string[]>([""]);
   const [editSkipExternalDomains, setEditSkipExternalDomains] = useState<boolean>(true);
+  const [editExcludeSubdomains, setEditExcludeSubdomains] = useState<boolean>(true);
   
   const router = useRouter();
   
@@ -132,6 +133,9 @@ export default function SavedScansPage() {
     
     // Initialize skip external domains option
     setEditSkipExternalDomains(config.config.skipExternalDomains !== false);
+    
+    // Initialize exclude subdomains option
+    setEditExcludeSubdomains(config.config.excludeSubdomains !== false);
     
     // Initialize exclusion patterns
     setEditRegexExclusions(
@@ -209,6 +213,7 @@ export default function SavedScansPage() {
         cssSelectorsForceExclude: editCssSelectorsForceExclude,
         wildcardExclusions: filteredWildcardExclusions,
         skipExternalDomains: editSkipExternalDomains,
+        excludeSubdomains: editExcludeSubdomains,
       };
       
       // Update auth settings
@@ -531,18 +536,26 @@ export default function SavedScansPage() {
               </Label>
             </div>
             
-            <div className="flex items-center space-x-2 mt-4">
+            <div className="flex items-center space-x-2 mb-4">
               <Checkbox
                 id="editSkipExternalDomains"
                 checked={editSkipExternalDomains}
                 onCheckedChange={(checked) => setEditSkipExternalDomains(!!checked)}
               />
-              <label
-                htmlFor="editSkipExternalDomains"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
+              <Label htmlFor="editSkipExternalDomains" className="cursor-pointer text-sm font-normal">
                 Skip external domains
-              </label>
+              </Label>
+            </div>
+            
+            <div className="flex items-center space-x-2 mb-4">
+              <Checkbox
+                id="editExcludeSubdomains"
+                checked={editExcludeSubdomains}
+                onCheckedChange={(checked) => setEditExcludeSubdomains(!!checked)}
+              />
+              <Label htmlFor="editExcludeSubdomains" className="cursor-pointer text-sm font-normal">
+                Do not check subdomains
+              </Label>
             </div>
             
             <div className="space-y-4 border-t pt-4 mt-2">
@@ -811,6 +824,7 @@ export default function SavedScansPage() {
                         cssSelectorsForceExclude: editCssSelectorsForceExclude,
                         wildcardExclusions: editWildcardExclusions.filter(w => w.trim() !== ""),
                         skipExternalDomains: editSkipExternalDomains,
+                        excludeSubdomains: editExcludeSubdomains,
                         ...(editUseAuth && {
                           auth: {
                             username: editUsername,

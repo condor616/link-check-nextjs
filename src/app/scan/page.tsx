@@ -669,7 +669,8 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
         regexExclusions: filteredRegexExclusions,
         cssSelectors: filteredCssSelectors,
         cssSelectorsForceExclude: cssSelectorsForceExclude,
-        wildcardExclusions: filteredWildcardExclusions
+        wildcardExclusions: filteredWildcardExclusions,
+        excludeSubdomains: editedConfig.excludeSubdomains
       };
       
       // Update the paramConfigString with the edited config
@@ -825,6 +826,17 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                       />
                       <Label htmlFor="skipExternalDomains" className="cursor-pointer text-sm font-normal">
                         Skip external domains
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="excludeSubdomains"
+                        checked={editedConfig.excludeSubdomains !== false} // Default to true if undefined
+                        onCheckedChange={(checked) => updateConfigField('excludeSubdomains', !!checked)}
+                      />
+                      <Label htmlFor="excludeSubdomains" className="cursor-pointer text-sm font-normal">
+                        Do not check subdomains
                       </Label>
                     </div>
                     
@@ -1165,7 +1177,8 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                                 regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
                                 cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
                                 cssSelectorsForceExclude: cssSelectorsForceExclude,
-                                wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== "")
+                                wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== ""),
+                                excludeSubdomains: editedConfig.excludeSubdomains !== false
                               }
                             }}
                           />
@@ -1488,6 +1501,7 @@ function ScanForm() {
   const [depth, setDepth] = useState<number>(0);
   const [scanSameLinkOnce, setScanSameLinkOnce] = useState<boolean>(true);
   const [skipExternalDomains, setSkipExternalDomains] = useState<boolean>(true);
+  const [excludeSubdomains, setExcludeSubdomains] = useState<boolean>(true);
   const [concurrency, setConcurrency] = useState<number>(10);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [requestTimeout, setRequestTimeout] = useState<number>(30);
@@ -1557,6 +1571,7 @@ function ScanForm() {
     setRequestTimeout((config.config.requestTimeout ?? 30000) / 1000); // Convert from ms to seconds
     setScanSameLinkOnce(config.config.scanSameLinkOnce !== false);
     setSkipExternalDomains(config.config.skipExternalDomains !== false);
+    setExcludeSubdomains(config.config.excludeSubdomains !== false);
     
     // Set exclusion patterns
     setRegexExclusions(
@@ -1634,6 +1649,7 @@ function ScanForm() {
         wildcardExclusions: string[];
         requestTimeout: number;
         skipExternalDomains: boolean;
+        excludeSubdomains: boolean;
         auth?: { username: string; password: string };
         useAuthForAllDomains?: boolean;
       } = {
@@ -1647,6 +1663,7 @@ function ScanForm() {
         wildcardExclusions: filteredWildcardExclusions,
         requestTimeout: requestTimeout * 1000, // Convert to milliseconds
         skipExternalDomains: skipExternalDomains,
+        excludeSubdomains: excludeSubdomains,
       };
       
       // Add auth credentials if enabled
@@ -1742,6 +1759,7 @@ function ScanForm() {
         wildcardExclusions: string[];
         requestTimeout: number;
         skipExternalDomains: boolean;
+        excludeSubdomains: boolean;
         auth?: { username: string; password: string };
         useAuthForAllDomains?: boolean;
       } = {
@@ -1755,6 +1773,7 @@ function ScanForm() {
         wildcardExclusions: filteredWildcardExclusions,
         requestTimeout: requestTimeout * 1000, // Convert to milliseconds
         skipExternalDomains: skipExternalDomains,
+        excludeSubdomains: excludeSubdomains,
       };
       
       // Always include auth credentials if they exist
@@ -1889,6 +1908,7 @@ function ScanForm() {
     setRequestTimeout(30);
     setScanSameLinkOnce(true);
     setSkipExternalDomains(true);
+    setExcludeSubdomains(true);
     setRegexExclusions([""]);
     setCssSelectors([""]);
     setCssSelectorsForceExclude(false);
@@ -2009,6 +2029,7 @@ function ScanForm() {
       
       setScanSameLinkOnce(configData.scanSameLinkOnce ?? true);
       setSkipExternalDomains(configData.skipExternalDomains !== false);
+      setExcludeSubdomains(configData.excludeSubdomains !== false);
       
       if (configData.auth) {
         setUsername(configData.auth.username || '');
@@ -2315,7 +2336,18 @@ function ScanForm() {
                 onCheckedChange={(checked) => setSkipExternalDomains(!!checked)}
               />
               <Label htmlFor="skipExternalDomains" className="cursor-pointer text-sm font-normal">
-                Skip external domains - Don't check links pointing to different domains
+                Skip external domains
+              </Label>
+            </div>
+            
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="excludeSubdomains"
+                checked={excludeSubdomains}
+                onCheckedChange={(checked) => setExcludeSubdomains(!!checked)}
+              />
+              <Label htmlFor="excludeSubdomains" className="cursor-pointer text-sm font-normal">
+                Do not check subdomains
               </Label>
             </div>
             
@@ -2658,6 +2690,8 @@ function ScanForm() {
                         concurrency: concurrency,
                         requestTimeout: requestTimeout * 1000, 
                         scanSameLinkOnce: scanSameLinkOnce,
+                        skipExternalDomains: skipExternalDomains,
+                        excludeSubdomains: excludeSubdomains,
                         regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
                         cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
                         cssSelectorsForceExclude: cssSelectorsForceExclude,
