@@ -256,12 +256,11 @@ function ScanDetailsContent() {
                   )}
                 </div>
                 
-                <ScanResults 
-                  results={scan.results} 
-                  scanUrl={scan.scanUrl} 
+                <ScanResults
+                  results={scan.results}
+                  scanUrl={scan.scanUrl}
                   scanId={scanId}
                   scanConfig={scan.config}
-                  hideTabs={true}
                 />
               </div>
             </div>
