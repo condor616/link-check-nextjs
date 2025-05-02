@@ -5,24 +5,28 @@
   "config": {
     "depth": 4,
     "scanSameLinkOnce": true,
-    "concurrency": 20,
+    "concurrency": 30,
     "itemsPerPage": 10,
-    "regexExclusions": [],
-    "cssSelectors": [
-      ".site-footer",
-      "#block-polaris-languagecountryselectorfordesktop",
-      "#block-polaris-languagecountryselectorformobile"
+    "regexExclusions": [
+      "^https?://(www\\.)?novartis\\.com/[a-z]{2}-[a-z]{2}/"
     ],
-    "cssSelectorsForceExclude": true,
+    "cssSelectors": [],
+    "cssSelectorsForceExclude": false,
     "wildcardExclusions": [
       "novartis.com/careers/career-search/job/*",
       "novartis.com/news/media-releases/*",
       "novartis.com/clinicaltrials/study/*",
       "novartis.com/node/*",
-      "novartis.com/node/*/printable/print"
+      "novartis.com/node/*/printable/print",
+      "novartis.com/sites/novartis_com/files/styles/*",
+      "novartis.com/sites/novartis_com/files/*.pdf",
+      "novartis.com/careers/career-search/*",
+      "novartis.com/acc-es/*"
     ],
-    "requestTimeout": 30000
+    "requestTimeout": 30000,
+    "skipExternalDomains": true,
+    "excludeSubdomains": true
   },
   "createdAt": "2025-05-02T17:52:56.579Z",
-  "updatedAt": "2025-05-02T19:02:45.185Z"
+  "updatedAt": "2025-05-02T20:09:01.310Z"
 }
