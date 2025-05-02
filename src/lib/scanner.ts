@@ -323,7 +323,11 @@ class Scanner {
             // For each CSS selector, mark links that should be excluded
             this.config.cssSelectors.forEach(selector => {
                 try {
-                    $(selector).find('a[href]').each((_, el) => {
+                    // Select the elements with the selector first, then find all links within them
+                    const selectedElements = $(selector);
+                    
+                    // Then find all links within those elements
+                    selectedElements.find('a[href]').each((_, el) => {
                         // Mark elements to be excluded
                         $(el).attr('data-link-checker-exclude', 'true');
                         
@@ -377,11 +381,16 @@ class Scanner {
                 return;
             }
 
-            // Only process links from the same domain as the start URL
-            if (!this.isSameDomain(nextUrl)) {
-                // Create a basic result entry for external links but don't queue them for processing
+            // Check if external domain and if we should skip processing external links
+            const isExternal = !this.isSameDomain(nextUrl);
+            if (isExternal) {
+                // Always create a basic result entry for external links
                 this.addOrUpdateResultWithContext(nextUrl, pageUrl, $.html(element), { status: 'external' });
-                return;
+                
+                // If skipExternalDomains is true, don't queue external links for processing
+                if (this.config.skipExternalDomains) {
+                    return;
+                }
             }
 
             // Capture the HTML context
@@ -399,7 +408,7 @@ class Scanner {
             linkBatch.push({ url: nextUrl, context: htmlContext });
         });
 
-        // Process the batch of links all at once (only same-domain links)
+        // Process the batch of links all at once 
         for (const { url, context } of linkBatch) {
             // Add or update result entry with HTML context
             this.addOrUpdateResultWithContext(url, pageUrl, context);
@@ -557,7 +566,7 @@ export async function scanWebsite(startUrl: string, config: ScanConfig = {}): Pr
     // Create a new scanner instance with domain filtering enabled by default
     const scanner = new WebsiteScanner(startUrl, {
         ...config,
-        // By default, enable domain filtering for re-scans
+        // Preserve user's explicit choice, otherwise default to true
         skipExternalDomains: config.skipExternalDomains !== undefined ? config.skipExternalDomains : true
     });
     
@@ -629,10 +638,13 @@ class WebsiteScanner extends Scanner {
             return;
         }
 
-        // Check if it's an external domain and we should skip it
+        // Check if it's an external domain and we should skip processing it
+        // (But we still want to include the link in our results, just not fetch/analyze it)
         if (this.config.skipExternalDomains && !this.isSameDomain(urlToProcess) && urlToProcess !== this.startUrl) {
             console.log(`Skipping external domain: ${urlToProcess} (not scanning for content)`);
             currentResult.status = 'external';
+            // Mark as visited to prevent queuing attempts
+            this.visitedLinks.add(urlToProcess);
             return;
         }
 

@@ -1,22 +1,28 @@
 {
   "id": "config_1746208376579_27863d47",
-  "name": "Scan for www.novartis.com",
+  "name": "www.novartis.com",
   "url": "https://www.novartis.com",
   "config": {
-    "depth": 2,
+    "depth": 4,
     "scanSameLinkOnce": true,
-    "concurrency": 10,
+    "concurrency": 20,
     "itemsPerPage": 10,
     "regexExclusions": [],
     "cssSelectors": [
-      ".footer",
-      ".header",
-      "#block-polaris-languagecountryselectorfordesktop"
+      ".site-footer",
+      "#block-polaris-languagecountryselectorfordesktop",
+      "#block-polaris-languagecountryselectorformobile"
     ],
-    "cssSelectorsForceExclude": false,
-    "wildcardExclusions": [],
+    "cssSelectorsForceExclude": true,
+    "wildcardExclusions": [
+      "novartis.com/careers/career-search/job/*",
+      "novartis.com/news/media-releases/*",
+      "novartis.com/clinicaltrials/study/*",
+      "novartis.com/node/*",
+      "novartis.com/node/*/printable/print"
+    ],
     "requestTimeout": 30000
   },
   "createdAt": "2025-05-02T17:52:56.579Z",
-  "updatedAt": "2025-05-02T18:00:02.803Z"
+  "updatedAt": "2025-05-02T19:02:45.185Z"
 }

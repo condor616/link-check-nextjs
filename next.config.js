@@ -9,10 +9,6 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   experimental: {
-    windowHistorySupport: true,
-    optimisticClientCache: true,
-    // Improve transition performance
-    optimisticNavigation: true,
     // Create persistent scrollbars to avoid layout shifts during transitions
     scrollRestoration: true,
   },

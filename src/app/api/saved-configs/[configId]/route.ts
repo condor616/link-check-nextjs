@@ -13,10 +13,10 @@ function validateConfigId(configId: string): boolean {
 // GET a specific saved configuration
 export async function GET(
   request: NextRequest,
-  { params }: { params: { configId: string } }
+  { params }: { params: Promise<{ configId: string }> }
 ) {
   try {
-    const { configId } = params;
+    const { configId } = await params;
     
     // Validate configId
     if (!configId || !validateConfigId(configId)) {
@@ -57,10 +57,10 @@ export async function GET(
 // PUT to update a specific configuration
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { configId: string } }
+  { params }: { params: Promise<{ configId: string }> }
 ) {
   try {
-    const { configId } = params;
+    const { configId } = await params;
     
     // Validate configId
     if (!configId || !validateConfigId(configId)) {
@@ -129,10 +129,10 @@ export async function PUT(
 // DELETE a specific configuration
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { configId: string } }
+  { params }: { params: Promise<{ configId: string }> }
 ) {
   try {
-    const { configId } = params;
+    const { configId } = await params;
     
     // Validate configId
     if (!configId || !validateConfigId(configId)) {
