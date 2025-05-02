@@ -612,7 +612,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
             <CardFooter className="flex justify-between">
               <Button 
                 variant="outline" 
-                onClick={() => router.push('/')}
+                onClick={() => router.back()}
                 className="gap-2"
               >
                 <ArrowLeft className="h-4 w-4" /> Cancel
