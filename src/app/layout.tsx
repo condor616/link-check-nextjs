@@ -5,7 +5,8 @@ import {
   AlertCircle, 
   History, 
   Settings, 
-  LogOut 
+  LogOut,
+  Save
 } from 'lucide-react';
 import { PageTransition } from "@/components/PageTransition";
 import { TransitionLink } from "@/components/TransitionLink";
@@ -45,6 +46,14 @@ export default function RootLayout({
               >
                 <AlertCircle size={20} />
                 <span>New Scan</span>
+              </TransitionLink>
+              <TransitionLink 
+                href="/saved-scans" 
+                className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
+                activeClassName="bg-purple-800"
+              >
+                <Save size={20} />
+                <span>Saved Scans</span>
               </TransitionLink>
               <TransitionLink 
                 href="/history" 

@@ -40,6 +40,7 @@ yarn-error.log*
 /.scan_history/
 /.scan_params/
 /.scan_queue/
+/.scan_configs/
 
 # typescript
 *.tsbuildinfo

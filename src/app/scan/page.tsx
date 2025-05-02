@@ -19,7 +19,13 @@ import {
   Key,
   Check,
   X,
-  Plus
+  Plus,
+  ChevronDown,
+  FileUp,
+  Copy,
+  ClipboardCheck,
+  FileCode,
+  HelpCircle
 } from 'lucide-react';
 import ScanResults from '@/components/ScanResults';
 import Link from 'next/link';
@@ -37,6 +43,16 @@ import { motion } from 'framer-motion';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import JSONPreview from '@/components/JSONPreview';
+import { Textarea } from "@/components/ui/textarea";
 
 // Define the scan status interface
 interface ScanStatus {
@@ -111,6 +127,12 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
   // Use ref to track if we've already initiated a scan for this URL/config combination
   const hasInitiatedScan = useRef(false);
   
+  // Add copy to clipboard function
+  const copyJsonToClipboard = (json: any) => {
+    const stringified = JSON.stringify(json, null, 2);
+    navigator.clipboard.writeText(stringified);
+  };
+  
   // Add states for loading scan parameters from ID
   const [paramUrl, setParamUrl] = useState<string | undefined>(scanUrl);
   const [paramConfigString, setParamConfigString] = useState<string | null>(scanConfigString || null);
@@ -130,6 +152,15 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
   // Add confirmation state to prevent automatic scan on page refresh
   const [scanConfirmed, setScanConfirmed] = useState<boolean>(false);
   
+  // Add states for the help popups
+  const [showUrlExclusionHelp, setShowUrlExclusionHelp] = useState<boolean>(false);
+  const [showCssSelectorsHelp, setShowCssSelectorsHelp] = useState<boolean>(false);
+  const [showRegexExclusionHelp, setShowRegexExclusionHelp] = useState<boolean>(false);
+
+  const urlExclusionHelpRef = useRef<HTMLDivElement>(null);
+  const cssSelectorsHelpRef = useRef<HTMLDivElement>(null);
+  const regexExclusionHelpRef = useRef<HTMLDivElement>(null);
+
   const [scanStatus, setScanStatus] = useState<ScanStatus>({
     status: 'initializing',
     progress: {
@@ -402,6 +433,31 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
     hasAttemptedAutoSave.current = false;
   }, [paramUrl, paramConfigString]);
   
+  // Add click outside handlers for all popups
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (urlExclusionHelpRef.current && !urlExclusionHelpRef.current.contains(event.target as Node)) {
+        setShowUrlExclusionHelp(false);
+      }
+
+      if (cssSelectorsHelpRef.current && !cssSelectorsHelpRef.current.contains(event.target as Node)) {
+        setShowCssSelectorsHelp(false);
+      }
+
+      if (regexExclusionHelpRef.current && !regexExclusionHelpRef.current.contains(event.target as Node)) {
+        setShowRegexExclusionHelp(false);
+      }
+    };
+
+    if (showUrlExclusionHelp || showCssSelectorsHelp || showRegexExclusionHelp) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUrlExclusionHelp, showCssSelectorsHelp, showRegexExclusionHelp]);
+
   // Modify the save scan function to be more reliable
   const handleSaveScan = async () => {
     console.log('handleSaveScan called with', results.length, 'results');
@@ -613,7 +669,8 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
         regexExclusions: filteredRegexExclusions,
         cssSelectors: filteredCssSelectors,
         cssSelectorsForceExclude: cssSelectorsForceExclude,
-        wildcardExclusions: filteredWildcardExclusions
+        wildcardExclusions: filteredWildcardExclusions,
+        excludeSubdomains: editedConfig.excludeSubdomains
       };
       
       // Update the paramConfigString with the edited config
@@ -761,6 +818,28 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                       </Label>
                     </div>
                     
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="skipExternalDomains"
+                        checked={editedConfig.skipExternalDomains !== false} // Default to true if undefined
+                        onCheckedChange={(checked) => updateConfigField('skipExternalDomains', !!checked)}
+                      />
+                      <Label htmlFor="skipExternalDomains" className="cursor-pointer text-sm font-normal">
+                        Skip external domains
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="excludeSubdomains"
+                        checked={editedConfig.excludeSubdomains !== false} // Default to true if undefined
+                        onCheckedChange={(checked) => updateConfigField('excludeSubdomains', !!checked)}
+                      />
+                      <Label htmlFor="excludeSubdomains" className="cursor-pointer text-sm font-normal">
+                        Do not check subdomains
+                      </Label>
+                    </div>
+                    
                     <Button 
                       variant="link" 
                       className="p-0 h-auto text-purple-600" 
@@ -776,7 +855,54 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                           <div className="space-y-6">
                             {/* Wildcard Exclusion Rules */}
                             <div className="space-y-2">
-                              <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
+                              <div className="flex items-center gap-2 relative">
+                                <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
+                                <div >
+                                  <button 
+                                    type="button"
+                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                    onClick={() => setShowUrlExclusionHelp(!showUrlExclusionHelp)}
+                                    aria-label="URL Exclusion Patterns Help"
+                                  >
+                                    <HelpCircle className="h-4 w-4" />
+                                  </button>
+                                  
+                                  {showUrlExclusionHelp && (
+                                    <div 
+                                      ref={urlExclusionHelpRef}
+                                      className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                                    >
+                                      <div className="flex justify-between items-center mb-2">
+                                        <h3 className="font-medium">URL Exclusion Patterns Help</h3>
+                                        <button 
+                                          type="button" 
+                                          className="text-muted-foreground hover:text-foreground"
+                                          onClick={() => setShowUrlExclusionHelp(false)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                      
+                                      <p className="mb-2">You can use various formats for URL exclusion patterns:</p>
+                                      
+                                      <ul className="space-y-1 mb-2 list-disc pl-4">
+                                        <li><span className="font-medium">Domain + path:</span> <code>example.com/about/*</code></li>
+                                        <li><span className="font-medium">Path only:</span> <code>/about/*</code></li>
+                                        <li><span className="font-medium">Full URL:</span> <code>https://example.com/about/*</code></li>
+                                        <li><span className="font-medium">Just domain:</span> <code>example.com</code> (excludes all URLs on that domain)</li>
+                                      </ul>
+                                      
+                                      <p className="mb-2"><span className="font-medium">Wildcards:</span></p>
+                                      <ul className="space-y-1 list-disc pl-4">
+                                        <li><code>*</code> matches any sequence of characters</li>
+                                        <li><code>?</code> matches a single character</li>
+                                      </ul>
+                                      
+                                      <p className="mt-2 text-xs text-muted-foreground">Example: <code>example.com/node/*/printable/print</code> will exclude all printable pages in the node section.</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                               <p className="text-sm text-muted-foreground mb-2">
                                 Simple URL patterns to exclude (e.g., "example.com/about/*")
                               </p>
@@ -831,7 +957,49 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                             
                             {/* Regex Exclusion Rules */}
                             <div className="space-y-2">
-                              <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
+                              <div className="flex items-center gap-2 relative">
+                                <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
+                                <div >
+                                  <button 
+                                    type="button"
+                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                    onClick={() => setShowRegexExclusionHelp(!showRegexExclusionHelp)}
+                                    aria-label="Regex Exclusion Patterns Help"
+                                  >
+                                    <HelpCircle className="h-4 w-4" />
+                                  </button>
+                                  
+                                  {showRegexExclusionHelp && (
+                                    <div 
+                                      ref={regexExclusionHelpRef}
+                                      className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                                    >
+                                      <div className="flex justify-between items-center mb-2">
+                                        <h3 className="font-medium">Regex Exclusion Patterns Help</h3>
+                                        <button 
+                                          type="button" 
+                                          className="text-muted-foreground hover:text-foreground"
+                                          onClick={() => setShowRegexExclusionHelp(false)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                      
+                                      <p className="mb-2">Regular expression patterns to exclude URLs from scanning.</p>
+                                      
+                                      <p className="mb-2">Examples of regex patterns:</p>
+                                      <ul className="space-y-1 mb-2 list-disc pl-4">
+                                        <li><code>\.pdf$</code> - URLs ending with .pdf</li>
+                                        <li><code>/assets/.*\.zip$</code> - ZIP files in the assets directory</li>
+                                        <li><code>(login|signin|register)</code> - URLs containing login, signin, or register</li>
+                                        <li><code>^https://api\.</code> - URLs starting with https://api.</li>
+                                      </ul>
+                                      
+                                      <p className="mt-2 text-xs text-muted-foreground">Remember to escape special characters with a backslash, like <code>\.</code> for periods.</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                               <p className="text-sm text-muted-foreground mb-2">
                                 Links matching these patterns will be skipped
                               </p>
@@ -889,7 +1057,50 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                           <div className="space-y-6">
                             {/* CSS Selector Exclusions */}
                             <div className="space-y-2">
-                              <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
+                              <div className="flex items-center gap-2 relative">
+                                <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
+                                <div >
+                                  <button 
+                                    type="button"
+                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                    onClick={() => setShowCssSelectorsHelp(!showCssSelectorsHelp)}
+                                    aria-label="CSS Selector Exclusions Help"
+                                  >
+                                    <HelpCircle className="h-4 w-4" />
+                                  </button>
+                                  
+                                  {showCssSelectorsHelp && (
+                                    <div 
+                                      ref={cssSelectorsHelpRef}
+                                      className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
+                                    >
+                                      <div className="flex justify-between items-center mb-2">
+                                        <h3 className="font-medium">CSS Selector Exclusions Help</h3>
+                                        <button 
+                                          type="button" 
+                                          className="text-muted-foreground hover:text-foreground"
+                                          onClick={() => setShowCssSelectorsHelp(false)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                      
+                                      <p className="mb-2">Links inside elements matching these CSS selectors will be excluded from the scan.</p>
+                                      
+                                      <p className="mb-2">Examples of valid CSS selectors:</p>
+                                      <ul className="space-y-1 mb-2 list-disc pl-4">
+                                        <li><code>.footer</code> - Elements with class "footer"</li>
+                                        <li><code>#navigation</code> - Element with ID "navigation"</li>
+                                        <li><code>footer a</code> - All links inside footer elements</li>
+                                        <li><code>.sidebar, .footer</code> - Multiple selectors (comma-separated)</li>
+                                        <li><code>[data-skip]</code> - Elements with attribute "data-skip"</li>
+                                      </ul>
+                                      
+                                      <p className="mt-2 text-xs text-muted-foreground">Example: <code>#block-polaris-languagecountryselectorfordesktop</code> will exclude all links in the language selector.</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                               <p className="text-sm text-muted-foreground mb-2">
                                 Links within these CSS selectors will be skipped
                               </p>
@@ -957,21 +1168,23 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                         
                         {/* Configuration JSON (Read-only) */}
                         <div className="border-t border-border pt-6">
-                          <div className="space-y-2">
-                            <Label htmlFor="configJson">Configuration JSON (Read-only)</Label>
-                    <pre className="p-2 bg-muted rounded-md mt-1 overflow-auto max-h-40 text-xs">
-                              {JSON.stringify({
+                          <JSONPreview
+                            data={{
+                              name: scanId ? `Scan ${scanId}` : "Current Configuration",
+                              url: paramUrl || "",
+                              config: {
                                 ...editedConfig,
                                 regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
                                 cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
-                                cssSelectorsForceExclude,
-                                wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== "")
-                              }, null, 2)}
-                    </pre>
-                          </div>
+                                cssSelectorsForceExclude: cssSelectorsForceExclude,
+                                wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== ""),
+                                excludeSubdomains: editedConfig.excludeSubdomains !== false
+                              }
+                            }}
+                          />
                         </div>
-                  </div>
-                )}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1287,6 +1500,8 @@ function ScanForm() {
   const [url, setUrl] = useState<string>("");
   const [depth, setDepth] = useState<number>(0);
   const [scanSameLinkOnce, setScanSameLinkOnce] = useState<boolean>(true);
+  const [skipExternalDomains, setSkipExternalDomains] = useState<boolean>(true);
+  const [excludeSubdomains, setExcludeSubdomains] = useState<boolean>(true);
   const [concurrency, setConcurrency] = useState<number>(10);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [requestTimeout, setRequestTimeout] = useState<number>(30);
@@ -1297,12 +1512,115 @@ function ScanForm() {
   const [isCreatingScan, setIsCreatingScan] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string | null>(null);
   
+  // Add states for saved scans dropdown
+  const [savedConfigs, setSavedConfigs] = useState<any[]>([]);
+  const [isLoadingSavedConfigs, setIsLoadingSavedConfigs] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadedConfigName, setLoadedConfigName] = useState<string | null>(null);
+  
   // Auth states
   const [showAuthDialog, setShowAuthDialog] = useState<boolean>(false);
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [authEnabled, setAuthEnabled] = useState<boolean>(false);
   const [useAuthForAllDomains, setUseAuthForAllDomains] = useState<boolean>(true);
+  
+  // Save configuration states
+  const [showSaveDialog, setShowSaveDialog] = useState<boolean>(false);
+  const [configName, setConfigName] = useState<string>("");
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  
+  // Add useEffect to fetch saved configurations when component mounts
+  useEffect(() => {
+    fetchSavedConfigs();
+  }, []);
+  
+  // Function to fetch saved configurations
+  const fetchSavedConfigs = async () => {
+    setIsLoadingSavedConfigs(true);
+    setLoadError(null);
+    
+    try {
+      const response = await fetch('/api/saved-configs');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch saved configurations');
+      }
+      
+      setSavedConfigs(data);
+    } catch (error) {
+      console.error('Error fetching saved configurations:', error);
+      setLoadError(error instanceof Error ? error.message : 'Failed to fetch saved configurations');
+    } finally {
+      setIsLoadingSavedConfigs(false);
+    }
+  };
+  
+  // Function to load a saved configuration into the form
+  const loadSavedConfig = (config: any) => {
+    // Set basic fields
+    setUrl(config.url || "");
+    setLoadedConfigName(config.name || null);
+    
+    // Set scan parameters from config
+    setDepth(config.config.depth ?? 0);
+    setConcurrency(config.config.concurrency ?? 10);
+    setRequestTimeout((config.config.requestTimeout ?? 30000) / 1000); // Convert from ms to seconds
+    setScanSameLinkOnce(config.config.scanSameLinkOnce !== false);
+    setSkipExternalDomains(config.config.skipExternalDomains !== false);
+    setExcludeSubdomains(config.config.excludeSubdomains !== false);
+    
+    // Set exclusion patterns
+    setRegexExclusions(
+      config.config.regexExclusions?.length ? 
+      config.config.regexExclusions : [""]
+    );
+    
+    setCssSelectors(
+      config.config.cssSelectors?.length ? 
+      config.config.cssSelectors : [""]
+    );
+    
+    setCssSelectorsForceExclude(!!config.config.cssSelectorsForceExclude);
+    
+    setWildcardExclusions(
+      config.config.wildcardExclusions?.length ? 
+      config.config.wildcardExclusions : [""]
+    );
+    
+    // Set auth if available
+    if (config.config.auth) {
+      setUsername(config.config.auth.username || '');
+      setPassword(config.config.auth.password || '');
+      setAuthEnabled(true);
+      setUseAuthForAllDomains(config.config.useAuthForAllDomains || false);
+    } else {
+      setUsername('');
+      setPassword('');
+      setAuthEnabled(false);
+      setUseAuthForAllDomains(true);
+    }
+    
+    // Show advanced options if any advanced options are set
+    if (
+      (config.config.regexExclusions && config.config.regexExclusions.length > 0) ||
+      (config.config.cssSelectors && config.config.cssSelectors.length > 0) ||
+      (config.config.wildcardExclusions && config.config.wildcardExclusions.length > 0)
+    ) {
+      setShowAdvanced(true);
+    }
+    
+    // Set an initial name for saving
+    if (!configName && config.name) {
+      setConfigName(`${config.name} (Copy)`);
+    }
+    
+    // Clear any errors
+    setScanError(null);
+  };
   
   const handleScan = async () => {
     // Basic URL validation
@@ -1320,7 +1638,21 @@ function ScanForm() {
       const filteredWildcardExclusions = wildcardExclusions.filter(pattern => pattern.trim() !== "");
       const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
       
-      const config: any = {
+      const config: {
+        depth: number;
+        scanSameLinkOnce: boolean;
+        concurrency: number;
+        itemsPerPage: number;
+        regexExclusions: string[];
+        cssSelectors: string[];
+        cssSelectorsForceExclude: boolean;
+        wildcardExclusions: string[];
+        requestTimeout: number;
+        skipExternalDomains: boolean;
+        excludeSubdomains: boolean;
+        auth?: { username: string; password: string };
+        useAuthForAllDomains?: boolean;
+      } = {
         depth: depth,
         scanSameLinkOnce: scanSameLinkOnce,
         concurrency: concurrency,
@@ -1330,6 +1662,8 @@ function ScanForm() {
         cssSelectorsForceExclude: cssSelectorsForceExclude,
         wildcardExclusions: filteredWildcardExclusions,
         requestTimeout: requestTimeout * 1000, // Convert to milliseconds
+        skipExternalDomains: skipExternalDomains,
+        excludeSubdomains: excludeSubdomains,
       };
       
       // Add auth credentials if enabled
@@ -1375,8 +1709,141 @@ function ScanForm() {
     }
   };
   
+  // Save scan configuration
+  const saveConfiguration = async () => {
+    // Validate configuration name
+    if (!configName.trim()) {
+      setSaveError('Please provide a name for this scan');
+      return;
+    }
+    
+    // Validate URL
+    if (!url) {
+      setSaveError('Please provide a URL');
+      return;
+    }
+    
+    try {
+      // Try to parse URL to ensure it's valid
+      const urlObj = new URL(url);
+      
+      // Must be http or https
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        setSaveError('URL must use HTTP or HTTPS protocol');
+        return;
+      }
+    } catch (e) {
+      setSaveError('Please provide a valid URL (e.g., https://example.com)');
+      return;
+    }
+    
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+    
+    try {
+      // Filter out empty entries
+      const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
+      const filteredWildcardExclusions = wildcardExclusions.filter(pattern => pattern.trim() !== "");
+      const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
+      
+      // Create config object with proper typing
+      const config: {
+        depth: number;
+        scanSameLinkOnce: boolean;
+        concurrency: number;
+        itemsPerPage: number;
+        regexExclusions: string[];
+        cssSelectors: string[];
+        cssSelectorsForceExclude: boolean;
+        wildcardExclusions: string[];
+        requestTimeout: number;
+        skipExternalDomains: boolean;
+        excludeSubdomains: boolean;
+        auth?: { username: string; password: string };
+        useAuthForAllDomains?: boolean;
+      } = {
+        depth: depth,
+        scanSameLinkOnce: scanSameLinkOnce,
+        concurrency: concurrency,
+        itemsPerPage: 10,
+        regexExclusions: filteredRegexExclusions,
+        cssSelectors: filteredCssSelectors,
+        cssSelectorsForceExclude: cssSelectorsForceExclude,
+        wildcardExclusions: filteredWildcardExclusions,
+        requestTimeout: requestTimeout * 1000, // Convert to milliseconds
+        skipExternalDomains: skipExternalDomains,
+        excludeSubdomains: excludeSubdomains,
+      };
+      
+      // Always include auth credentials if they exist
+      if (authEnabled && username && password) {
+        config.auth = {
+          username,
+          password
+        };
+        config.useAuthForAllDomains = useAuthForAllDomains;
+      }
+      
+      // Send to API
+      const response = await fetch('/api/saved-configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: configName,
+          url: url,
+          config: config
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save scan configuration');
+      }
+      
+      setSaveSuccess(true);
+      setConfigName('');
+      
+      // Close dialog after a short delay
+      setTimeout(() => {
+        setShowSaveDialog(false);
+        setSaveSuccess(false);
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving scan configuration:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save scan configuration');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
   const toggleAuthDialog = () => {
     setShowAuthDialog(!showAuthDialog);
+  };
+  
+  // Toggle save configuration dialog
+  const toggleSaveDialog = () => {
+    setShowSaveDialog(!showSaveDialog);
+    setSaveError(null);
+    setSaveSuccess(false);
+    
+    if (!showSaveDialog) {
+      // Set initial config name based on loaded scan or URL domain
+      if (loadedConfigName && !configName) {
+        setConfigName(`${loadedConfigName} (Copy)`);
+      } else if (!configName && url) {
+        // Generate a default name based on URL domain
+        try {
+          const urlObj = new URL(url);
+          setConfigName(`Scan for ${urlObj.hostname}`);
+        } catch (e) {
+          setConfigName('New Scan');
+        }
+      }
+    }
   };
   
   const saveAuthCredentials = () => {
@@ -1432,7 +1899,227 @@ function ScanForm() {
     newExclusions[index] = value;
     setWildcardExclusions(newExclusions);
   };
+
+  // Add a function to reset the form
+  const resetLoadedScan = () => {
+    setUrl("");
+    setDepth(0);
+    setConcurrency(10);
+    setRequestTimeout(30);
+    setScanSameLinkOnce(true);
+    setSkipExternalDomains(true);
+    setExcludeSubdomains(true);
+    setRegexExclusions([""]);
+    setCssSelectors([""]);
+    setCssSelectorsForceExclude(false);
+    setWildcardExclusions([""]);
+    setUsername("");
+    setPassword("");
+    setAuthEnabled(false);
+    setUseAuthForAllDomains(true);
+    setLoadedConfigName(null);
+    setConfigName("");
+    setShowAdvanced(false);
+    setScanError(null);
+  };
+
+  // Add copy to clipboard function
+  const copyJsonToClipboard = (json: any) => {
+    const stringified = JSON.stringify(json, null, 2);
+    navigator.clipboard.writeText(stringified);
+  };
+
+  // Add a function to validate and parse JSON
+  const validateJsonConfig = (jsonContent: string): any => {
+    try {
+      // Trim whitespace
+      const cleanedJson = jsonContent.trim();
+      
+      // Try to parse the JSON
+      const parsedJson = JSON.parse(cleanedJson);
+      
+      // Handle various formats
+      if (typeof parsedJson !== 'object' || parsedJson === null) {
+        throw new Error('Invalid configuration: JSON must be an object');
+      }
+      
+      // Handle nested config structure
+      if (parsedJson.config && parsedJson.url) {
+        // Validate URL
+        try {
+          new URL(parsedJson.url);
+        } catch (e) {
+          throw new Error('Invalid URL format in configuration');
+        }
+        
+        // This is the preferred format from Copy All
+        return parsedJson;
+      } 
+      // Handle flat structure with URL at top level
+      else if (parsedJson.url) {
+        // Validate URL
+        try {
+          new URL(parsedJson.url);
+        } catch (e) {
+          throw new Error('Invalid URL format in configuration');
+        }
+        
+        return parsedJson;
+      } 
+      // Missing URL
+      else {
+        throw new Error('Invalid configuration: URL is required');
+      }
+    } catch (e) {
+      // Handle parsing errors
+      if (e instanceof SyntaxError) {
+        throw new Error(`Invalid JSON syntax: ${e.message}`);
+      }
+      
+      // Re-throw other errors
+      throw e;
+    }
+  };
+
+  const [showImportDialog, setShowImportDialog] = useState<boolean>(false);
+  const [importConfig, setImportConfig] = useState<any>(null);
+  const [importJsonContent, setImportJsonContent] = useState<string>("{}");
+  const [importJsonError, setImportJsonError] = useState<string | null>(null);
+
+  const toggleImportDialog = () => {
+    setShowImportDialog(!showImportDialog);
+    // Initialize with empty object when opening the dialog
+    if (!showImportDialog) {
+      const emptyConfig = {};
+      setImportConfig(emptyConfig);
+      setImportJsonContent(JSON.stringify(emptyConfig, null, 2));
+      setImportJsonError(null);
+    }
+  };
+
+  const handleImportJsonChange = (content: string) => {
+    setImportJsonContent(content);
+    setImportJsonError(null);
+  };
+
+  const handleSubmitImport = () => {
+    try {
+      const parsedJson = validateJsonConfig(importJsonContent);
+      handleImportConfig(parsedJson);
+    } catch (error) {
+      console.error('Error importing configuration:', error);
+      setImportJsonError(error instanceof Error ? error.message : 'Invalid configuration format');
+    }
+  };
+
+  const handleImportConfig = (importedData: any) => {
+    try {
+      // Check if we have a nested structure with a config property
+      const hasNestedConfig = importedData.config && typeof importedData.config === 'object';
+      const configData = hasNestedConfig ? importedData.config : importedData;
+      
+      // Update all the form fields with the imported data
+      setUrl(importedData.url || '');
+      setDepth(configData.depth ?? 1);
+      setConcurrency(configData.concurrency ?? 10);
+      
+      // Handle request timeout - might be in seconds or milliseconds
+      const timeout = configData.requestTimeout ?? 30000;
+      setRequestTimeout(timeout > 1000 ? timeout / 1000 : timeout); // Convert to seconds if in milliseconds
+      
+      setScanSameLinkOnce(configData.scanSameLinkOnce ?? true);
+      setSkipExternalDomains(configData.skipExternalDomains !== false);
+      setExcludeSubdomains(configData.excludeSubdomains !== false);
+      
+      if (configData.auth) {
+        setUsername(configData.auth.username || '');
+        setPassword(configData.auth.password || '');
+        setAuthEnabled(true);
+        setUseAuthForAllDomains(configData.useAuthForAllDomains ?? true);
+      } else {
+        setAuthEnabled(false);
+        setUsername('');
+        setPassword('');
+      }
+      
+      // Set exclusion patterns if they exist
+      if (configData.regexExclusions && Array.isArray(configData.regexExclusions)) {
+        setRegexExclusions(configData.regexExclusions.length > 0 
+          ? configData.regexExclusions 
+          : [""]
+        );
+      }
+      
+      if (configData.cssSelectors && Array.isArray(configData.cssSelectors)) {
+        setCssSelectors(configData.cssSelectors.length > 0 
+          ? configData.cssSelectors 
+          : [""]
+        );
+      }
+      
+      setCssSelectorsForceExclude(!!configData.cssSelectorsForceExclude);
+      
+      if (configData.wildcardExclusions && Array.isArray(configData.wildcardExclusions)) {
+        setWildcardExclusions(configData.wildcardExclusions.length > 0 
+          ? configData.wildcardExclusions 
+          : [""]
+        );
+      }
+      
+      // Set config name if available
+      if (importedData.name) {
+        setConfigName(importedData.name);
+      }
+      
+      // Close the import dialog
+      setShowImportDialog(false);
+      
+      // Set a state to show a notification that the config was imported
+      setHasImported(true);
+      setTimeout(() => setHasImported(false), 5000); // Hide notification after 5 seconds
+    } catch (error) {
+      console.error('Error importing configuration:', error);
+      setImportJsonError(error instanceof Error ? error.message : 'Invalid configuration format');
+    }
+  };
+
+  // Add hasImported state
+  const [hasImported, setHasImported] = useState<boolean>(false);
+
+  // Add states for the other help popups
+  const [showUrlExclusionHelp, setShowUrlExclusionHelp] = useState<boolean>(false);
+  const [showCssSelectorsHelp, setShowCssSelectorsHelp] = useState<boolean>(false);
+  const [showRegexExclusionHelp, setShowRegexExclusionHelp] = useState<boolean>(false);
   
+  const urlExclusionHelpRef = useRef<HTMLDivElement>(null);
+  const cssSelectorsHelpRef = useRef<HTMLDivElement>(null);
+  const regexExclusionHelpRef = useRef<HTMLDivElement>(null);
+  
+  // Add click outside handlers for all popups
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (urlExclusionHelpRef.current && !urlExclusionHelpRef.current.contains(event.target as Node)) {
+        setShowUrlExclusionHelp(false);
+      }
+      
+      if (cssSelectorsHelpRef.current && !cssSelectorsHelpRef.current.contains(event.target as Node)) {
+        setShowCssSelectorsHelp(false);
+      }
+      
+      if (regexExclusionHelpRef.current && !regexExclusionHelpRef.current.contains(event.target as Node)) {
+        setShowRegexExclusionHelp(false);
+      }
+    };
+    
+    if (showUrlExclusionHelp || showCssSelectorsHelp || showRegexExclusionHelp) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUrlExclusionHelp, showCssSelectorsHelp, showRegexExclusionHelp]);
+
   return (
     <div className="space-y-6 mx-auto container p-4 max-w-none">
       <h1 className="text-2xl font-bold">New Scan</h1>
@@ -1440,21 +2127,139 @@ function ScanForm() {
       {/* Main scan card */}
       <Card className="bg-white shadow">
         <CardHeader>
-          <CardTitle>Scan Website for Broken Links</CardTitle>
-          <CardDescription>Enter a URL to scan for broken links and other issues</CardDescription>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl">New Scan</CardTitle>
+              <CardDescription>
+                Enter a URL to scan for broken links
+              </CardDescription>
+            </div>
+            
+            {/* Add the Load Scan dropdown here */}
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2"
+                    disabled={isLoadingSavedConfigs || savedConfigs.length === 0}
+                  >
+                    {isLoadingSavedConfigs ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <FileUp className="h-4 w-4" />
+                        Load Scan
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[300px]">
+                  <DropdownMenuLabel>Saved Scan Configurations</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  {savedConfigs.length === 0 ? (
+                    <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      No saved scans found
+                    </div>
+                  ) : (
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {savedConfigs.map((config) => (
+                        <DropdownMenuItem 
+                          key={config.id}
+                          onClick={() => loadSavedConfig(config)}
+                          className="cursor-pointer flex flex-col items-start p-3"
+                        >
+                          <div className="font-medium">{config.name}</div>
+                          <div className="text-xs text-muted-foreground truncate max-w-full">
+                            {config.url}
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-2"
+                onClick={toggleImportDialog}
+              >
+                <FileCode className="h-4 w-4" />
+                Import Scan (JSON)
+              </Button>
+              
+              {loadedConfigName && (
+                <div className="text-sm text-muted-foreground">
+                  Loaded: <span className="font-medium">{loadedConfigName}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </CardHeader>
+
         <CardContent>
           <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="url">Website URL</Label>
-              <div className="flex gap-2 items-center">
-                <Input
+            {/* Add the imported scan notification */}
+            {hasImported && (
+              <div className="flex items-center gap-2 bg-green-50 p-2 rounded-md border border-green-200 text-green-700">
+                <div className="flex-1">
+                  <div className="font-medium">
+                    Configuration imported successfully
+                  </div>
+                  <div className="text-xs text-green-600">
+                    The form has been populated with the imported configuration. You can now modify it and start the scan or save it.
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setHasImported(false)}
+                  className="h-8 text-green-700 hover:text-green-800 hover:bg-green-100"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Load config notification */}
+            {loadedConfigName && (
+              <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-md border border-blue-200 text-blue-700">
+                <div className="flex-1">
+                  <div className="font-medium">
+                    Loaded configuration: {loadedConfigName}
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    Make changes as needed, then click "Start Scan" to run, or "Save Configuration" to save as a new configuration
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={resetLoadedScan}
+                  className="h-8 text-blue-700 hover:text-blue-800 hover:bg-blue-100"
+                >
+                  <X className="h-4 w-4 mr-1" /> Clear
+                </Button>
+              </div>
+            )}
+            
+            <div>
+              <Label htmlFor="url" className="text-base font-medium">URL to scan</Label>
+              <div className="flex mt-1.5 gap-2">
+                <Input 
                   id="url"
-                  placeholder="https://example.com"
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  className="flex-1 h-10"
+                  placeholder="https://example.com"
+                  className="flex-1"
+                  required
                 />
                 <Button 
                   variant={authEnabled ? "secondary" : "outline"} 
@@ -1524,6 +2329,28 @@ function ScanForm() {
               </Label>
             </div>
             
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="skipExternalDomains"
+                checked={skipExternalDomains}
+                onCheckedChange={(checked) => setSkipExternalDomains(!!checked)}
+              />
+              <Label htmlFor="skipExternalDomains" className="cursor-pointer text-sm font-normal">
+                Skip external domains
+              </Label>
+            </div>
+            
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="excludeSubdomains"
+                checked={excludeSubdomains}
+                onCheckedChange={(checked) => setExcludeSubdomains(!!checked)}
+              />
+              <Label htmlFor="excludeSubdomains" className="cursor-pointer text-sm font-normal">
+                Do not check subdomains
+              </Label>
+            </div>
+            
             {/* Button to toggle advanced options */}
             <Button 
               variant="link" 
@@ -1541,7 +2368,54 @@ function ScanForm() {
                   <div className="space-y-6">
                     {/* Wildcard Exclusion Rules */}
                     <div className="space-y-2">
-                      <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
+                      <div className="flex items-center gap-2 relative">
+                        <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
+                        <div >
+                          <button 
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground focus:outline-none"
+                            onClick={() => setShowUrlExclusionHelp(!showUrlExclusionHelp)}
+                            aria-label="URL Exclusion Patterns Help"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                          </button>
+                          
+                          {showUrlExclusionHelp && (
+                            <div 
+                              ref={urlExclusionHelpRef}
+                              className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <h3 className="font-medium">URL Exclusion Patterns Help</h3>
+                                <button 
+                                  type="button" 
+                                  className="text-muted-foreground hover:text-foreground"
+                                  onClick={() => setShowUrlExclusionHelp(false)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              
+                              <p className="mb-2">You can use various formats for URL exclusion patterns:</p>
+                              
+                              <ul className="space-y-1 mb-2 list-disc pl-4">
+                                <li><span className="font-medium">Domain + path:</span> <code>example.com/about/*</code></li>
+                                <li><span className="font-medium">Path only:</span> <code>/about/*</code></li>
+                                <li><span className="font-medium">Full URL:</span> <code>https://example.com/about/*</code></li>
+                                <li><span className="font-medium">Just domain:</span> <code>example.com</code> (excludes all URLs on that domain)</li>
+                              </ul>
+                              
+                              <p className="mb-2"><span className="font-medium">Wildcards:</span></p>
+                              <ul className="space-y-1 list-disc pl-4">
+                                <li><code>*</code> matches any sequence of characters</li>
+                                <li><code>?</code> matches a single character</li>
+                              </ul>
+                              
+                              <p className="mt-2 text-xs text-muted-foreground">Example: <code>example.com/node/*/printable/print</code> will exclude all printable pages in the node section.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         Simple URL patterns to exclude (e.g., "example.com/about/*")
                       </p>
@@ -1596,7 +2470,49 @@ function ScanForm() {
                     
                     {/* Regex Exclusion Rules */}
                     <div className="space-y-2">
-                      <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
+                      <div className="flex items-center gap-2 relative">
+                        <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
+                        <div className="relative">
+                          <button 
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground focus:outline-none"
+                            onClick={() => setShowRegexExclusionHelp(!showRegexExclusionHelp)}
+                            aria-label="Regex Exclusion Patterns Help"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                          </button>
+                          
+                          {showRegexExclusionHelp && (
+                            <div 
+                              ref={regexExclusionHelpRef}
+                              className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <h3 className="font-medium">Regex Exclusion Patterns Help</h3>
+                                <button 
+                                  type="button" 
+                                  className="text-muted-foreground hover:text-foreground"
+                                  onClick={() => setShowRegexExclusionHelp(false)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              
+                              <p className="mb-2">Regular expression patterns to exclude URLs from scanning.</p>
+                              
+                              <p className="mb-2">Examples of regex patterns:</p>
+                              <ul className="space-y-1 mb-2 list-disc pl-4">
+                                <li><code>\.pdf$</code> - URLs ending with .pdf</li>
+                                <li><code>/assets/.*\.zip$</code> - ZIP files in the assets directory</li>
+                                <li><code>(login|signin|register)</code> - URLs containing login, signin, or register</li>
+                                <li><code>^https://api\.</code> - URLs starting with https://api.</li>
+                              </ul>
+                              
+                              <p className="mt-2 text-xs text-muted-foreground">Remember to escape special characters with a backslash, like <code>\.</code> for periods.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         Links matching these patterns will be skipped
                       </p>
@@ -1654,7 +2570,50 @@ function ScanForm() {
                   <div className="space-y-6">
                     {/* CSS Selector Exclusions */}
                     <div className="space-y-2">
-                      <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
+                      <div className="flex items-center gap-2 relative">
+                        <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
+                        <div className="relative">
+                          <button 
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground focus:outline-none"
+                            onClick={() => setShowCssSelectorsHelp(!showCssSelectorsHelp)}
+                            aria-label="CSS Selector Exclusions Help"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                          </button>
+                          
+                          {showCssSelectorsHelp && (
+                            <div 
+                              ref={cssSelectorsHelpRef}
+                              className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <h3 className="font-medium">CSS Selector Exclusions Help</h3>
+                                <button 
+                                  type="button" 
+                                  className="text-muted-foreground hover:text-foreground"
+                                  onClick={() => setShowCssSelectorsHelp(false)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              
+                              <p className="mb-2">Links inside elements matching these CSS selectors will be excluded from the scan.</p>
+                              
+                              <p className="mb-2">Examples of valid CSS selectors:</p>
+                              <ul className="space-y-1 mb-2 list-disc pl-4">
+                                <li><code>.footer</code> - Elements with class "footer"</li>
+                                <li><code>#navigation</code> - Element with ID "navigation"</li>
+                                <li><code>footer a</code> - All links inside footer elements</li>
+                                <li><code>.sidebar, .footer</code> - Multiple selectors (comma-separated)</li>
+                                <li><code>[data-skip]</code> - Elements with attribute "data-skip"</li>
+                              </ul>
+                              
+                              <p className="mt-2 text-xs text-muted-foreground">Example: <code>#block-polaris-languagecountryselectorfordesktop</code> will exclude all links in the language selector.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         Links within these CSS selectors will be skipped
                       </p>
@@ -1719,16 +2678,54 @@ function ScanForm() {
                     </div>
                   </div>
                 </div>
+                
+                {/* Configuration JSON (Read-only) */}
+                <div className="border-t border-border pt-6">
+                  <JSONPreview
+                    data={{
+                      name: configName || `Scan for ${url ? new URL(url).hostname : "New Domain"}`,
+                      url: url,
+                      config: {
+                        depth: depth,
+                        concurrency: concurrency,
+                        requestTimeout: requestTimeout * 1000, 
+                        scanSameLinkOnce: scanSameLinkOnce,
+                        skipExternalDomains: skipExternalDomains,
+                        excludeSubdomains: excludeSubdomains,
+                        regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
+                        cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
+                        cssSelectorsForceExclude: cssSelectorsForceExclude,
+                        wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== ""),
+                        ...(authEnabled && {
+                          auth: {
+                            username: username,
+                            password: password
+                          },
+                          useAuthForAllDomains: useAuthForAllDomains
+                        })
+                      }
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex justify-between">
+          <Button
+            variant="outline"
+            type="button"
+            onClick={toggleSaveDialog}
+            disabled={!url}
+          >
+            <Save className="mr-2 h-4 w-4" /> Save Scan
+          </Button>
+          
           <Button
             variant="default"
             size="lg"
             onClick={handleScan}
-            className="w-full bg-purple-600 hover:bg-purple-700"
+            className="bg-purple-600 hover:bg-purple-700"
             disabled={isCreatingScan}
           >
             {isCreatingScan ? (
@@ -1757,56 +2754,184 @@ function ScanForm() {
       </Card>
       
       {/* Auth Dialog */}
-      {showAuthDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium mb-4">HTTP Basic Authentication</h3>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Username"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                />
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox
-                  id="useAuthForAllDomains"
-                  checked={useAuthForAllDomains}
-                  onCheckedChange={(checked) => setUseAuthForAllDomains(!!checked)}
-                />
-                <Label htmlFor="useAuthForAllDomains" className="cursor-pointer text-sm font-normal">
-                  Use auth for all domains
-                </Label>
-              </div>
+      <AlertDialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>HTTP Basic Authentication</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
+              />
             </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={clearAuthCredentials}>
-                Clear
-              </Button>
-              <Button variant="ghost" onClick={() => setShowAuthDialog(false)}>
-                Cancel
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+              />
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="useAuthForAllDomains"
+                checked={useAuthForAllDomains}
+                onCheckedChange={(checked) => setUseAuthForAllDomains(!!checked)}
+              />
+              <Label htmlFor="useAuthForAllDomains" className="cursor-pointer text-sm font-normal">
+                Use auth for all domains
+              </Label>
+            </div>
+          </div>
+          <AlertDialogFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={clearAuthCredentials}
+              className="mr-auto"
+            >
+              Clear
+            </Button>
+            <div>
+              <AlertDialogCancel className="mr-2">Cancel</AlertDialogCancel>
               <Button variant="default" onClick={saveAuthCredentials}>
                 Save
               </Button>
             </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Save Configuration Dialog */}
+      <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Scan</AlertDialogTitle>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="configName">Scan Name</Label>
+              <Input
+                id="configName"
+                type="text"
+                placeholder="My website scan"
+                value={configName}
+                onChange={(e) => setConfigName(e.target.value)}
+              />
+            </div>
+            
+            <div className="text-sm text-muted-foreground">
+              This will save your current scan settings including URL, exclusions, and authentication for future use.
+            </div>
+            
+            {authEnabled && (
+              <div className="text-sm bg-green-50 p-3 rounded border border-green-200 text-green-800">
+                <p className="font-medium mb-1">Authentication Included:</p>
+                <p className="text-xs">Username: {username}</p>
+                <p className="text-xs">Password saved</p>
+                <p className="text-xs mt-1">{useAuthForAllDomains ? "Applied to all domains" : "Applied to main domain only"}</p>
+              </div>
+            )}
+            
+            {saveError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{saveError}</AlertDescription>
+              </Alert>
+            )}
+            
+            {saveSuccess && (
+              <Alert className="bg-green-50 text-green-800 border-green-200">
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>Scan saved successfully!</AlertDescription>
+              </Alert>
+            )}
           </div>
-        </div>
-      )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+            <Button 
+              onClick={saveConfiguration} 
+              disabled={isSaving || !configName.trim() || !url}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Scan'
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Add import dialog */}
+      <AlertDialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <AlertDialogContent className="max-w-4xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import Scan Configuration</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-2">
+              Paste your scan configuration JSON below. This will populate the scan form fields when you click Submit.
+            </p>
+            
+            <div className="mb-4 bg-blue-50 p-3 rounded-md border border-blue-200 text-blue-700 text-sm">
+              <p className="font-medium mb-1">Expected JSON Format:</p>
+              <p className="text-xs mb-2">You can paste a simple JSON with <code>url</code> at the top level, or a full configuration with a nested <code>config</code> object:</p>
+              <pre className="text-xs bg-blue-100 p-2 rounded overflow-auto">
+{`{
+  "name": "Optional Name",
+  "url": "https://example.com",
+  "config": {
+    "depth": 2,
+    "concurrency": 10,
+    "cssSelectors": ["..."],
+    "regexExclusions": ["..."],
+    ...
+  }
+}`}
+              </pre>
+            </div>
+            
+            {importJsonError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{importJsonError}</AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="importJsonContent" className="text-base font-medium">
+                Configuration JSON (Editable)
+              </Label>
+              <Textarea
+                id="importJsonContent"
+                value={importJsonContent}
+                onChange={(e) => handleImportJsonChange(e.target.value)}
+                className="font-mono text-sm p-4 max-h-[400px] min-h-[300px]"
+                rows={12}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button variant="default" onClick={handleSubmitImport}>
+              Submit
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 

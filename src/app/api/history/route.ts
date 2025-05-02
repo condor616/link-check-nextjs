@@ -50,7 +50,22 @@ export async function GET(_request: NextRequest) {
       .filter(item => item !== null)
       .sort((a, b) => b.timestamp - a.timestamp);
     
-    return NextResponse.json({ items: validScans });
+    // Create lightweight summaries instead of sending full scan data
+    const summaries = validScans.map(scan => ({
+      id: scan.id,
+      scanUrl: scan.scanUrl,
+      scanDate: scan.scanDate,
+      durationSeconds: scan.durationSeconds,
+      timestamp: scan.timestamp,
+      resultsCount: scan.results?.length || 0,
+      brokenLinksCount: scan.results?.filter((r: { status: string }) => 
+        r.status === 'broken' || r.status === 'error'
+      ).length || 0,
+      config: scan.config
+      // Omit the full results array which can be very large
+    }));
+    
+    return NextResponse.json({ items: summaries });
   } catch (err) {
     console.error('Error retrieving scan history:', err);
     return NextResponse.json(

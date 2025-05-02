@@ -22,6 +22,7 @@ export interface ScanConfig {
     useAuthForAllDomains?: boolean; // Use auth headers for all domains instead of just the same domain
     processHtml?: boolean; // Whether to process HTML content for links (default: true)
     skipExternalDomains?: boolean; // Whether to skip external domains (default: true for re-scans)
+    excludeSubdomains?: boolean; // Whether to exclude subdomains (default: true)
     // TODO: Add User-Agent
 }
 
@@ -56,7 +57,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'cssSelectorsForceExclude' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains'>> & ScanConfig;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'cssSelectorsForceExclude' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains' | 'excludeSubdomains'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -92,6 +93,7 @@ class Scanner {
             useAuthForAllDomains: config.useAuthForAllDomains ?? false,
             processHtml: config.processHtml ?? true,
             skipExternalDomains: config.skipExternalDomains ?? true,
+            excludeSubdomains: config.excludeSubdomains ?? true,
             ...config, // Include any other passed config options
         };
 
@@ -323,7 +325,11 @@ class Scanner {
             // For each CSS selector, mark links that should be excluded
             this.config.cssSelectors.forEach(selector => {
                 try {
-                    $(selector).find('a[href]').each((_, el) => {
+                    // Select the elements with the selector first, then find all links within them
+                    const selectedElements = $(selector);
+                    
+                    // Then find all links within those elements
+                    selectedElements.find('a[href]').each((_, el) => {
                         // Mark elements to be excluded
                         $(el).attr('data-link-checker-exclude', 'true');
                         
@@ -377,11 +383,16 @@ class Scanner {
                 return;
             }
 
-            // Only process links from the same domain as the start URL
-            if (!this.isSameDomain(nextUrl)) {
-                // Create a basic result entry for external links but don't queue them for processing
+            // Check if external domain and if we should skip processing external links
+            const isExternal = !this.isSameDomain(nextUrl);
+            if (isExternal) {
+                // Always create a basic result entry for external links
                 this.addOrUpdateResultWithContext(nextUrl, pageUrl, $.html(element), { status: 'external' });
-                return;
+                
+                // If skipExternalDomains is true, don't queue external links for processing
+                if (this.config.skipExternalDomains) {
+                    return;
+                }
             }
 
             // Capture the HTML context
@@ -399,7 +410,7 @@ class Scanner {
             linkBatch.push({ url: nextUrl, context: htmlContext });
         });
 
-        // Process the batch of links all at once (only same-domain links)
+        // Process the batch of links all at once 
         for (const { url, context } of linkBatch) {
             // Add or update result entry with HTML context
             this.addOrUpdateResultWithContext(url, pageUrl, context);
@@ -511,7 +522,21 @@ class Scanner {
             result.status = 'external';
         }
 
-        // 4. Check wildcard exclusions (new feature)
+        // 4. Check for subdomains that should be excluded
+        if (this.config.excludeSubdomains) {
+            // Extract the root domain from the base URL
+            const baseHostname = new URL(this.startUrl).hostname;
+            const rootDomain = extractRootDomain(baseHostname);
+            
+            // Check if the URL is a subdomain of the root domain, but not the same as the base hostname
+            if (urlObj.hostname !== baseHostname && isSubdomainOfRoot(urlObj.hostname, rootDomain)) {
+                result.status = 'skipped';
+                result.errorMessage = `Skipped subdomain: ${urlObj.hostname}`;
+                return true;
+            }
+        }
+
+        // 5. Check wildcard exclusions (new feature)
         if (this.config.wildcardExclusions && this.config.wildcardExclusions.length > 0) {
             // Wildcard exclusions allow easy URL filtering without complex regex
             // Examples of wildcard patterns:
@@ -527,7 +552,7 @@ class Scanner {
             }
         }
 
-        // 5. Check regex exclusions
+        // 6. Check regex exclusions
         if (this.config.regexExclusions && this.config.regexExclusions.length > 0) {
             for (const pattern of this.config.regexExclusions) {
                 try {
@@ -557,7 +582,7 @@ export async function scanWebsite(startUrl: string, config: ScanConfig = {}): Pr
     // Create a new scanner instance with domain filtering enabled by default
     const scanner = new WebsiteScanner(startUrl, {
         ...config,
-        // By default, enable domain filtering for re-scans
+        // Preserve user's explicit choice, otherwise default to true
         skipExternalDomains: config.skipExternalDomains !== undefined ? config.skipExternalDomains : true
     });
     
@@ -629,10 +654,13 @@ class WebsiteScanner extends Scanner {
             return;
         }
 
-        // Check if it's an external domain and we should skip it
+        // Check if it's an external domain and we should skip processing it
+        // (But we still want to include the link in our results, just not fetch/analyze it)
         if (this.config.skipExternalDomains && !this.isSameDomain(urlToProcess) && urlToProcess !== this.startUrl) {
             console.log(`Skipping external domain: ${urlToProcess} (not scanning for content)`);
             currentResult.status = 'external';
+            // Mark as visited to prevent queuing attempts
+            this.visitedLinks.add(urlToProcess);
             return;
         }
 
@@ -716,4 +744,52 @@ class WebsiteScanner extends Scanner {
             }
         }
     }
+}
+
+// Extract the root domain from a hostname (e.g., "www.example.com" -> "example.com")
+function extractRootDomain(hostname: string): string {
+    const parts = hostname.split('.');
+    // If we have a standard domain like example.com
+    if (parts.length === 2) return hostname;
+    // For domains like www.example.com, or sub.example.com
+    // Return just the main domain (example.com)
+    return parts.slice(-2).join('.');
+}
+
+// Check if hostname is a subdomain of the root domain
+function isSubdomainOfRoot(hostname: string, rootDomain: string): boolean {
+    // Not a subdomain if it's the same as the root
+    if (hostname === rootDomain) return false;
+    
+    // Check if the hostname ends with the root domain
+    return hostname.endsWith('.' + rootDomain);
+}
+
+// Original isSubdomain function is no longer used for subdomain checking
+function isSubdomain(subdomain: string, parentDomain: string): boolean {
+    // Skip identical domains
+    if (subdomain === parentDomain) {
+        return false;
+    }
+    
+    // Extract domain parts
+    const subdomainParts = subdomain.split('.');
+    const parentDomainParts = parentDomain.split('.');
+    
+    // Subdomain must have more parts
+    if (subdomainParts.length <= parentDomainParts.length) {
+        return false;
+    }
+    
+    // Check if the subdomain ends with the parent domain
+    // For example, "reporting.novartis.com" should be a subdomain of "novartis.com"
+    const parentLength = parentDomainParts.length;
+    for (let i = 0; i < parentLength; i++) {
+        const subIdx = subdomainParts.length - parentLength + i;
+        if (subdomainParts[subIdx] !== parentDomainParts[i]) {
+            return false;
+        }
+    }
+    
+    return true;
 }
