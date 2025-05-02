@@ -159,30 +159,81 @@ export default function HistoryPage() {
 
   // Format date for display
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
+    try {
+      const date = new Date(dateStr);
+      
+      // Check if date is valid before formatting
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(date);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
   };
 
   // Get the exact time of the last scan
   const getLastScanDateTime = () => {
     if (scans.length === 0) return '-';
     
-    const lastScanDate = new Date(Math.max(...scans.map(s => new Date(s.scanDate).getTime())));
-    
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }).format(lastScanDate);
+    try {
+      // Simple approach - sort the scans by date and take the most recent
+      // First attempt to just sort and use the first result
+      const sortedScans = [...scans].sort((a, b) => {
+        const dateA = new Date(a.scanDate).getTime();
+        const dateB = new Date(b.scanDate).getTime();
+        
+        // If either date is invalid, consider it lesser (will be sorted to the end)
+        if (isNaN(dateA)) return 1;
+        if (isNaN(dateB)) return -1;
+        
+        return dateB - dateA; // Descending order (newest first)
+      });
+      
+      // Find the first scan with a valid date
+      for (const scan of sortedScans) {
+        const date = new Date(scan.scanDate);
+        if (!isNaN(date.getTime())) {
+          return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }).format(date);
+        }
+      }
+      
+      // Fallback - try the first scan regardless
+      if (scans.length > 0) {
+        const firstScan = scans[0];
+        const date = new Date(firstScan.scanDate);
+        if (!isNaN(date.getTime())) {
+          return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }).format(date);
+        }
+      }
+      
+      return '-';
+    } catch (error) {
+      console.error('Error formatting last scan date:', error);
+      return '-';
+    }
   };
 
   // TODO: Export scan function
