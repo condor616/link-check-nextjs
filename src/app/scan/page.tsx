@@ -694,39 +694,6 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
             </Alert>
           )}
           
-          {/* Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-muted/50 p-4 rounded-md">
-              <div className="text-xs text-muted-foreground">OK Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-                {scanStatus.progress.ok}
-              </div>
-            </div>
-            
-            <div className="bg-muted/50 p-4 rounded-md">
-              <div className="text-xs text-muted-foreground">Broken Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                <XCircle className="w-5 h-5 text-destructive" />
-                {scanStatus.progress.broken}
-              </div>
-            </div>
-            
-            <div className="bg-muted/50 p-4 rounded-md">
-              <div className="text-xs text-muted-foreground">External Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                {scanStatus.progress.external}
-              </div>
-            </div>
-            
-            <div className="bg-muted/50 p-4 rounded-md">
-              <div className="text-xs text-muted-foreground">Skipped Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                {scanStatus.progress.skipped}
-              </div>
-            </div>
-          </div>
-          
           {/* Scan Results (if scan is completed or has some results) */}
           {(scanStatus.status === 'completed' || results.length > 0) && (
             <div className="space-y-4">
@@ -818,6 +785,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                 results={results} 
                 scanUrl={paramUrl || ''} 
                 itemsPerPage={10}
+                hideTabs={true}
               />
             </div>
           )}
@@ -960,6 +928,7 @@ function ScanForm() {
   
   // Exclusion states
   const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
+  const [wildcardExclusions, setWildcardExclusions] = useState<string[]>([""]);
   const [cssSelectors, setCssSelectors] = useState<string[]>([""]);
   
   const handleScan = async () => {
@@ -975,6 +944,7 @@ function ScanForm() {
     try {
       // Filter out empty entries
       const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
+      const filteredWildcardExclusions = wildcardExclusions.filter(pattern => pattern.trim() !== "");
       const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
       
       const config: any = {
@@ -983,6 +953,7 @@ function ScanForm() {
         concurrency: concurrency,
         itemsPerPage: 10,
         regexExclusions: filteredRegexExclusions,
+        wildcardExclusions: filteredWildcardExclusions,
         cssSelectors: filteredCssSelectors,
         requestTimeout: requestTimeout * 1000, // Convert to milliseconds
       };
@@ -1072,6 +1043,20 @@ function ScanForm() {
     const newSelectors = [...cssSelectors];
     newSelectors[index] = value;
     setCssSelectors(newSelectors);
+  };
+  
+  const addWildcardExclusion = () => setWildcardExclusions([...wildcardExclusions, ""]);
+  
+  const removeWildcardExclusion = (index: number) => {
+    const newExclusions = [...wildcardExclusions];
+    newExclusions.splice(index, 1);
+    setWildcardExclusions(newExclusions);
+  };
+  
+  const updateWildcardExclusion = (index: number, value: string) => {
+    const newExclusions = [...wildcardExclusions];
+    newExclusions[index] = value;
+    setWildcardExclusions(newExclusions);
   };
   
   return (
@@ -1164,6 +1149,46 @@ function ScanForm() {
                     onChange={(e) => setRequestTimeout(parseInt(e.target.value) || 30)}
                   />
                   <p className="text-xs text-muted-foreground">Time before giving up on a single URL (5-180 seconds)</p>
+                </div>
+                
+                {/* Wildcard Exclusion Rules */}
+                <div className="space-y-2">
+                  <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Simple URL patterns to exclude (e.g., "example.com/about/*")
+                  </p>
+                  
+                  {wildcardExclusions.map((pattern, index) => (
+                    <div key={`wildcard-${index}`} className="flex gap-2 items-center mb-2">
+                      <Input
+                        value={pattern}
+                        onChange={(e) => updateWildcardExclusion(index, e.target.value)}
+                        placeholder="e.g. example.com/about/*"
+                      />
+                      
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeWildcardExclusion(index)}
+                        disabled={wildcardExclusions.length <= 1}
+                        className="shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addWildcardExclusion}
+                    className="mt-1"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Pattern
+                  </Button>
                 </div>
                 
                 {/* Regex Exclusion Rules */}

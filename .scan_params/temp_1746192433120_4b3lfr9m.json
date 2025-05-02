@@ -1,0 +1,16 @@
+{
+  "url": "https://www.condor616.com",
+  "config": {
+    "depth": 0,
+    "scanSameLinkOnce": true,
+    "concurrency": 10,
+    "itemsPerPage": 10,
+    "regexExclusions": [],
+    "wildcardExclusions": [
+      "https://www.condor616.com/blog/category",
+      "https://www.condor616.com/blog/category/*"
+    ],
+    "cssSelectors": [],
+    "requestTimeout": 30000
+  }
+}

@@ -81,9 +81,10 @@ interface ScanResultsProps {
   itemsPerPage?: number;
   scanId?: string;
   scanConfig?: any; // Add scanConfig to receive the original scan configuration
+  hideTabs?: boolean; // Add option to hide tabs and only show problematic links
 }
 
-export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId, scanConfig }: ScanResultsProps) {
+export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId, scanConfig, hideTabs = false }: ScanResultsProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -93,24 +94,52 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const [recheckSuccess, setRecheckSuccess] = useState<Map<string, string>>(new Map());
   const [localResults, setLocalResults] = useState<SerializedScanResult[]>(results);
   
+  // Use 'all' as the default tab when hideTabs is true
+  const [activeTab, setActiveTab] = useState<string>(hideTabs ? "all" : "problematic");
+  
   // Update local results when props change
   useEffect(() => {
     setLocalResults(results);
   }, [results]);
 
+  // Reset to 'all' if hideTabs is toggled
+  useEffect(() => {
+    if (hideTabs) {
+      setActiveTab("all");
+    }
+  }, [hideTabs]);
+
   // Filter results by status
-  const brokenLinks = localResults.filter(r => r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400));
-  const errorLinks = localResults.filter(r => r.status === 'error');
+  // First, identify skipped links - they take priority over other categories
   const skippedLinks = localResults.filter(r => r.status === 'skipped');
-  const externalLinks = localResults.filter(r => r.status === 'external');
+  // Extract all skipped URLs to avoid duplicating them in other categories
+  const skippedUrls = new Set(skippedLinks.map(r => r.url));
+
+  // Then process broken links, excluding those already in skipped
+  const brokenLinks = localResults.filter(r => 
+    !skippedUrls.has(r.url) && 
+    (r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400))
+  );
+
+  // Error links, excluding skipped
+  const errorLinks = localResults.filter(r => 
+    !skippedUrls.has(r.url) && 
+    r.status === 'error'
+  );
+
+  // External links, excluding skipped
+  const externalLinks = localResults.filter(r => 
+    !skippedUrls.has(r.url) && 
+    r.status === 'external'
+  );
+
+  // OK links, excluding skipped, broken and external
   const okLinks = localResults.filter(r => {
-    // Only include links that are:
-    // 1. Marked as "ok" status
-    // 2. Have no status code, or a status code < 400
-    // 3. Not already included in brokenLinks (double check)
-    return r.status === 'ok' && 
+    return !skippedUrls.has(r.url) &&
+           r.status === 'ok' && 
            (r.statusCode === undefined || r.statusCode < 400) &&
-           !brokenLinks.some(link => link.url === r.url);
+           !brokenLinks.some(link => link.url === r.url) &&
+           !externalLinks.some(link => link.url === r.url);
   });
   
   // Combined problematic links (broken + error)
@@ -166,7 +195,6 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const uniqueAllCount = getUniqueCount(results);
 
   // Pagination state and handlers
-  const [activeTab, setActiveTab] = useState<string>("problematic");
   
   // Get current list based on active tab
   const getCurrentList = () => {
@@ -1317,12 +1345,28 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  // Add this function to compare domains
+  // Update this function to compare domains properly, considering subdomains
   const isDifferentDomain = (url: string, baseUrl: string): boolean => {
     try {
       const urlDomain = new URL(url).hostname;
       const baseUrlDomain = new URL(baseUrl).hostname;
-      return urlDomain !== baseUrlDomain;
+      
+      // Extract root domains to handle subdomains
+      const getBaseDomain = (domain: string) => {
+        // Extract the base domain (e.g., example.com from sub.example.com)
+        const parts = domain.split('.');
+        // If we have enough parts for a subdomain
+        if (parts.length > 2) {
+          // Get the last two parts (e.g., example.com)
+          return parts.slice(-2).join('.');
+        }
+        return domain;
+      };
+      
+      const urlBaseDomain = getBaseDomain(urlDomain);
+      const baseUrlBaseDomain = getBaseDomain(baseUrlDomain);
+      
+      return urlBaseDomain !== baseUrlBaseDomain;
     } catch {
       return false;
     }
@@ -1330,58 +1374,138 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
 
   return (
     <div className="w-full">
-      <div className="flex justify-between items-center mb-4">
-        <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
-            <TabsList>
-              <TabsTrigger value="problematic" className="flex items-center gap-1">
-                <span>Problematic</span>
-                <Badge variant="outline" className="ml-1 py-0">{uniqueProblematicCount}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="ok" className="flex items-center gap-1">
-                <span>OK</span>
-                <Badge variant="outline" className="ml-1 py-0">{uniqueOkCount}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="external" className="flex items-center gap-1">
-                <span>External</span>
-                <Badge variant="outline" className="ml-1 py-0">{uniqueExternalCount}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="skipped" className="flex items-center gap-1">
-                <span>Skipped</span>
-                <Badge variant="outline" className="ml-1 py-0">{uniqueSkippedCount}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="all" className="flex items-center gap-1">
-                <span>All</span>
-                <Badge variant="outline" className="ml-1 py-0">{uniqueAllCount}</Badge>
-              </TabsTrigger>
-            </TabsList>
-            
-            {/* Add Export Button */}
-            <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} className="ml-auto" />
+      {!hideTabs ? (
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
+                <TabsList>
+                  <TabsTrigger value="problematic" className="flex items-center gap-1">
+                    <span>Problematic</span>
+                    <Badge variant="outline" className="ml-1 py-0">{uniqueProblematicCount}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="ok" className="flex items-center gap-1">
+                    <span>OK</span>
+                    <Badge variant="outline" className="ml-1 py-0">{uniqueOkCount}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="external" className="flex items-center gap-1">
+                    <span>External</span>
+                    <Badge variant="outline" className="ml-1 py-0">{uniqueExternalCount}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="skipped" className="flex items-center gap-1">
+                    <span>Skipped</span>
+                    <Badge variant="outline" className="ml-1 py-0">{uniqueSkippedCount}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="flex items-center gap-1">
+                    <span>All</span>
+                    <Badge variant="outline" className="ml-1 py-0">{uniqueAllCount}</Badge>
+                  </TabsTrigger>
+                </TabsList>
+                
+                {/* Add Export Button */}
+                <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} className="ml-auto" />
+              </div>
+            </Tabs>
           </div>
-        </Tabs>
-      </div>
-      <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
-        <TabsContent value="problematic" className="mt-4">
-          {renderLinksList(problematicLinks, true)}
-        </TabsContent>
-        
-        <TabsContent value="ok" className="mt-4">
-          {renderLinksList(okLinks)}
-        </TabsContent>
-        
-        <TabsContent value="external" className="mt-4">
-          {renderLinksList(externalLinks)}
-        </TabsContent>
-        
-        <TabsContent value="skipped" className="mt-4">
-          {renderLinksList(skippedLinks)}
-        </TabsContent>
-        
-        <TabsContent value="all" className="mt-4">
-          {renderLinksList(results)}
-        </TabsContent>
-      </Tabs>
+          <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
+            <TabsContent value="problematic" className="mt-4">
+              {renderLinksList(problematicLinks, true)}
+            </TabsContent>
+            
+            <TabsContent value="ok" className="mt-4">
+              {renderLinksList(okLinks)}
+            </TabsContent>
+            
+            <TabsContent value="external" className="mt-4">
+              {renderLinksList(externalLinks)}
+            </TabsContent>
+            
+            <TabsContent value="skipped" className="mt-4">
+              {renderLinksList(skippedLinks)}
+            </TabsContent>
+            
+            <TabsContent value="all" className="mt-4">
+              {renderLinksList(results)}
+            </TabsContent>
+          </Tabs>
+        </>
+      ) : (
+        <div>
+          {/* Filter cards that act as tabs */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div 
+              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'problematic' ? 'ring-2 ring-purple-500' : ''}`}
+              onClick={() => handleTabChange('problematic')}
+            >
+              <div className="text-xs text-muted-foreground">Problematic Links</div>
+              <div className="text-2xl font-semibold flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-destructive" />
+                {uniqueProblematicCount}
+              </div>
+            </div>
+            
+            <div 
+              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'ok' ? 'ring-2 ring-purple-500' : ''}`}
+              onClick={() => handleTabChange('ok')}
+            >
+              <div className="text-xs text-muted-foreground">OK Links</div>
+              <div className="text-2xl font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                {uniqueOkCount}
+              </div>
+            </div>
+            
+            <div 
+              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'external' ? 'ring-2 ring-purple-500' : ''}`}
+              onClick={() => handleTabChange('external')}
+            >
+              <div className="text-xs text-muted-foreground">External Links</div>
+              <div className="text-2xl font-semibold flex items-center gap-2">
+                <ArrowUpRight className="w-5 h-5 text-blue-500" />
+                {uniqueExternalCount}
+              </div>
+            </div>
+            
+            <div 
+              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'skipped' ? 'ring-2 ring-purple-500' : ''}`}
+              onClick={() => handleTabChange('skipped')}
+            >
+              <div className="text-xs text-muted-foreground">Skipped Links</div>
+              <div className="text-2xl font-semibold flex items-center gap-2">
+                {uniqueSkippedCount}
+              </div>
+            </div>
+            
+            <div 
+              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'all' ? 'ring-2 ring-purple-500' : ''}`}
+              onClick={() => handleTabChange('all')}
+            >
+              <div className="text-xs text-muted-foreground">All Links</div>
+              <div className="text-2xl font-semibold flex items-center gap-2">
+                {uniqueAllCount}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">
+              {activeTab === 'problematic' && 'Problematic Links'}
+              {activeTab === 'ok' && 'OK Links'}
+              {activeTab === 'external' && 'External Links'}
+              {activeTab === 'skipped' && 'Skipped Links'}
+              {activeTab === 'all' && 'All Links'}
+            </h3>
+            <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} />
+          </div>
+          
+          {/* Render the appropriate list based on activeTab */}
+          {activeTab === 'problematic' && renderLinksList(problematicLinks, true)}
+          {activeTab === 'ok' && renderLinksList(okLinks)}
+          {activeTab === 'external' && renderLinksList(externalLinks)}
+          {activeTab === 'skipped' && renderLinksList(skippedLinks)}
+          {activeTab === 'all' && renderLinksList(results)}
+        </div>
+      )}
     </div>
   );
 } 

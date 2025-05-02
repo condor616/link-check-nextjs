@@ -1,0 +1,12 @@
+{
+  "url": "https://condor616.com",
+  "config": {
+    "depth": 0,
+    "scanSameLinkOnce": true,
+    "concurrency": 10,
+    "itemsPerPage": 10,
+    "regexExclusions": [],
+    "cssSelectors": [],
+    "requestTimeout": 30000
+  }
+}

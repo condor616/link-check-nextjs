@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertCircle, ArrowLeft, Trash2 } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Trash2, CheckCircle2, XCircle } from 'lucide-react';
 import { ScanResult } from '@/lib/scanner';
 import ScanResults from '@/components/ScanResults';
 import {
@@ -150,6 +150,11 @@ function ScanDetailsContent() {
   // Filter broken links
   const brokenLinks = scan?.results?.filter(r => r.status === 'broken' || r.status === 'error') || [];
   
+  // Count different types of links
+  const okLinks = scan?.results?.filter(r => r.status === 'ok') || [];
+  const externalLinks = scan?.results?.filter(r => r.status === 'external') || [];
+  const skippedLinks = scan?.results?.filter(r => r.status === 'skipped') || [];
+  
   return (
     <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
       <Card className="w-full max-w-6xl">
@@ -162,41 +167,16 @@ function ScanDetailsContent() {
               </Link>
             </Button>
             
-            {scan && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" disabled={isDeleting}>
-                    {isDeleting ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4 mr-2" />
-                    )}
-                    Delete
+            <div className="flex gap-2">
+              {scan && (
+                <Link href={`/scan?id=${scanId}`}>
+                  <Button variant="outline" size="sm" className="text-purple-600 border-purple-200 hover:bg-purple-50">
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Scan again
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete this scan record. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={deleteScan}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            
-            {scan && (
-              <Link href={`/scan?id=${scanId}`} className="ml-2">
-                <Button variant="outline" size="sm" className="text-purple-600 border-purple-200 hover:bg-purple-50">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  Scan again
-                </Button>
-              </Link>
-            )}
+                </Link>
+              )}
+            </div>
           </div>
           
           <CardTitle className="text-2xl flex items-center gap-2">
@@ -244,12 +224,44 @@ function ScanDetailsContent() {
               </div>
               
               {/* Scan Results */}
-              <div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Results</h3>
+                  
+                  {scan && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm" disabled={isDeleting}>
+                          {isDeleting ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 mr-2" />
+                          )}
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete this scan record. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={deleteScan}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
+                
                 <ScanResults 
                   results={scan.results} 
                   scanUrl={scan.scanUrl} 
                   scanId={scanId}
                   scanConfig={scan.config}
+                  hideTabs={true}
                 />
               </div>
             </div>

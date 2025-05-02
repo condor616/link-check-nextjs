@@ -11,6 +11,7 @@ export interface ScanConfig {
     concurrency?: number; // Max concurrent requests
     itemsPerPage?: number; // Items per page for results pagination
     regexExclusions?: string[]; // Array of regex patterns for URLs to exclude
+    wildcardExclusions?: string[]; // Array of wildcard patterns for URLs to exclude (e.g., "example.com/about/*", "*/privacy/", "https://*.example.org")
     cssSelectors?: string[]; // Array of CSS selectors - links inside these elements will be excluded
     requestTimeout?: number; // Timeout in milliseconds for each request (default: 10000)
     auth?: {
@@ -54,7 +55,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'cssSelectors' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains'>> & ScanConfig;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -83,6 +84,7 @@ class Scanner {
             concurrency: config.concurrency ?? 10, // Default concurrency
             itemsPerPage: config.itemsPerPage ?? 10, // Default to 10 items per page
             regexExclusions: config.regexExclusions ?? [], // Default to empty array
+            wildcardExclusions: config.wildcardExclusions ?? [], // Default to empty array
             cssSelectors: config.cssSelectors ?? [], // Default to empty array
             requestTimeout: config.requestTimeout ?? 30000, // Default to 30 seconds (up from 10)
             useAuthForAllDomains: config.useAuthForAllDomains ?? false,
@@ -159,7 +161,23 @@ class Scanner {
         try {
             const urlObj = new URL(url);
             const baseObj = new URL(this.baseUrl);
-            return urlObj.hostname === baseObj.hostname;
+            
+            // Extract root domains to handle subdomains
+            const getBaseDomain = (domain: string) => {
+                // Extract the base domain (e.g., example.com from sub.example.com)
+                const parts = domain.split('.');
+                // If we have enough parts for a subdomain
+                if (parts.length > 2) {
+                    // Get the last two parts (e.g., example.com)
+                    return parts.slice(-2).join('.');
+                }
+                return domain;
+            };
+            
+            const urlBaseDomain = getBaseDomain(urlObj.hostname);
+            const baseUrlBaseDomain = getBaseDomain(baseObj.hostname);
+            
+            return urlBaseDomain === baseUrlBaseDomain;
         } catch {
             return false;
         }
@@ -296,6 +314,7 @@ class Scanner {
         
         // Get all links that are not in excluded CSS selectors
         let links = $('a[href]');
+        let skippedLinks = new Set<string>();
         
         // Filter out links based on CSS selectors if configured
         if (this.config.cssSelectors && this.config.cssSelectors.length > 0) {
@@ -305,6 +324,26 @@ class Scanner {
                     $(selector).find('a[href]').each((_, el) => {
                         // Mark elements to be excluded
                         $(el).attr('data-link-checker-exclude', 'true');
+                        
+                        // Track the URL to mark as skipped
+                        const href = $(el).attr('href')?.trim();
+                        if (href) {
+                            const nextUrl = this.normalizeUrl(href, pageUrl);
+                            if (nextUrl) {
+                                skippedLinks.add(nextUrl);
+                                
+                                // Add as skipped to results immediately
+                                this.addOrUpdateResultWithContext(
+                                    nextUrl, 
+                                    pageUrl, 
+                                    $.html(el), 
+                                    { 
+                                        status: 'skipped',
+                                        errorMessage: 'Excluded by CSS selector' 
+                                    }
+                                );
+                            }
+                        }
                     });
                 } catch (error) {
                     console.warn(`Invalid CSS selector: ${selector}`);
@@ -324,6 +363,11 @@ class Scanner {
 
             const nextUrl = this.normalizeUrl(href, pageUrl);
             if (!nextUrl) return;
+            
+            // Skip processing links we've already marked as skipped
+            if (skippedLinks.has(nextUrl)) {
+                return;
+            }
 
             // Only process links from the same domain as the start URL
             if (!this.isSameDomain(nextUrl)) {
@@ -373,6 +417,68 @@ class Scanner {
         }
     }
 
+    // Wildcard matching helper function
+    protected wildcardMatch(text: string, pattern: string): boolean {
+        // Handle patterns that are meant to match any part of the URL
+        if (!pattern.includes('://') && !pattern.startsWith('*')) {
+            // If pattern doesn't have protocol and doesn't start with *, check if it's a domain or path pattern
+            if (pattern.includes('/')) {
+                // Contains a slash, could be domain + path like "example.com/about/*"
+                const parts = pattern.split('/', 2);
+                const domainPart = parts[0];
+                
+                try {
+                    // Try to extract the domain from the URL
+                    const urlObj = new URL(text);
+                    
+                    // Check if domain matches (supports subdomains)
+                    if (!urlObj.hostname.endsWith(domainPart) && 
+                        !urlObj.hostname.replace('www.', '').endsWith(domainPart)) {
+                        return false;
+                    }
+                    
+                    // For domain matches, we want to match the rest of the pattern against the pathname
+                    // Rebuild the pattern as a path-only pattern
+                    const pathPattern = pattern.substring(domainPart.length);
+                    if (pathPattern === '/') {
+                        // If pattern is exactly domain.com/, then only match the domain root
+                        return urlObj.pathname === '/' || urlObj.pathname === '';
+                    } else if (pathPattern === '/*') {
+                        // If pattern is domain.com/*, then match everything on the domain
+                        return true;
+                    } else {
+                        // Convert the pattern to match against the pathname
+                        // If pattern is domain.com/about/*, use */about/* to match the pathname
+                        pattern = '*' + pathPattern;
+                        text = urlObj.pathname;
+                    }
+                } catch (e) {
+                    // If URL parsing fails, fall back to direct string matching
+                }
+            } else {
+                // Might be just a domain pattern like "example.com"
+                try {
+                    const urlObj = new URL(text);
+                    // Check both with and without www prefix
+                    return urlObj.hostname.endsWith(pattern) || 
+                           urlObj.hostname.replace('www.', '').endsWith(pattern);
+                } catch (e) {
+                    // If URL parsing fails, fall back to direct string matching
+                }
+            }
+        }
+        
+        // Convert wildcard pattern to regex
+        // Escape special regex chars, but convert * to .* and ? to .
+        const regexPattern = pattern
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special chars except * and ?
+            .replace(/\*/g, '.*')                 // * becomes .*
+            .replace(/\?/g, '.');                 // ? becomes .
+        
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(text);
+    }
+
     // Determines if a URL should be processed or skipped
     protected shouldSkipUrl(url: string, depth: number, result: ScanResult): boolean {
         // 1. Already fetched/processed?
@@ -397,7 +503,23 @@ class Scanner {
             result.status = 'external';
         }
 
-        // 4. Check regex exclusions
+        // 4. Check wildcard exclusions (new feature)
+        if (this.config.wildcardExclusions && this.config.wildcardExclusions.length > 0) {
+            // Wildcard exclusions allow easy URL filtering without complex regex
+            // Examples of wildcard patterns:
+            // - "example.com/about/*" - Skips all URLs on example.com in the about section
+            // - "*/privacy-policy*" - Skips all privacy policy pages on any domain
+            // - "example.org/blog/*/comments" - Skips all comment sections of blog posts
+            for (const pattern of this.config.wildcardExclusions) {
+                if (this.wildcardMatch(url, pattern)) {
+                    result.status = 'skipped';
+                    result.errorMessage = `URL matches wildcard exclusion pattern: ${pattern}`;
+                    return true;
+                }
+            }
+        }
+
+        // 5. Check regex exclusions
         if (this.config.regexExclusions && this.config.regexExclusions.length > 0) {
             for (const pattern of this.config.regexExclusions) {
                 try {
