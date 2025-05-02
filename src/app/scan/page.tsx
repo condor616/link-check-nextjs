@@ -154,6 +154,10 @@ function ScannerContent() {
             username: authCredentials.username,
             password: authCredentials.password
           };
+          // Pass the useAuthForAllDomains flag if present
+          if ('useAuthForAllDomains' in scanConfig) {
+            requestBody.config.useAuthForAllDomains = scanConfig.useAuthForAllDomains;
+          }
         }
         
         const response = await fetch('/api/scan', {

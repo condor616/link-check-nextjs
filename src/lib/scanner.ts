@@ -17,6 +17,7 @@ export interface ScanConfig {
         username: string;
         password: string;
     }; // HTTP Basic Authentication credentials
+    useAuthForAllDomains?: boolean; // Use auth headers for all domains instead of just the same domain
     // TODO: Add User-Agent
 }
 
@@ -49,7 +50,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'cssSelectors' | 'requestTimeout'>> & ScanConfig;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'cssSelectors' | 'requestTimeout' | 'useAuthForAllDomains'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -58,6 +59,10 @@ class Scanner {
     protected isRunning: boolean = false;
     // Use the inferred type for the limiter instance
     protected limit: LimitFunction | null = null;
+    // Cache for auth headers to avoid recomputing for each request
+    private authHeadersCache: Record<string, string> | null = null;
+    // Domain cache to optimize hostname lookups
+    private domainCache: Map<string, string> = new Map();
 
     constructor(startUrl: string, config: ScanConfig = {}) {
         const normalizedStart = this.normalizeUrl(startUrl, startUrl);
@@ -76,6 +81,7 @@ class Scanner {
             regexExclusions: config.regexExclusions ?? [], // Default to empty array
             cssSelectors: config.cssSelectors ?? [], // Default to empty array
             requestTimeout: config.requestTimeout ?? 30000, // Default to 30 seconds (up from 10)
+            useAuthForAllDomains: config.useAuthForAllDomains ?? false,
             ...config, // Include any other passed config options
         };
 
@@ -87,6 +93,21 @@ class Scanner {
             throw new Error("Request timeout must be a positive number.");
         }
 
+        // Initialize auth headers cache if auth is provided
+        if (this.config.auth?.username && this.config.auth?.password) {
+            const credentials = Buffer.from(`${this.config.auth.username}:${this.config.auth.password}`).toString('base64');
+            this.authHeadersCache = {
+                'User-Agent': 'LinkCheckerProBot/1.0',
+                'Authorization': `Basic ${credentials}`,
+                'Connection': 'keep-alive' // Enable connection reuse
+            };
+        } else {
+            this.authHeadersCache = {
+                'User-Agent': 'LinkCheckerProBot/1.0',
+                'Connection': 'keep-alive' // Enable connection reuse
+            };
+        }
+        
         this.visitedLinks = new Set<string>();
         this.queuedLinks = new Set<string>();
         this.results = new Map<string, ScanResult>();
@@ -95,6 +116,11 @@ class Scanner {
     }
 
     private normalizeUrl(url: string, baseUrl: string): string | null {
+        // Quick check for common non-HTTP protocols
+        if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('javascript:')) {
+            return null;
+        }
+        
         try {
             // Handle mailto:, tel:, etc. which are valid but not scannable http links
             if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('#')) {
@@ -104,9 +130,13 @@ class Scanner {
             }
 
             if (url.startsWith('#')) {
-                const absoluteUrl = new URL(baseUrl);
-                absoluteUrl.hash = "";
-                return absoluteUrl.toString();
+                // For anchors, cache and reuse base URL without fragment
+                if (!this.domainCache.has(baseUrl)) {
+                    const absoluteUrl = new URL(baseUrl);
+                    absoluteUrl.hash = "";
+                    this.domainCache.set(baseUrl, absoluteUrl.toString());
+                }
+                return this.domainCache.get(baseUrl) || baseUrl;
             }
 
             const absoluteUrl = new URL(url, baseUrl);
@@ -115,6 +145,17 @@ class Scanner {
         } catch (error) {
             console.warn(`Invalid URL encountered: ${url} (Base: ${baseUrl})`);
             return null;
+        }
+    }
+
+    // Helper method to determine if a URL is from the same domain as the base URL
+    private isSameDomain(url: string): boolean {
+        try {
+            const urlObj = new URL(url);
+            const baseObj = new URL(this.baseUrl);
+            return urlObj.hostname === baseObj.hostname;
+        } catch {
+            return false;
         }
     }
 
@@ -184,22 +225,30 @@ class Scanner {
 
         // Fetch and process
         try {
-            // Prepare headers including auth if configured
-            const headers: Record<string, string> = { 
-                'User-Agent': 'LinkCheckerProBot/1.0'
+            // Only use auth headers for the same domain or when configured to use for all domains
+            const isSameDomainUrl = this.isSameDomain(urlToProcess);
+            const shouldUseAuth = isSameDomainUrl || this.config.useAuthForAllDomains;
+            
+            // Choose appropriate timeout based on whether it's same domain
+            const timeoutDuration = isSameDomainUrl ? 
+                this.config.requestTimeout : 
+                Math.min(this.config.requestTimeout, 15000); // 15s max for external domains
+            
+            const fetchOptions: RequestInit = {
+                headers: shouldUseAuth ? this.authHeadersCache || {
+                    'User-Agent': 'LinkCheckerProBot/1.0',
+                    'Connection': 'keep-alive'
+                } : {
+                    'User-Agent': 'LinkCheckerProBot/1.0',
+                    'Connection': 'keep-alive'
+                },
+                redirect: 'follow',
+                signal: AbortSignal.timeout(timeoutDuration),
+                cache: 'no-store',
+                keepalive: true
             };
             
-            // Add basic auth if configured
-            if (this.config.auth?.username && this.config.auth?.password) {
-                const credentials = Buffer.from(`${this.config.auth.username}:${this.config.auth.password}`).toString('base64');
-                headers['Authorization'] = `Basic ${credentials}`;
-            }
-            
-            const response = await fetch(urlToProcess, {
-                headers,
-                redirect: 'follow',
-                signal: AbortSignal.timeout(this.config.requestTimeout), // Use configurable timeout
-            });
+            const response = await fetch(urlToProcess, fetchOptions);
 
             const status = response.status;
             const contentType = response.headers.get('content-type') || '';
@@ -260,6 +309,9 @@ class Scanner {
             links = links.filter((_, el) => !$(el).attr('data-link-checker-exclude'));
         }
 
+        // Prepare a batch of links to process more efficiently
+        const linkBatch: { url: string, context: string }[] = [];
+
         links.each((_, element) => {
             const href = $(element).attr('href')?.trim();
             if (!href) return;
@@ -268,27 +320,31 @@ class Scanner {
             if (!nextUrl) return;
 
             // Capture the HTML context (the <a> tag and its content)
-            // Get up to 5 parents to give enough context
-            const parents = $(element).parents().slice(0, 5);
+            // Streamlined context capture for better performance
             let htmlContext = '';
-            if (parents.length > 0) {
-                // Get the outermost parent for context
-                const parentHtml = $.html(parents.last());
-                // Trim to a reasonable size
-                htmlContext = parentHtml.length > 500 ? 
-                    parentHtml.substring(0, 500) + '...' : 
-                    parentHtml;
-            } else {
-                // If no parents, just get the link element HTML
+            try {
+                // Just grab the immediate parent for context - reduces processing time
+                const parent = $(element).parent();
+                htmlContext = parent.length ? 
+                    $.html(parent).substring(0, 200) : // Smaller context size
+                    $.html(element);
+            } catch (e) {
+                // Fallback to just the element itself if there's an error
                 htmlContext = $.html(element);
             }
 
+            // Add to batch instead of processing immediately
+            linkBatch.push({ url: nextUrl, context: htmlContext });
+        });
+
+        // Process the batch of links all at once
+        for (const { url, context } of linkBatch) {
             // Add or update result entry with HTML context
-            this.addOrUpdateResultWithContext(nextUrl, pageUrl, htmlContext);
+            this.addOrUpdateResultWithContext(url, pageUrl, context);
 
             // Queue for processing if meets criteria
-            this.queueLinkForProcessing(nextUrl, currentDepth + 1);
-        });
+            this.queueLinkForProcessing(url, currentDepth + 1);
+        }
     }
 
     // Determines if a URL should be processed or skipped
@@ -364,8 +420,14 @@ class Scanner {
             throw new Error("Scan already in progress.");
         }
         this.isRunning = true;
-        this.limit = pLimit(this.config.concurrency);
-        console.log(`Starting concurrent scan (concurrency: ${this.config.concurrency}) for ${this.startUrl}`);
+        
+        // Adjust concurrency for authenticated requests if needed
+        const effectiveConcurrency = this.config.auth 
+            ? Math.min(this.config.concurrency, 15) // Limit concurrent auth requests to prevent server throttling
+            : this.config.concurrency;
+            
+        this.limit = pLimit(effectiveConcurrency);
+        console.log(`Starting concurrent scan (concurrency: ${effectiveConcurrency}) for ${this.startUrl}`);
 
         // Queue the initial URL
         this.queuedLinks.add(this.startUrl);

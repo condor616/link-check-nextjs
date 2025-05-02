@@ -31,6 +31,7 @@ export default function HomePage() {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [authEnabled, setAuthEnabled] = useState<boolean>(false);
+  const [useAuthForAllDomains, setUseAuthForAllDomains] = useState<boolean>(true);
   
   // New states for regex and CSS selector exclusions
   const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
@@ -81,6 +82,8 @@ export default function HomePage() {
         username,
         password
       };
+      // Add useAuthForAllDomains flag if auth is enabled
+      requestBody.config.useAuthForAllDomains = useAuthForAllDomains;
     }
 
     try {
@@ -378,6 +381,20 @@ export default function HomePage() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Password"
                     />
+                  </div>
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="useAuthForAllDomains"
+                      checked={useAuthForAllDomains}
+                      onCheckedChange={(checked) => setUseAuthForAllDomains(!!checked)}
+                    />
+                    <Label htmlFor="useAuthForAllDomains" className="cursor-pointer text-sm font-normal">
+                      Use auth for all domains (may improve performance)
+                    </Label>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Performance tip: Using auth for all domains reduces connection setup time. 
+                    Only disable if external sites don't accept the credentials.
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-6">
