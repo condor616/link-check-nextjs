@@ -19,7 +19,11 @@ import {
   Key,
   Check,
   X,
-  Plus
+  Plus,
+  ChevronDown,
+  FileUp,
+  Copy,
+  ClipboardCheck
 } from 'lucide-react';
 import ScanResults from '@/components/ScanResults';
 import Link from 'next/link';
@@ -37,6 +41,15 @@ import { motion } from 'framer-motion';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import JSONPreview from '@/components/JSONPreview';
 
 // Define the scan status interface
 interface ScanStatus {
@@ -110,6 +123,12 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
   
   // Use ref to track if we've already initiated a scan for this URL/config combination
   const hasInitiatedScan = useRef(false);
+  
+  // Add copy to clipboard function
+  const copyJsonToClipboard = (json: any) => {
+    const stringified = JSON.stringify(json, null, 2);
+    navigator.clipboard.writeText(stringified);
+  };
   
   // Add states for loading scan parameters from ID
   const [paramUrl, setParamUrl] = useState<string | undefined>(scanUrl);
@@ -957,21 +976,18 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                         
                         {/* Configuration JSON (Read-only) */}
                         <div className="border-t border-border pt-6">
-                          <div className="space-y-2">
-                            <Label htmlFor="configJson">Configuration JSON (Read-only)</Label>
-                    <pre className="p-2 bg-muted rounded-md mt-1 overflow-auto max-h-40 text-xs">
-                              {JSON.stringify({
-                                ...editedConfig,
-                                regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
-                                cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
-                                cssSelectorsForceExclude,
-                                wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== "")
-                              }, null, 2)}
-                    </pre>
-                          </div>
+                          <JSONPreview
+                            data={{
+                              ...editedConfig,
+                              regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
+                              cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
+                              cssSelectorsForceExclude,
+                              wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== "")
+                            }}
+                          />
                         </div>
-                  </div>
-                )}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1297,6 +1313,12 @@ function ScanForm() {
   const [isCreatingScan, setIsCreatingScan] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string | null>(null);
   
+  // Add states for saved scans dropdown
+  const [savedConfigs, setSavedConfigs] = useState<any[]>([]);
+  const [isLoadingSavedConfigs, setIsLoadingSavedConfigs] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadedConfigName, setLoadedConfigName] = useState<string | null>(null);
+  
   // Auth states
   const [showAuthDialog, setShowAuthDialog] = useState<boolean>(false);
   const [username, setUsername] = useState<string>("");
@@ -1310,6 +1332,94 @@ function ScanForm() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  
+  // Add useEffect to fetch saved configurations when component mounts
+  useEffect(() => {
+    fetchSavedConfigs();
+  }, []);
+  
+  // Function to fetch saved configurations
+  const fetchSavedConfigs = async () => {
+    setIsLoadingSavedConfigs(true);
+    setLoadError(null);
+    
+    try {
+      const response = await fetch('/api/saved-configs');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch saved configurations');
+      }
+      
+      setSavedConfigs(data);
+    } catch (error) {
+      console.error('Error fetching saved configurations:', error);
+      setLoadError(error instanceof Error ? error.message : 'Failed to fetch saved configurations');
+    } finally {
+      setIsLoadingSavedConfigs(false);
+    }
+  };
+  
+  // Function to load a saved configuration into the form
+  const loadSavedConfig = (config: any) => {
+    // Set basic fields
+    setUrl(config.url || "");
+    setLoadedConfigName(config.name || null);
+    
+    // Set scan parameters from config
+    setDepth(config.config.depth ?? 0);
+    setConcurrency(config.config.concurrency ?? 10);
+    setRequestTimeout((config.config.requestTimeout ?? 30000) / 1000); // Convert from ms to seconds
+    setScanSameLinkOnce(config.config.scanSameLinkOnce !== false);
+    
+    // Set exclusion patterns
+    setRegexExclusions(
+      config.config.regexExclusions?.length ? 
+      config.config.regexExclusions : [""]
+    );
+    
+    setCssSelectors(
+      config.config.cssSelectors?.length ? 
+      config.config.cssSelectors : [""]
+    );
+    
+    setCssSelectorsForceExclude(!!config.config.cssSelectorsForceExclude);
+    
+    setWildcardExclusions(
+      config.config.wildcardExclusions?.length ? 
+      config.config.wildcardExclusions : [""]
+    );
+    
+    // Set auth if available
+    if (config.config.auth) {
+      setUsername(config.config.auth.username || '');
+      setPassword(config.config.auth.password || '');
+      setAuthEnabled(true);
+      setUseAuthForAllDomains(config.config.useAuthForAllDomains || false);
+    } else {
+      setUsername('');
+      setPassword('');
+      setAuthEnabled(false);
+      setUseAuthForAllDomains(true);
+    }
+    
+    // Show advanced options if any advanced options are set
+    if (
+      (config.config.regexExclusions && config.config.regexExclusions.length > 0) ||
+      (config.config.cssSelectors && config.config.cssSelectors.length > 0) ||
+      (config.config.wildcardExclusions && config.config.wildcardExclusions.length > 0)
+    ) {
+      setShowAdvanced(true);
+    }
+    
+    // Set an initial name for saving
+    if (!configName && config.name) {
+      setConfigName(`${config.name} (Copy)`);
+    }
+    
+    // Clear any errors
+    setScanError(null);
+  };
   
   const handleScan = async () => {
     // Basic URL validation
@@ -1499,13 +1609,18 @@ function ScanForm() {
     setSaveError(null);
     setSaveSuccess(false);
     
-    // Generate a default name based on URL domain
-    if (!configName && url) {
-      try {
-        const urlObj = new URL(url);
-        setConfigName(`Scan for ${urlObj.hostname}`);
-      } catch (e) {
-        setConfigName('New Scan');
+    if (!showSaveDialog) {
+      // Set initial config name based on loaded scan or URL domain
+      if (loadedConfigName && !configName) {
+        setConfigName(`${loadedConfigName} (Copy)`);
+      } else if (!configName && url) {
+        // Generate a default name based on URL domain
+        try {
+          const urlObj = new URL(url);
+          setConfigName(`Scan for ${urlObj.hostname}`);
+        } catch (e) {
+          setConfigName('New Scan');
+        }
       }
     }
   };
@@ -1564,6 +1679,33 @@ function ScanForm() {
     setWildcardExclusions(newExclusions);
   };
 
+  // Add a function to reset the form
+  const resetLoadedScan = () => {
+    setUrl("");
+    setDepth(0);
+    setConcurrency(10);
+    setRequestTimeout(30);
+    setScanSameLinkOnce(true);
+    setRegexExclusions([""]);
+    setCssSelectors([""]);
+    setCssSelectorsForceExclude(false);
+    setWildcardExclusions([""]);
+    setUsername("");
+    setPassword("");
+    setAuthEnabled(false);
+    setUseAuthForAllDomains(true);
+    setLoadedConfigName(null);
+    setConfigName("");
+    setShowAdvanced(false);
+    setScanError(null);
+  };
+
+  // Add copy to clipboard function
+  const copyJsonToClipboard = (json: any) => {
+    const stringified = JSON.stringify(json, null, 2);
+    navigator.clipboard.writeText(stringified);
+  };
+
   return (
     <div className="space-y-6 mx-auto container p-4 max-w-none">
       <h1 className="text-2xl font-bold">New Scan</h1>
@@ -1571,21 +1713,86 @@ function ScanForm() {
       {/* Main scan card */}
       <Card className="bg-white shadow">
         <CardHeader>
-          <CardTitle>Scan Website for Broken Links</CardTitle>
-          <CardDescription>Enter a URL to scan for broken links and other issues</CardDescription>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl">New Scan</CardTitle>
+              <CardDescription>
+                Enter a URL to scan for broken links
+              </CardDescription>
+            </div>
+            
+            {/* Add the Load Scan dropdown here */}
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2"
+                    disabled={isLoadingSavedConfigs || savedConfigs.length === 0}
+                  >
+                    {isLoadingSavedConfigs ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <FileUp className="h-4 w-4" />
+                        Load Scan
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[300px]">
+                  <DropdownMenuLabel>Saved Scan Configurations</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  {savedConfigs.length === 0 ? (
+                    <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      No saved scans found
+                    </div>
+                  ) : (
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {savedConfigs.map((config) => (
+                        <DropdownMenuItem 
+                          key={config.id}
+                          onClick={() => loadSavedConfig(config)}
+                          className="cursor-pointer flex flex-col items-start p-3"
+                        >
+                          <div className="font-medium">{config.name}</div>
+                          <div className="text-xs text-muted-foreground truncate max-w-full">
+                            {config.url}
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {loadedConfigName && (
+                <div className="text-sm text-muted-foreground">
+                  Loaded: <span className="font-medium">{loadedConfigName}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </CardHeader>
+
         <CardContent>
           <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="url">Website URL</Label>
-              <div className="flex gap-2 items-center">
-                <Input
+            <div>
+              <Label htmlFor="url" className="text-base font-medium">URL to scan</Label>
+              <div className="flex mt-1.5 gap-2">
+                <Input 
                   id="url"
-                  placeholder="https://example.com"
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  className="flex-1 h-10"
+                  placeholder="https://example.com"
+                  className="flex-1"
+                  required
                 />
                 <Button 
                   variant={authEnabled ? "secondary" : "outline"} 
@@ -1604,6 +1811,28 @@ function ScanForm() {
                 </div>
               )}
             </div>
+            
+            {/* Add the loaded scan notification here */}
+            {loadedConfigName && (
+              <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-md border border-blue-200 text-blue-700">
+                <div className="flex-1">
+                  <div className="font-medium">
+                    Loaded configuration: {loadedConfigName}
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    Make changes as needed, then click "Start Scan" to run, or "Save Configuration" to save as a new configuration
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={resetLoadedScan}
+                  className="h-8 text-blue-700 hover:text-blue-800 hover:bg-blue-100"
+                >
+                  <X className="h-4 w-4 mr-1" /> Clear
+                </Button>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -1849,6 +2078,32 @@ function ScanForm() {
                       </div>
                     </div>
                   </div>
+                </div>
+                
+                {/* Configuration JSON (Read-only) */}
+                <div className="border-t border-border pt-6 mt-4">
+                  <JSONPreview
+                    data={{
+                      url: url,
+                      config: {
+                        depth: depth,
+                        concurrency: concurrency,
+                        requestTimeout: requestTimeout * 1000, 
+                        scanSameLinkOnce: scanSameLinkOnce,
+                        regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
+                        cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
+                        cssSelectorsForceExclude: cssSelectorsForceExclude,
+                        wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== ""),
+                        ...(authEnabled && {
+                          auth: {
+                            username: username,
+                            password: password
+                          },
+                          useAuthForAllDomains: useAuthForAllDomains
+                        })
+                      }
+                    }}
+                  />
                 </div>
               </div>
             )}

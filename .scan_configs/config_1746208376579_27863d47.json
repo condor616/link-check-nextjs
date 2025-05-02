@@ -10,12 +10,13 @@
     "regexExclusions": [],
     "cssSelectors": [
       ".footer",
-      ".header"
+      ".header",
+      "#block-polaris-languagecountryselectorfordesktop"
     ],
     "cssSelectorsForceExclude": false,
     "wildcardExclusions": [],
     "requestTimeout": 30000
   },
   "createdAt": "2025-05-02T17:52:56.579Z",
-  "updatedAt": "2025-05-02T17:52:56.579Z"
+  "updatedAt": "2025-05-02T18:00:02.803Z"
 }

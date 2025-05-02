@@ -26,7 +26,8 @@ import {
   X, 
   Save, 
   ArrowLeft,
-  Plus
+  Plus,
+  Copy
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -39,6 +40,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import JSONPreview from '@/components/JSONPreview';
 
 export default function SavedScansPage() {
   const [configs, setConfigs] = useState<SavedScanConfig[]>([]);
@@ -340,6 +342,12 @@ export default function SavedScansPage() {
     const newExclusions = [...editWildcardExclusions];
     newExclusions[index] = value;
     setEditWildcardExclusions(newExclusions);
+  };
+  
+  // Add copy to clipboard function
+  const copyJsonToClipboard = (json: any) => {
+    const stringified = JSON.stringify(json, null, 2);
+    navigator.clipboard.writeText(stringified);
   };
   
   return (
@@ -766,6 +774,33 @@ export default function SavedScansPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+                
+                {/* Use the new JSONPreview component */}
+                <div className="border-t border-border pt-6 mt-4">
+                  <JSONPreview 
+                    data={{
+                      name: editName,
+                      url: editUrl,
+                      config: {
+                        depth: editDepth,
+                        concurrency: editConcurrency,
+                        requestTimeout: editRequestTimeout * 1000, // Convert to milliseconds
+                        scanSameLinkOnce: editScanSameLinkOnce,
+                        regexExclusions: editRegexExclusions.filter(r => r.trim() !== ""),
+                        cssSelectors: editCssSelectors.filter(s => s.trim() !== ""),
+                        cssSelectorsForceExclude: editCssSelectorsForceExclude,
+                        wildcardExclusions: editWildcardExclusions.filter(w => w.trim() !== ""),
+                        ...(editUseAuth && {
+                          auth: {
+                            username: editUsername,
+                            password: editPassword
+                          },
+                          useAuthForAllDomains: editUseAuthForAllDomains
+                        })
+                      }
+                    }}
+                  />
                 </div>
               </div>
             )}

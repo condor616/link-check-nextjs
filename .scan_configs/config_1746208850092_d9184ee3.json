@@ -1,5 +1,5 @@
 {
-  "id": "config_1746207976912_1578809d",
+  "id": "config_1746208850092_d9184ee3",
   "name": "Scan for condor616.com",
   "url": "https://condor616.com",
   "config": {
@@ -8,11 +8,13 @@
     "concurrency": 10,
     "itemsPerPage": 10,
     "regexExclusions": [],
-    "cssSelectors": [],
+    "cssSelectors": [
+      ".footer"
+    ],
     "cssSelectorsForceExclude": false,
     "wildcardExclusions": [],
     "requestTimeout": 30000
   },
-  "createdAt": "2025-05-02T17:46:16.912Z",
-  "updatedAt": "2025-05-02T17:51:17.256Z"
+  "createdAt": "2025-05-02T18:00:50.092Z",
+  "updatedAt": "2025-05-02T18:00:50.092Z"
 }
