@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Trash2, AlertCircle, ExternalLink, FileDown } from 'lucide-react';
+import { Input } from "@/components/ui/input";
 
 // Define the scan summary structure (from API response)
 interface ScanSummary {
@@ -161,36 +162,84 @@ export default function HistoryPage() {
     const date = new Date(dateStr);
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
-      month: 'short',
+      month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     }).format(date);
   };
 
+  // Get the exact time of the last scan
+  const getLastScanDateTime = () => {
+    if (scans.length === 0) return '-';
+    
+    const lastScanDate = new Date(Math.max(...scans.map(s => new Date(s.scanDate).getTime())));
+    
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(lastScanDate);
+  };
+
   // TODO: Export scan function
 
   return (
-    <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
-      <Card className="w-full max-w-5xl">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-2xl">Scan History</CardTitle>
-              <CardDescription>View and manage your previous scans</CardDescription>
-            </div>
-            <Link href="/">
-              <Button variant="outline" size="sm">
-                New Scan
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Scan History</h1>
+        <div className="flex items-center space-x-2">
+          <Input 
+            className="w-64 h-10" 
+            placeholder="Search scans..." 
+          />
+          <Link href="/">
+            <Button variant="purple" className="h-10">
+              New Scan
+            </Button>
+          </Link>
+        </div>
+      </div>
+      
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="py-3 px-4">
+            <h3 className="text-3xl font-bold text-purple-700">{scans.length}</h3>
+            <p className="text-sm text-gray-500">Total Scans</p>
+          </CardContent>
+        </Card>
         
+        <Card>
+          <CardContent className="py-3 px-4">
+            <h3 className="text-3xl font-bold text-purple-700">
+              {scans.reduce((sum, scan) => sum + scan.brokenLinksCount, 0)}
+            </h3>
+            <p className="text-sm text-gray-500">Total Broken Links</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="py-3 px-4">
+            <h3 className="text-3xl font-bold text-purple-700 break-words">
+              {getLastScanDateTime()}
+            </h3>
+            <p className="text-sm text-gray-500">Last Scan</p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Scans</CardTitle>
+        </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
             </div>
           ) : error ? (
             <Alert variant="destructive">
@@ -199,111 +248,94 @@ export default function HistoryPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : scans.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No saved scans found.</p>
-              <Button asChild>
-                <Link href="/">Start a New Scan</Link>
-              </Button>
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">No scan history found</p>
+              <Link href="/">
+                <Button variant="purple">Start Your First Scan</Button>
+              </Link>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead className="text-right">Links</TableHead>
-                  <TableHead className="text-right">Broken</TableHead>
-                  <TableHead className="w-[160px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scans.map((scan) => (
-                  <TableRow key={scan.id}>
-                    <TableCell className="font-medium max-w-[200px] truncate">
-                      <a 
-                        href={scan.scanUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center hover:underline"
-                      >
-                        {scan.scanUrl.replace(/^https?:\/\//, '')}
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    </TableCell>
-                    <TableCell>{formatDate(scan.scanDate)}</TableCell>
-                    <TableCell>{scan.durationSeconds.toFixed(2)}s</TableCell>
-                    <TableCell className="text-right">{scan.resultsCount}</TableCell>
-                    <TableCell className={`text-right ${scan.brokenLinksCount > 0 ? 'text-destructive font-medium' : ''}`}>
-                      {scan.brokenLinksCount}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        {/* View Details Button */}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 w-8 p-0"
-                          title="View Details"
-                        >
-                          <Link href={`/history/${scan.id}`}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
-                        </Button>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Results</TableHead>
+                    <TableHead>Broken Links</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scans.map((scan) => (
+                    <TableRow key={scan.id}>
+                      <TableCell className="font-medium truncate max-w-[200px]" title={scan.scanUrl}>
+                        {scan.scanUrl}
+                      </TableCell>
+                      <TableCell>{formatDate(scan.scanDate)}</TableCell>
+                      <TableCell>{scan.resultsCount}</TableCell>
+                      <TableCell>
+                        <span className={scan.brokenLinksCount > 0 ? 'text-red-500 font-semibold' : 'text-green-500'}>
+                          {scan.brokenLinksCount}
+                        </span>
+                      </TableCell>
+                      <TableCell>{scan.durationSeconds.toFixed(2)}s</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Link href={`/history/${scan.id}`}>
+                          <Button variant="outline" size="sm">
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </Link>
                         
-                        {/* Export Button - TODO: implement export */}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 w-8 p-0"
-                          title="Export Scan"
-                          disabled
-                        >
-                          <FileDown className="h-4 w-4" />
-                        </Button>
-                        
-                        {/* Delete Button */}
-                        <AlertDialog open={deleteId === scan.id} onOpenChange={(open: boolean) => !open && setDeleteId(null)}>
+                        <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button 
                               variant="outline" 
-                              size="sm" 
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive" 
+                              size="sm"
+                              className="text-red-500 border-red-200 hover:bg-red-50"
                               onClick={() => setDeleteId(scan.id)}
-                              disabled={isDeleting}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Scan</AlertDialogTitle>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete this scan? This action cannot be undone.
+                                This will permanently delete this scan history record. This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction 
-                                onClick={() => deleteScan(scan.id)} 
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => deleteScan(scan.id)}
+                                className="bg-red-500 hover:bg-red-600 text-white"
                                 disabled={isDeleting}
                               >
-                                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Delete
+                                {isDeleting && deleteId === scan.id ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  'Delete'
+                                )}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 } 
