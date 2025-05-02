@@ -78,6 +78,7 @@ export default function SavedScansPage() {
   const [editCssSelectors, setEditCssSelectors] = useState<string[]>([""]);
   const [editCssSelectorsForceExclude, setEditCssSelectorsForceExclude] = useState<boolean>(false);
   const [editWildcardExclusions, setEditWildcardExclusions] = useState<string[]>([""]);
+  const [editSkipExternalDomains, setEditSkipExternalDomains] = useState<boolean>(true);
   
   const router = useRouter();
   
@@ -128,6 +129,9 @@ export default function SavedScansPage() {
     
     // Initialize scan same link once option
     setEditScanSameLinkOnce(config.config.scanSameLinkOnce !== false);
+    
+    // Initialize skip external domains option
+    setEditSkipExternalDomains(config.config.skipExternalDomains !== false);
     
     // Initialize exclusion patterns
     setEditRegexExclusions(
@@ -204,6 +208,7 @@ export default function SavedScansPage() {
         cssSelectors: filteredCssSelectors,
         cssSelectorsForceExclude: editCssSelectorsForceExclude,
         wildcardExclusions: filteredWildcardExclusions,
+        skipExternalDomains: editSkipExternalDomains,
       };
       
       // Update auth settings
@@ -526,6 +531,20 @@ export default function SavedScansPage() {
               </Label>
             </div>
             
+            <div className="flex items-center space-x-2 mt-4">
+              <Checkbox
+                id="editSkipExternalDomains"
+                checked={editSkipExternalDomains}
+                onCheckedChange={(checked) => setEditSkipExternalDomains(!!checked)}
+              />
+              <label
+                htmlFor="editSkipExternalDomains"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Skip external domains
+              </label>
+            </div>
+            
             <div className="space-y-4 border-t pt-4 mt-2">
               <div className="flex items-center space-x-2 py-2">
                 <Checkbox 
@@ -791,6 +810,7 @@ export default function SavedScansPage() {
                         cssSelectors: editCssSelectors.filter(s => s.trim() !== ""),
                         cssSelectorsForceExclude: editCssSelectorsForceExclude,
                         wildcardExclusions: editWildcardExclusions.filter(w => w.trim() !== ""),
+                        skipExternalDomains: editSkipExternalDomains,
                         ...(editUseAuth && {
                           auth: {
                             username: editUsername,

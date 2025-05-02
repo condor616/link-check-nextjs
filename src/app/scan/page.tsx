@@ -817,6 +817,17 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                       </Label>
                     </div>
                     
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="skipExternalDomains"
+                        checked={editedConfig.skipExternalDomains !== false} // Default to true if undefined
+                        onCheckedChange={(checked) => updateConfigField('skipExternalDomains', !!checked)}
+                      />
+                      <Label htmlFor="skipExternalDomains" className="cursor-pointer text-sm font-normal">
+                        Skip external domains
+                      </Label>
+                    </div>
+                    
                     <Button 
                       variant="link" 
                       className="p-0 h-auto text-purple-600" 
@@ -2427,7 +2438,7 @@ function ScanForm() {
                     
                     {/* Regex Exclusion Rules */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 relative">
                         <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
                         <div className="relative">
                           <button 
@@ -2527,7 +2538,7 @@ function ScanForm() {
                   <div className="space-y-6">
                     {/* CSS Selector Exclusions */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 relative">
                         <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
                         <div className="relative">
                           <button 
