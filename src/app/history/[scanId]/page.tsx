@@ -45,8 +45,8 @@ interface SavedScan {
 // Loading fallback for Suspense
 function ScanDetailsLoading() {
   return (
-    <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
-      <Card className="w-full max-w-6xl">
+    <main className="container mx-auto p-4 max-w-none">
+      <Card className="w-full bg-white shadow">
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <Button variant="ghost" className="p-0" asChild>
@@ -156,8 +156,8 @@ function ScanDetailsContent() {
   const skippedLinks = scan?.results?.filter(r => r.status === 'skipped') || [];
   
   return (
-    <main className="container mx-auto flex flex-col items-center p-4 md:p-8 min-h-screen">
-      <Card className="w-full max-w-6xl">
+    <main className="container mx-auto p-4 max-w-none">
+      <Card className="w-full bg-white shadow">
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <Button variant="ghost" className="p-0" asChild>
