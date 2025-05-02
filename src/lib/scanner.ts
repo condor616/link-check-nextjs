@@ -13,6 +13,10 @@ export interface ScanConfig {
     regexExclusions?: string[]; // Array of regex patterns for URLs to exclude
     cssSelectors?: string[]; // Array of CSS selectors - links inside these elements will be excluded
     requestTimeout?: number; // Timeout in milliseconds for each request (default: 10000)
+    auth?: {
+        username: string;
+        password: string;
+    }; // HTTP Basic Authentication credentials
     // TODO: Add User-Agent
 }
 
@@ -180,8 +184,19 @@ class Scanner {
 
         // Fetch and process
         try {
+            // Prepare headers including auth if configured
+            const headers: Record<string, string> = { 
+                'User-Agent': 'LinkCheckerProBot/1.0'
+            };
+            
+            // Add basic auth if configured
+            if (this.config.auth?.username && this.config.auth?.password) {
+                const credentials = Buffer.from(`${this.config.auth.username}:${this.config.auth.password}`).toString('base64');
+                headers['Authorization'] = `Basic ${credentials}`;
+            }
+            
             const response = await fetch(urlToProcess, {
-                headers: { 'User-Agent': 'LinkCheckerProBot/1.0' },
+                headers,
                 redirect: 'follow',
                 signal: AbortSignal.timeout(this.config.requestTimeout), // Use configurable timeout
             });
