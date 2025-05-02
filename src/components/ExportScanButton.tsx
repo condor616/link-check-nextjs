@@ -87,6 +87,48 @@ export default function ExportScanButton({ scanId, scanUrl, results, className =
         const externalLinks = results.filter(r => r.status === 'external');
         const skippedLinks = results.filter(r => r.status === 'skipped');
         
+        // Function to render a table of links
+        const renderLinkTable = (links: SerializedScanResult[], isProblematic = false) => {
+          if (links.length === 0) {
+            return `<p>No ${isProblematic ? 'problematic' : ''} links found.</p>`;
+          }
+          
+          return `
+          <table>
+            <thead>
+              <tr>
+                <th>URL</th>
+                <th>Status</th>
+                ${isProblematic ? '<th>Found On</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${links.map(link => `
+                <tr>
+                  <td><a href="${link.url}" target="_blank">${link.url}</a></td>
+                  <td>
+                    <span class="badge badge-${link.status}">
+                      ${link.status}${link.statusCode ? ` (${link.statusCode})` : ''}
+                    </span>
+                    ${link.errorMessage ? `<div>${link.errorMessage}</div>` : ''}
+                  </td>
+                  ${isProblematic ? `
+                  <td>
+                    Found on ${link.foundOn.length} page(s)
+                    <div class="details">
+                      <ul>
+                        ${link.foundOn.map(page => `<li><a href="${page}" target="_blank">${page}</a></li>`).join('')}
+                      </ul>
+                    </div>
+                  </td>
+                  ` : ''}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          `;
+        };
+        
         const html = `
 <!DOCTYPE html>
 <html>
@@ -131,33 +173,17 @@ export default function ExportScanButton({ scanId, scanUrl, results, className =
     .summary-value {
       font-weight: 500;
     }
-    .tabs {
+    .tab-panel {
       margin-bottom: 20px;
     }
-    .tab-list {
-      display: flex;
-      border-bottom: 1px solid #ddd;
-      margin-bottom: 15px;
-    }
-    .tab {
-      padding: 8px 16px;
-      cursor: pointer;
-      border: 1px solid transparent;
-      border-bottom: none;
-      margin-right: 5px;
-      border-radius: 4px 4px 0 0;
-    }
-    .tab.active {
-      background-color: #fff;
-      border-color: #ddd;
-      border-bottom: 1px solid #fff;
-      margin-bottom: -1px;
-    }
-    .tab-panel {
-      display: none;
-    }
-    .tab-panel.active {
+    .tab-panel::before {
+      content: attr(data-title);
+      font-size: 1.5rem;
+      font-weight: bold;
       display: block;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 5px;
     }
     table {
       width: 100%;
@@ -234,28 +260,18 @@ export default function ExportScanButton({ scanId, scanUrl, results, className =
   </style>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      // Tab switching
-      const tabs = document.querySelectorAll('.tab');
-      const tabPanels = document.querySelectorAll('.tab-panel');
-      
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          // Remove active class from all tabs and panels
-          tabs.forEach(t => t.classList.remove('active'));
-          tabPanels.forEach(p => p.classList.remove('active'));
-          
-          // Add active class to clicked tab and corresponding panel
-          tab.classList.add('active');
-          const panelId = tab.getAttribute('data-panel');
-          document.getElementById(panelId).classList.add('active');
+      // Implement show/hide functionality for expanded views
+      const showMoreLinks = document.querySelectorAll('.show-more');
+      showMoreLinks.forEach(link => {
+        link.addEventListener('click', function() {
+          const detailsId = this.getAttribute('data-target');
+          const details = document.getElementById(detailsId);
+          if (details) {
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+            this.textContent = details.style.display === 'none' ? 'Show more...' : 'Show less';
+          }
         });
       });
-      
-      // Default to first tab
-      if (tabs.length > 0 && tabPanels.length > 0) {
-        tabs[0].classList.add('active');
-        tabPanels[0].classList.add('active');
-      }
     });
   </script>
 </head>
@@ -290,142 +306,20 @@ export default function ExportScanButton({ scanId, scanUrl, results, className =
     </div>
   </div>
   
-  <div class="tabs">
-    <div class="tab-list">
-      <div class="tab active" data-panel="problematic-panel">Problematic Links</div>
-      <div class="tab" data-panel="ok-panel">Working Links</div>
-      <div class="tab" data-panel="external-panel">External Links</div>
-      <div class="tab" data-panel="skipped-panel">Skipped Links</div>
-      <div class="tab" data-panel="all-panel">All Links</div>
-    </div>
-    
-    <div id="problematic-panel" class="tab-panel active" data-title="Problematic Links">
-      <h2>Problematic Links (${brokenLinks.length})</h2>
-      ${brokenLinks.length > 0 ? `
-      <table>
-        <thead>
-          <tr>
-            <th>URL</th>
-            <th>Status</th>
-            <th>Found On</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${brokenLinks.map(link => `
-            <tr>
-              <td><a href="${link.url}" target="_blank">${link.url}</a></td>
-              <td>
-                <span class="badge badge-${link.status}">
-                  ${link.status}${link.statusCode ? ` (${link.statusCode})` : ''}
-                </span>
-                ${link.errorMessage ? `<div>${link.errorMessage}</div>` : ''}
-              </td>
-              <td>
-                Found on ${link.foundOn.length} page(s)
-                <div class="details">
-                  <ul>
-                    ${link.foundOn.map(page => `<li><a href="${page}" target="_blank">${page}</a></li>`).join('')}
-                  </ul>
-                </div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      ` : `<p>No problematic links found. Great job!</p>`}
-    </div>
-    
-    <div id="ok-panel" class="tab-panel" data-title="Working Links">
-      <h2>Working Links (${okLinks.length})</h2>
-      ${okLinks.length > 0 ? `
-      <table>
-        <thead>
-          <tr>
-            <th>URL</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${okLinks.map(link => `
-            <tr>
-              <td><a href="${link.url}" target="_blank">${link.url}</a></td>
-              <td><span class="badge badge-ok">OK${link.statusCode ? ` (${link.statusCode})` : ''}</span></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      ` : `<p>No working links found.</p>`}
-    </div>
-    
-    <div id="external-panel" class="tab-panel" data-title="External Links">
-      <h2>External Links (${externalLinks.length})</h2>
-      ${externalLinks.length > 0 ? `
-      <table>
-        <thead>
-          <tr>
-            <th>URL</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${externalLinks.map(link => `
-            <tr>
-              <td><a href="${link.url}" target="_blank">${link.url}</a></td>
-              <td><span class="badge badge-external">External</span></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      ` : `<p>No external links found.</p>`}
-    </div>
-    
-    <div id="skipped-panel" class="tab-panel" data-title="Skipped Links">
-      <h2>Skipped Links (${skippedLinks.length})</h2>
-      ${skippedLinks.length > 0 ? `
-      <table>
-        <thead>
-          <tr>
-            <th>URL</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${skippedLinks.map(link => `
-            <tr>
-              <td><a href="${link.url}" target="_blank">${link.url}</a></td>
-              <td><span class="badge badge-skipped">Skipped</span></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      ` : `<p>No skipped links found.</p>`}
-    </div>
-    
-    <div id="all-panel" class="tab-panel" data-title="All Links">
-      <h2>All Links (${results.length})</h2>
-      ${results.length > 0 ? `
-      <table>
-        <thead>
-          <tr>
-            <th>URL</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${results.map(link => `
-            <tr>
-              <td><a href="${link.url}" target="_blank">${link.url}</a></td>
-              <td>
-                <span class="badge badge-${link.status}">
-                  ${link.status}${link.statusCode ? ` (${link.statusCode})` : ''}
-                </span>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      ` : `<p>No links found.</p>`}
-    </div>
+  <div class="tab-panel" data-title="Problematic Links (${brokenLinks.length})">
+    ${renderLinkTable(brokenLinks, true)}
+  </div>
+  
+  <div class="tab-panel" data-title="OK Links (${okLinks.length})">
+    ${renderLinkTable(okLinks)}
+  </div>
+  
+  <div class="tab-panel" data-title="External Links (${externalLinks.length})">
+    ${renderLinkTable(externalLinks)}
+  </div>
+  
+  <div class="tab-panel" data-title="Skipped Links (${skippedLinks.length})">
+    ${renderLinkTable(skippedLinks)}
   </div>
   
   <div class="footer">

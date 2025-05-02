@@ -3,12 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { ScanResult } from '@/lib/scanner';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -81,10 +75,9 @@ interface ScanResultsProps {
   itemsPerPage?: number;
   scanId?: string;
   scanConfig?: any; // Add scanConfig to receive the original scan configuration
-  hideTabs?: boolean; // Add option to hide tabs and only show problematic links
 }
 
-export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId, scanConfig, hideTabs = false }: ScanResultsProps) {
+export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId, scanConfig }: ScanResultsProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -94,20 +87,13 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const [recheckSuccess, setRecheckSuccess] = useState<Map<string, string>>(new Map());
   const [localResults, setLocalResults] = useState<SerializedScanResult[]>(results);
   
-  // Use 'all' as the default tab when hideTabs is true
-  const [activeTab, setActiveTab] = useState<string>(hideTabs ? "all" : "problematic");
+  // Use 'all' as the default tab 
+  const [activeTab, setActiveTab] = useState<string>("all");
   
   // Update local results when props change
   useEffect(() => {
     setLocalResults(results);
   }, [results]);
-
-  // Reset to 'all' if hideTabs is toggled
-  useEffect(() => {
-    if (hideTabs) {
-      setActiveTab("all");
-    }
-  }, [hideTabs]);
 
   // Filter results by status
   // First, identify skipped links - they take priority over other categories
@@ -1374,138 +1360,81 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
 
   return (
     <div className="w-full">
-      {!hideTabs ? (
-        <>
-          <div className="flex justify-between items-center mb-4">
-            <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
-                <TabsList>
-                  <TabsTrigger value="problematic" className="flex items-center gap-1">
-                    <span>Problematic</span>
-                    <Badge variant="outline" className="ml-1 py-0">{uniqueProblematicCount}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="ok" className="flex items-center gap-1">
-                    <span>OK</span>
-                    <Badge variant="outline" className="ml-1 py-0">{uniqueOkCount}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="external" className="flex items-center gap-1">
-                    <span>External</span>
-                    <Badge variant="outline" className="ml-1 py-0">{uniqueExternalCount}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="skipped" className="flex items-center gap-1">
-                    <span>Skipped</span>
-                    <Badge variant="outline" className="ml-1 py-0">{uniqueSkippedCount}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="all" className="flex items-center gap-1">
-                    <span>All</span>
-                    <Badge variant="outline" className="ml-1 py-0">{uniqueAllCount}</Badge>
-                  </TabsTrigger>
-                </TabsList>
-                
-                {/* Add Export Button */}
-                <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} className="ml-auto" />
-              </div>
-            </Tabs>
-          </div>
-          <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
-            <TabsContent value="problematic" className="mt-4">
-              {renderLinksList(problematicLinks, true)}
-            </TabsContent>
-            
-            <TabsContent value="ok" className="mt-4">
-              {renderLinksList(okLinks)}
-            </TabsContent>
-            
-            <TabsContent value="external" className="mt-4">
-              {renderLinksList(externalLinks)}
-            </TabsContent>
-            
-            <TabsContent value="skipped" className="mt-4">
-              {renderLinksList(skippedLinks)}
-            </TabsContent>
-            
-            <TabsContent value="all" className="mt-4">
-              {renderLinksList(results)}
-            </TabsContent>
-          </Tabs>
-        </>
-      ) : (
-        <div>
-          {/* Filter cards that act as tabs */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div 
-              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'problematic' ? 'ring-2 ring-purple-500' : ''}`}
-              onClick={() => handleTabChange('problematic')}
-            >
-              <div className="text-xs text-muted-foreground">Problematic Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                <XCircle className="w-5 h-5 text-destructive" />
-                {uniqueProblematicCount}
-              </div>
-            </div>
-            
-            <div 
-              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'ok' ? 'ring-2 ring-purple-500' : ''}`}
-              onClick={() => handleTabChange('ok')}
-            >
-              <div className="text-xs text-muted-foreground">OK Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-                {uniqueOkCount}
-              </div>
-            </div>
-            
-            <div 
-              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'external' ? 'ring-2 ring-purple-500' : ''}`}
-              onClick={() => handleTabChange('external')}
-            >
-              <div className="text-xs text-muted-foreground">External Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                <ArrowUpRight className="w-5 h-5 text-blue-500" />
-                {uniqueExternalCount}
-              </div>
-            </div>
-            
-            <div 
-              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'skipped' ? 'ring-2 ring-purple-500' : ''}`}
-              onClick={() => handleTabChange('skipped')}
-            >
-              <div className="text-xs text-muted-foreground">Skipped Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                {uniqueSkippedCount}
-              </div>
-            </div>
-            
-            <div 
-              className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'all' ? 'ring-2 ring-purple-500' : ''}`}
-              onClick={() => handleTabChange('all')}
-            >
-              <div className="text-xs text-muted-foreground">All Links</div>
-              <div className="text-2xl font-semibold flex items-center gap-2">
-                {uniqueAllCount}
-              </div>
+      <div>
+        {/* Filter cards that act as tabs */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div 
+            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'problematic' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => handleTabChange('problematic')}
+          >
+            <div className="text-xs text-muted-foreground">Problematic Links</div>
+            <div className="text-2xl font-semibold flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              {uniqueProblematicCount}
             </div>
           </div>
           
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium">
-              {activeTab === 'problematic' && 'Problematic Links'}
-              {activeTab === 'ok' && 'OK Links'}
-              {activeTab === 'external' && 'External Links'}
-              {activeTab === 'skipped' && 'Skipped Links'}
-              {activeTab === 'all' && 'All Links'}
-            </h3>
-            <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} />
+          <div 
+            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'ok' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => handleTabChange('ok')}
+          >
+            <div className="text-xs text-muted-foreground">OK Links</div>
+            <div className="text-2xl font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              {uniqueOkCount}
+            </div>
           </div>
           
-          {/* Render the appropriate list based on activeTab */}
-          {activeTab === 'problematic' && renderLinksList(problematicLinks, true)}
-          {activeTab === 'ok' && renderLinksList(okLinks)}
-          {activeTab === 'external' && renderLinksList(externalLinks)}
-          {activeTab === 'skipped' && renderLinksList(skippedLinks)}
-          {activeTab === 'all' && renderLinksList(results)}
+          <div 
+            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'external' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => handleTabChange('external')}
+          >
+            <div className="text-xs text-muted-foreground">External Links</div>
+            <div className="text-2xl font-semibold flex items-center gap-2">
+              <ArrowUpRight className="w-5 h-5 text-blue-500" />
+              {uniqueExternalCount}
+            </div>
+          </div>
+          
+          <div 
+            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'skipped' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => handleTabChange('skipped')}
+          >
+            <div className="text-xs text-muted-foreground">Skipped Links</div>
+            <div className="text-2xl font-semibold flex items-center gap-2">
+              {uniqueSkippedCount}
+            </div>
+          </div>
+          
+          <div 
+            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'all' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => handleTabChange('all')}
+          >
+            <div className="text-xs text-muted-foreground">All Links</div>
+            <div className="text-2xl font-semibold flex items-center gap-2">
+              {uniqueAllCount}
+            </div>
+          </div>
         </div>
-      )}
+        
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">
+            {activeTab === 'problematic' && 'Problematic Links'}
+            {activeTab === 'ok' && 'OK Links'}
+            {activeTab === 'external' && 'External Links'}
+            {activeTab === 'skipped' && 'Skipped Links'}
+            {activeTab === 'all' && 'All Links'}
+          </h3>
+          <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} />
+        </div>
+        
+        {/* Render the appropriate list based on activeTab */}
+        {activeTab === 'problematic' && renderLinksList(problematicLinks, true)}
+        {activeTab === 'ok' && renderLinksList(okLinks)}
+        {activeTab === 'external' && renderLinksList(externalLinks)}
+        {activeTab === 'skipped' && renderLinksList(skippedLinks)}
+        {activeTab === 'all' && renderLinksList(results)}
+      </div>
     </div>
   );
 } 

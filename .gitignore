@@ -38,6 +38,8 @@ yarn-error.log*
 
 # Link Checker History
 /.scan_history/
+/.scan_params/
+/.scan_queue/
 
 # typescript
 *.tsbuildinfo

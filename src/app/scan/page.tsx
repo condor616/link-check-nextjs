@@ -784,8 +784,8 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
               <ScanResults 
                 results={results} 
                 scanUrl={paramUrl || ''} 
-                itemsPerPage={10}
-                hideTabs={true}
+                scanId={savedScanId || undefined} 
+                scanConfig={scanConfig}
               />
             </div>
           )}
