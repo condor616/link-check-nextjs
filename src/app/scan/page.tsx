@@ -117,6 +117,16 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
   const [isLoadingParams, setIsLoadingParams] = useState<boolean>(!!scanId);
   const [loadParamsError, setLoadParamsError] = useState<string | null>(null);
   
+  // Add state for edited configuration
+  const [editedConfig, setEditedConfig] = useState<any>(null);
+  const [showAdvancedEdit, setShowAdvancedEdit] = useState<boolean>(false);
+  
+  // States for exclusion patterns
+  const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
+  const [cssSelectors, setCssSelectors] = useState<string[]>([""]);
+  const [cssSelectorsForceExclude, setCssSelectorsForceExclude] = useState<boolean>(false);
+  const [wildcardExclusions, setWildcardExclusions] = useState<string[]>([""]);
+  
   // Add confirmation state to prevent automatic scan on page refresh
   const [scanConfirmed, setScanConfirmed] = useState<boolean>(false);
   
@@ -178,6 +188,37 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+  
+  // Initialize editedConfig and exclusion patterns when scanConfig changes
+  useEffect(() => {
+    if (scanConfig && !editedConfig) {
+      setEditedConfig({...scanConfig});
+      
+      // Initialize exclusion patterns from config
+      if (scanConfig.regexExclusions && Array.isArray(scanConfig.regexExclusions)) {
+        setRegexExclusions(scanConfig.regexExclusions.length > 0 
+          ? scanConfig.regexExclusions 
+          : [""]
+        );
+      }
+      
+      if (scanConfig.cssSelectors && Array.isArray(scanConfig.cssSelectors)) {
+        setCssSelectors(scanConfig.cssSelectors.length > 0 
+          ? scanConfig.cssSelectors 
+          : [""]
+        );
+      }
+      
+      setCssSelectorsForceExclude(!!scanConfig.cssSelectorsForceExclude);
+      
+      if (scanConfig.wildcardExclusions && Array.isArray(scanConfig.wildcardExclusions)) {
+        setWildcardExclusions(scanConfig.wildcardExclusions.length > 0 
+          ? scanConfig.wildcardExclusions 
+          : [""]
+        );
+      }
+    }
+  }, [scanConfig, editedConfig]);
   
   // Add useEffect to load parameters from scanId
   useEffect(() => {
@@ -507,8 +548,77 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
     }
   };
   
-  // Add a function to handle confirmation
+  // Functions for handling exclusion patterns
+  const addRegexExclusion = () => setRegexExclusions([...regexExclusions, ""]);
+  
+  const removeRegexExclusion = (index: number) => {
+    const newExclusions = [...regexExclusions];
+    newExclusions.splice(index, 1);
+    setRegexExclusions(newExclusions);
+  };
+  
+  const updateRegexExclusion = (index: number, value: string) => {
+    const newExclusions = [...regexExclusions];
+    newExclusions[index] = value;
+    setRegexExclusions(newExclusions);
+  };
+  
+  const addCssSelector = () => setCssSelectors([...cssSelectors, ""]);
+  
+  const removeCssSelector = (index: number) => {
+    const newSelectors = [...cssSelectors];
+    newSelectors.splice(index, 1);
+    setCssSelectors(newSelectors);
+  };
+  
+  const updateCssSelector = (index: number, value: string) => {
+    const newSelectors = [...cssSelectors];
+    newSelectors[index] = value;
+    setCssSelectors(newSelectors);
+  };
+  
+  const addWildcardExclusion = () => setWildcardExclusions([...wildcardExclusions, ""]);
+  
+  const removeWildcardExclusion = (index: number) => {
+    const newExclusions = [...wildcardExclusions];
+    newExclusions.splice(index, 1);
+    setWildcardExclusions(newExclusions);
+  };
+  
+  const updateWildcardExclusion = (index: number, value: string) => {
+    const newExclusions = [...wildcardExclusions];
+    newExclusions[index] = value;
+    setWildcardExclusions(newExclusions);
+  };
+
+  // Add a function to handle configuration editing
+  const updateConfigField = (field: string, value: any) => {
+    setEditedConfig((prev: any) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Modify the confirm scan function to use the edited config with exclusion patterns
   const handleConfirmScan = () => {
+    if (editedConfig) {
+      // Filter out empty exclusion patterns
+      const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
+      const filteredWildcardExclusions = wildcardExclusions.filter(pattern => pattern.trim() !== "");
+      const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
+      
+      // Update the config with the edited values
+      const updatedConfig = {
+        ...editedConfig,
+        regexExclusions: filteredRegexExclusions,
+        cssSelectors: filteredCssSelectors,
+        cssSelectorsForceExclude: cssSelectorsForceExclude,
+        wildcardExclusions: filteredWildcardExclusions
+      };
+      
+      // Update the paramConfigString with the edited config
+      setParamConfigString(JSON.stringify(updatedConfig));
+    }
     setScanConfirmed(true);
   };
   
@@ -581,7 +691,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">Confirm Scan</CardTitle>
-              <CardDescription>You're about to scan the following URL</CardDescription>
+              <CardDescription>You're about to scan the following URL. You can modify scan parameters below.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <Alert variant="default" className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
@@ -594,14 +704,273 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
               
               <div className="p-4 border rounded-md bg-muted/50">
                 <p className="font-medium break-all">{paramUrl}</p>
-                {paramConfigString && (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    <p>With configuration:</p>
-                    <pre className="p-2 bg-muted rounded-md mt-1 overflow-auto max-h-40 text-xs">
-                      {JSON.stringify(scanConfig, null, 2)}
-                    </pre>
+                
+                {editedConfig && (
+                  <div className="mt-4 space-y-4">
+                    <h3 className="text-sm font-medium">Edit Scan Parameters</h3>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="scanDepth">Scan Depth</Label>
+                        <Input
+                          id="scanDepth"
+                          type="number"
+                          min="0"
+                          max="5"
+                          value={editedConfig.depth || 0}
+                          onChange={(e) => updateConfigField('depth', parseInt(e.target.value) || 0)}
+                        />
+                        <p className="text-xs text-muted-foreground">0 for current page only, higher for deeper scans</p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="concurrency">Concurrency</Label>
+                        <Input
+                          id="concurrency"
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={editedConfig.concurrency || 10}
+                          onChange={(e) => updateConfigField('concurrency', parseInt(e.target.value) || 10)}
+                        />
+                        <p className="text-xs text-muted-foreground">Number of simultaneous requests (1-50)</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="requestTimeout">Request Timeout (seconds)</Label>
+                      <Input
+                        id="requestTimeout"
+                        type="number"
+                        min="5"
+                        max="180"
+                        value={(editedConfig.requestTimeout || 30000) / 1000}
+                        onChange={(e) => updateConfigField('requestTimeout', (parseInt(e.target.value) || 30) * 1000)}
+                      />
+                      <p className="text-xs text-muted-foreground">Time before giving up on a single URL (5-180 seconds)</p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="scanSameLinkOnce"
+                        checked={editedConfig.scanSameLinkOnce !== false}
+                        onCheckedChange={(checked) => updateConfigField('scanSameLinkOnce', !!checked)}
+                      />
+                      <Label htmlFor="scanSameLinkOnce" className="cursor-pointer text-sm font-normal">
+                        Check each link only once
+                      </Label>
+                    </div>
+                    
+                    <Button 
+                      variant="link" 
+                      className="p-0 h-auto text-purple-600" 
+                      onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
+                    >
+                      {showAdvancedEdit ? 'Hide' : 'Show'} Advanced Options
+                    </Button>
+                    
+                    {showAdvancedEdit && (
+                      <div className="border border-border rounded-lg p-4 space-y-6 mt-2">
+                        {/* Wildcard Exclusion Rules */}
+                        <div className="space-y-2">
+                          <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Simple URL patterns to exclude (e.g., "example.com/about/*")
+                          </p>
+                          
+                          {wildcardExclusions.map((pattern, index) => (
+                            <div key={`wildcard-${index}`} className="flex gap-2 items-center mb-2">
+                              <div className="w-1.5 h-10 bg-yellow-400 rounded-sm mr-1"></div>
+                              <Input
+                                value={pattern}
+                                onChange={(e) => updateWildcardExclusion(index, e.target.value)}
+                                placeholder="e.g. example.com/about/*"
+                                className="flex-1"
+                              />
+                              
+                              {index === wildcardExclusions.length - 1 ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeWildcardExclusion(index)}
+                                    disabled={wildcardExclusions.length <= 1}
+                                    className="shrink-0"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                  
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={addWildcardExclusion}
+                                    className="shrink-0"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeWildcardExclusion(index)}
+                                  className="shrink-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="border-t border-border pt-6"></div>
+                        
+                        {/* Regex Exclusion Rules */}
+                        <div className="space-y-2">
+                          <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Links matching these patterns will be skipped
+                          </p>
+                          
+                          {regexExclusions.map((regex, index) => (
+                            <div key={`regex-${index}`} className="flex gap-2 items-center mb-2">
+                              <div className="w-1.5 h-10 bg-blue-400 rounded-sm mr-1"></div>
+                              <Input
+                                value={regex}
+                                onChange={(e) => updateRegexExclusion(index, e.target.value)}
+                                placeholder="e.g. \/assets\/.*\.pdf$"
+                                className="flex-1"
+                              />
+                              
+                              {index === regexExclusions.length - 1 ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeRegexExclusion(index)}
+                                    disabled={regexExclusions.length <= 1}
+                                    className="shrink-0"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                  
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={addRegexExclusion}
+                                    className="shrink-0"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeRegexExclusion(index)}
+                                  className="shrink-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="border-t border-border pt-6"></div>
+                        
+                        {/* CSS Selector Exclusions */}
+                        <div className="space-y-2">
+                          <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Links within these CSS selectors will be skipped
+                          </p>
+                          
+                          {cssSelectors.map((selector, index) => (
+                            <div key={`selector-${index}`} className="flex gap-2 items-center mb-2">
+                              <div className="w-1.5 h-10 bg-green-400 rounded-sm mr-1"></div>
+                              <Input
+                                value={selector}
+                                onChange={(e) => updateCssSelector(index, e.target.value)}
+                                placeholder="e.g. .footer, #navigation, [data-skip]"
+                                className="flex-1"
+                              />
+                              
+                              {index === cssSelectors.length - 1 ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeCssSelector(index)}
+                                    disabled={cssSelectors.length <= 1}
+                                    className="shrink-0"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                  
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={addCssSelector}
+                                    className="shrink-0"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeCssSelector(index)}
+                                  className="shrink-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          
+                          <div className="flex items-center space-x-2 pt-4">
+                            <Checkbox
+                              id="cssSelectorsForceExclude"
+                              checked={cssSelectorsForceExclude}
+                              onCheckedChange={(checked) => setCssSelectorsForceExclude(!!checked)}
+                            />
+                            <Label htmlFor="cssSelectorsForceExclude" className="cursor-pointer text-sm font-normal">
+                              Force Exclude - Links in CSS selectors are excluded entirely, even if found elsewhere on the page
+                            </Label>
+                          </div>
+                        </div>
+                        
+                        {/* Configuration JSON (Read-only) */}
+                        <div className="border-t border-border pt-6"></div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="configJson">Configuration JSON (Read-only)</Label>
+                          <pre className="p-2 bg-muted rounded-md mt-1 overflow-auto max-h-40 text-xs">
+                            {JSON.stringify({
+                              ...editedConfig,
+                              regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
+                              cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
+                              cssSelectorsForceExclude,
+                              wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== "")
+                            }, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+                
                 {scanId && (
                   <div className="mt-2 text-sm text-muted-foreground">
                     <p>Scan ID: {scanId}</p>
