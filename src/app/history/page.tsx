@@ -92,24 +92,15 @@ export default function HistoryPage() {
 
       // Transform the API response (items) into our expected format (scans)
       if (data.items && Array.isArray(data.items)) {
-        // The API returns full scan objects, so we need to extract the summary info
-        const summaries = data.items.map((item: ScanRecord) => {
-          // Count broken links in results
-          const brokenLinksCount = item.results ? 
-            item.results.filter((r) => 
-              r.status === 'broken' || r.status === 'error'
-            ).length : 0;
-            
-          return {
-            id: item.id,
-            scanUrl: item.scanUrl,
-            scanDate: item.scanDate,
-            durationSeconds: item.durationSeconds,
-            resultsCount: item.results?.length || 0,
-            brokenLinksCount
-          };
-        });
-        
+        // Use the summary values directly from the API
+        const summaries = data.items.map((item: any) => ({
+          id: item.id,
+          scanUrl: item.scanUrl,
+          scanDate: item.scanDate,
+          durationSeconds: item.durationSeconds,
+          resultsCount: item.resultsCount ?? 0,
+          brokenLinksCount: item.brokenLinksCount ?? 0
+        }));
         setScans(summaries);
       } else {
         setScans(data.scans || []);
@@ -419,4 +410,4 @@ export default function HistoryPage() {
       </div>
     </div>
   );
-} 
+}
