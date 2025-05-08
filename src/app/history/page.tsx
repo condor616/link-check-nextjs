@@ -3,23 +3,23 @@
 import React, { useState, useEffect } from 'react';
 // import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardContent, 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
 } from "@/components/ui/card";
-import { 
-  Table, 
-  TableHeader, 
-  TableRow, 
-  TableHead, 
-  TableBody, 
-  TableCell 
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -109,7 +109,7 @@ export default function HistoryPage() {
       console.error('Failed to fetch scan history:', err);
       setError(
         err instanceof Error
-          ? err.message 
+          ? err.message
           : 'Failed to load scan history'
       );
     } finally {
@@ -120,26 +120,26 @@ export default function HistoryPage() {
   // Function to delete a scan
   const deleteScan = async (id: string) => {
     setIsDeleting(true);
-    
+
     try {
       const response = await fetch(`/api/history/${id}`, {
         method: 'DELETE',
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || `Failed to delete scan (${response.status})`);
       }
-      
+
       // Remove the deleted scan from the list
       setScans(scans.filter(scan => scan.id !== id));
-      
+
     } catch (err: unknown) {
       console.error(`Failed to delete scan ${id}:`, err);
       setError(
         err instanceof Error
-          ? err.message 
+          ? err.message
           : 'Failed to delete scan'
       );
     } finally {
@@ -152,12 +152,12 @@ export default function HistoryPage() {
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
-      
+
       // Check if date is valid before formatting
       if (isNaN(date.getTime())) {
         return 'Invalid date';
       }
-      
+
       return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
         month: 'long',
@@ -174,21 +174,21 @@ export default function HistoryPage() {
   // Get the exact time of the last scan
   const getLastScanDateTime = () => {
     if (scans.length === 0) return '-';
-    
+
     try {
       // Simple approach - sort the scans by date and take the most recent
       // First attempt to just sort and use the first result
       const sortedScans = [...scans].sort((a, b) => {
         const dateA = new Date(a.scanDate).getTime();
         const dateB = new Date(b.scanDate).getTime();
-        
+
         // If either date is invalid, consider it lesser (will be sorted to the end)
         if (isNaN(dateA)) return 1;
         if (isNaN(dateB)) return -1;
-        
+
         return dateB - dateA; // Descending order (newest first)
       });
-      
+
       // Find the first scan with a valid date
       for (const scan of sortedScans) {
         const date = new Date(scan.scanDate);
@@ -203,7 +203,7 @@ export default function HistoryPage() {
           }).format(date);
         }
       }
-      
+
       // Fallback - try the first scan regardless
       if (scans.length > 0) {
         const firstScan = scans[0];
@@ -219,7 +219,7 @@ export default function HistoryPage() {
           }).format(date);
         }
       }
-      
+
       return '-';
     } catch (error) {
       console.error('Error formatting last scan date:', error);
@@ -239,10 +239,10 @@ export default function HistoryPage() {
               View and manage your previous scans
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="whitespace-nowrap"
               asChild
             >
@@ -251,9 +251,9 @@ export default function HistoryPage() {
                 New Scan
               </Link>
             </Button>
-            
-            <Button 
-              onClick={fetchScans} 
+
+            <Button
+              onClick={fetchScans}
               variant="outline"
               disabled={isLoading}
               className="whitespace-nowrap"
@@ -267,7 +267,7 @@ export default function HistoryPage() {
             </Button>
           </div>
         </div>
-        
+
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card className="bg-white shadow">
@@ -276,16 +276,16 @@ export default function HistoryPage() {
               <p className="text-sm text-muted-foreground">Total Scans</p>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-white shadow">
             <CardContent className="py-4 px-5">
               <h3 className="text-4xl font-bold text-purple-600">
-                {scans.reduce((sum, scan) => sum + scan.brokenLinksCount, 0)}
+                {scans.reduce((sum, scan) => sum + scan.resultsCount, 0)}
               </h3>
-              <p className="text-sm text-muted-foreground">Total Broken Links</p>
+              <p className="text-sm text-muted-foreground">Total Links Checked</p>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-white shadow">
             <CardContent className="py-4 px-5">
               <h3 className="text-4xl font-bold text-purple-600 break-words">
@@ -295,7 +295,7 @@ export default function HistoryPage() {
             </CardContent>
           </Card>
         </div>
-        
+
         <Card className="bg-white shadow">
           <CardHeader>
             <CardTitle>Recent Scans</CardTitle>
@@ -352,18 +352,18 @@ export default function HistoryPage() {
                               View
                             </Button>
                           </Link>
-                          
+
                           <Link href={`/scan?id=${scan.id}`}>
                             <Button variant="outline" size="sm" className="text-purple-600 border-purple-200 hover:bg-purple-50">
                               <AlertCircle className="h-4 w-4 mr-1" />
                               Scan again
                             </Button>
                           </Link>
-                          
+
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 className="text-red-500 border-red-200 hover:bg-red-50"
                                 onClick={() => setDeleteId(scan.id)}
@@ -381,7 +381,7 @@ export default function HistoryPage() {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
+                                <AlertDialogAction
                                   onClick={() => deleteScan(scan.id)}
                                   className="bg-red-500 hover:bg-red-600 text-white"
                                   disabled={isDeleting}
