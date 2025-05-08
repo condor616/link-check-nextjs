@@ -31,7 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Trash2, AlertCircle, ExternalLink, FileDown } from 'lucide-react';
+import { Loader2, Trash2, AlertCircle, ExternalLink, FileDown, Clock, Calendar } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 
 // Define the scan summary structure (from API response)
@@ -149,26 +149,67 @@ export default function HistoryPage() {
   };
 
   // Format date for display
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string, forCard: boolean = false) => {
     try {
       const date = new Date(dateStr);
-
-      // Check if date is valid before formatting
       if (isNaN(date.getTime())) {
         return 'Invalid date';
       }
 
-      return new Intl.DateTimeFormat('en-US', {
+      const options: Intl.DateTimeFormatOptions = {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-      }).format(date);
+        hour12: true
+      };
+
+      const formattedDate = new Intl.DateTimeFormat('en-US', options).format(date);
+      const timeAgo = calculateTimeAgo(date);
+
+      if (forCard) {
+        return (
+          <>
+            <span className="text-3xl font-extrabold text-green-700">{formattedDate}</span>
+            <span className="text-xs text-muted-foreground mt-1">{timeAgo}</span>
+          </>
+        );
+      }
+
+      return (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-col">
+            <span className="text-sm">{formattedDate}</span>
+            <span className="text-xs text-muted-foreground">{timeAgo}</span>
+          </div>
+        </div>
+      );
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid date';
     }
+  };
+
+  const calculateTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const weeks = Math.floor(days / 7);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+
+    if (years > 0) return `${years} year${years > 1 ? 's' : ''} ago`;
+    if (months > 0) return `${months} month${months > 1 ? 's' : ''} ago`;
+    if (weeks > 0) return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return `${seconds} second${seconds > 1 ? 's' : ''} ago`;
   };
 
   // Get the exact time of the last scan
@@ -177,7 +218,6 @@ export default function HistoryPage() {
 
     try {
       // Simple approach - sort the scans by date and take the most recent
-      // First attempt to just sort and use the first result
       const sortedScans = [...scans].sort((a, b) => {
         const dateA = new Date(a.scanDate).getTime();
         const dateB = new Date(b.scanDate).getTime();
@@ -193,31 +233,14 @@ export default function HistoryPage() {
       for (const scan of sortedScans) {
         const date = new Date(scan.scanDate);
         if (!isNaN(date.getTime())) {
-          return new Intl.DateTimeFormat('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }).format(date);
+          return formatDate(scan.scanDate, true);
         }
       }
 
       // Fallback - try the first scan regardless
       if (scans.length > 0) {
         const firstScan = scans[0];
-        const date = new Date(firstScan.scanDate);
-        if (!isNaN(date.getTime())) {
-          return new Intl.DateTimeFormat('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }).format(date);
-        }
+        return formatDate(firstScan.scanDate, true);
       }
 
       return '-';
@@ -269,32 +292,59 @@ export default function HistoryPage() {
         </div>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="bg-white shadow">
-            <CardContent className="py-4 px-5">
-              <h3 className="text-4xl font-bold text-purple-600">{scans.length}</h3>
-              <p className="text-sm text-muted-foreground">Total Scans</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow">
-            <CardContent className="py-4 px-5">
-              <h3 className="text-4xl font-bold text-purple-600">
-                {scans.reduce((sum, scan) => sum + scan.resultsCount, 0)}
-              </h3>
-              <p className="text-sm text-muted-foreground">Total Links Checked</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow">
-            <CardContent className="py-4 px-5">
-              <h3 className="text-4xl font-bold text-purple-600 break-words">
-                {getLastScanDateTime()}
-              </h3>
-              <p className="text-sm text-muted-foreground">Last Scan</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+  {/* Total Scans Card */}
+  <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+    <CardContent className="p-6">
+      <div className="flex flex-col items-center justify-center h-full space-y-6">
+        <div className="rounded-full bg-purple-50 p-3 group-hover:bg-purple-100 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 13v5m4-9v9m4-3v3" /></svg>
         </div>
+        <div className="flex flex-col items-center justify-center flex-grow">
+          <span className="text-3xl font-extrabold text-purple-700">{scans.length}</span>
+        </div>
+        <span className="text-sm text-muted-foreground">Total Scans</span>
+      </div>
+    </CardContent>
+  </Card>
+
+  {/* Total Links Checked Card */}
+  <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+    <CardContent className="p-6">
+      <div className="flex flex-col items-center justify-center h-full space-y-6">
+        <div className="rounded-full bg-blue-50 p-3 group-hover:bg-blue-100 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 13a5 5 0 007 7l1-1a5 5 0 00-7-7l-1 1zm4-4a5 5 0 00-7-7l-1 1a5 5 0 007 7l1-1z" /></svg>
+        </div>
+        <div className="flex flex-col items-center justify-center flex-grow">
+          <span className="text-3xl font-extrabold text-blue-700">{scans.reduce((sum, scan) => sum + scan.resultsCount, 0)}</span>
+        </div>
+        <span className="text-sm text-muted-foreground">Total Links Checked</span>
+      </div>
+    </CardContent>
+  </Card>
+
+  {/* Last Scan Card */}
+  <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+    <CardContent className="p-6">
+      <div className="flex flex-col items-center justify-center h-full space-y-6">
+        <div className="rounded-full bg-green-50 p-3 group-hover:bg-green-100 transition-colors">
+          <Calendar className="h-8 w-8 text-green-600" />
+        </div>
+        <div className="flex flex-col items-center justify-center flex-grow">
+          {(() => {
+            const value = getLastScanDateTime();
+            if (typeof value === 'string') {
+              return <span className="text-3xl font-extrabold text-green-700">{value}</span>;
+            }
+            // If value is a fragment, render as-is
+            return value;
+          })()}
+        </div>
+        <span className="text-sm text-muted-foreground">Last Scan</span>
+      </div>
+    </CardContent>
+  </Card>
+</div>
 
         <Card className="bg-white shadow">
           <CardHeader>
