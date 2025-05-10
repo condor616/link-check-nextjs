@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { ScanConfig, ScanResult } from '@/lib/scanner'; // Use alias
+import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 
 // Define the expected structure for saving
 interface SaveScanPayload {
@@ -32,7 +33,6 @@ async function ensureHistoryDir() {
 
 export async function POST(request: NextRequest) {
     try {
-        await ensureHistoryDir();
         const payload = await request.json() as SaveScanPayload;
 
         // Validate payload basic structure (add more specific checks as needed)
@@ -50,14 +50,14 @@ export async function POST(request: NextRequest) {
             ...payload,
         };
 
-        const filePath = path.join(historyDir, `${scanId}.json`);
-
-        // Save the data as JSON
-        await fs.writeFile(filePath, JSON.stringify(savedData, null, 2));
-
-        console.log(`Scan saved successfully: ${scanId}`);
-        return NextResponse.json({ message: 'Scan saved successfully', scanId: scanId }, { status: 201 });
-
+        // Check if using Supabase
+        const useSupabase = await isUsingSupabase();
+        
+        if (useSupabase) {
+            return await saveScanToSupabase(savedData);
+        } else {
+            return await saveScanToFile(savedData);
+        }
     } catch (error) {
         console.error("API Save Scan Error:", error);
         let errorMessage = 'Failed to save scan history';
@@ -67,5 +67,62 @@ export async function POST(request: NextRequest) {
             errorMessage = error.message;
         }
         return NextResponse.json({ error: errorMessage }, { status: 500 });
+    }
+}
+
+// Save scan data to file
+async function saveScanToFile(savedData: SavedScan) {
+    try {
+        await ensureHistoryDir();
+        
+        const filePath = path.join(historyDir, `${savedData.id}.json`);
+
+        // Save the data as JSON
+        await fs.writeFile(filePath, JSON.stringify(savedData, null, 2));
+
+        console.log(`Scan saved successfully to file: ${savedData.id}`);
+        return NextResponse.json({ 
+            message: 'Scan saved successfully to file', 
+            scanId: savedData.id 
+        }, { status: 201 });
+    } catch (error) {
+        console.error("Error saving scan to file:", error);
+        throw error;
+    }
+}
+
+// Save scan data to Supabase
+async function saveScanToSupabase(savedData: SavedScan) {
+    try {
+        const supabase = await getSupabaseClient();
+        
+        if (!supabase) {
+            throw new Error('Supabase client is not available');
+        }
+        
+        // Insert scan data into database
+        const { error } = await supabase
+            .from('scan_history')
+            .insert({
+                id: savedData.id,
+                scan_url: savedData.scanUrl,
+                scan_date: savedData.scanDate,
+                duration_seconds: savedData.durationSeconds,
+                config: savedData.config,
+                results: savedData.results
+            });
+        
+        if (error) {
+            throw new Error(`Supabase error: ${error.message}`);
+        }
+        
+        console.log(`Scan saved successfully to Supabase: ${savedData.id}`);
+        return NextResponse.json({ 
+            message: 'Scan saved successfully to Supabase', 
+            scanId: savedData.id 
+        }, { status: 201 });
+    } catch (error) {
+        console.error("Error saving scan to Supabase:", error);
+        throw error;
     }
 } 

@@ -42,6 +42,9 @@ yarn-error.log*
 /.scan_queue/
 /.scan_configs/
 
+# Application settings with credentials
+.app_settings.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

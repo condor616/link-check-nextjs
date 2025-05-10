@@ -27,7 +27,10 @@ import {
   Save, 
   ArrowLeft,
   Plus,
-  Copy
+  Copy,
+  Database,
+  FileJson,
+  Settings
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -41,11 +44,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import JSONPreview from '@/components/JSONPreview';
+import { useNotification } from '@/components/NotificationContext';
 
 export default function SavedScansPage() {
   const [configs, setConfigs] = useState<SavedScanConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSupabaseError, setIsSupabaseError] = useState<boolean>(false);
+  const [settingsType, setSettingsType] = useState<'file' | 'supabase' | null>(null);
   
   // Editing state
   const [editingConfig, setEditingConfig] = useState<SavedScanConfig | null>(null);
@@ -65,7 +71,7 @@ export default function SavedScansPage() {
   // Confirm dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   
   // Add additional state variables for scan options
@@ -82,6 +88,7 @@ export default function SavedScansPage() {
   const [editExcludeSubdomains, setEditExcludeSubdomains] = useState<boolean>(true);
   
   const router = useRouter();
+  const { addNotification } = useNotification();
   
   useEffect(() => {
     fetchConfigs();
@@ -90,12 +97,28 @@ export default function SavedScansPage() {
   const fetchConfigs = async () => {
     setLoading(true);
     setError(null);
+    setIsSupabaseError(false);
     
     try {
+      // First get current settings to know if we're using Supabase
+      const settingsResponse = await fetch('/api/settings');
+      if (settingsResponse.ok) {
+        const settingsData = await settingsResponse.json();
+        setSettingsType(settingsData.storageType || 'file');
+      }
+      
       const response = await fetch('/api/saved-configs');
       const data = await response.json();
       
       if (!response.ok) {
+        // Check if this is a Supabase connection error
+        if (data.error && typeof data.error === 'string' && 
+            (data.error.includes('Supabase') || 
+             data.error.includes('database') || 
+             data.error.includes('connection'))) {
+          setIsSupabaseError(true);
+          throw new Error(`Database connection error: ${data.error}`);
+        }
         throw new Error(data.error || 'Failed to fetch saved configurations');
       }
       
@@ -106,6 +129,39 @@ export default function SavedScansPage() {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Function to switch to file-based storage
+  const switchToFileStorage = async () => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          storageType: 'file',
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update settings');
+      }
+
+      addNotification('success', 'Successfully switched to file-based storage');
+      setSettingsType('file');
+      // Refetch configs with the new storage type
+      fetchConfigs();
+    } catch (error) {
+      console.error('Error switching to file storage:', error);
+      addNotification('error', error instanceof Error ? error.message : 'Failed to switch storage type');
+    }
+  };
+
+  // Navigate to settings page
+  const goToSettings = () => {
+    router.push('/settings');
   };
   
   const handleStartScan = (config: SavedScanConfig) => {
@@ -370,10 +426,41 @@ export default function SavedScansPage() {
           <span className="ml-2 text-lg">Loading configurations...</span>
         </div>
       ) : error ? (
+        isSupabaseError && settingsType === 'supabase' ? (
+          <div className="p-6 border rounded-lg bg-amber-50">
+            <div className="flex items-start gap-4">
+              <div className="mt-1">
+                <Database className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium text-amber-800">Database Connection Issue</h3>
+                  <p className="mt-1 text-amber-700">
+                    Unable to connect to the Supabase database. Your settings are configured to use Supabase, but the connection failed.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="font-medium text-amber-800">You have two options:</h4>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button onClick={switchToFileStorage} variant="outline" className="bg-white">
+                      <FileJson className="mr-2 h-4 w-4" />
+                      Switch to File Storage
+                    </Button>
+                    <Button onClick={goToSettings} variant="default">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Fix Supabase Settings
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
         <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+        )
       ) : configs.length === 0 ? (
         <Card className="bg-white shadow">
           <CardContent className="pt-6 pb-6">
