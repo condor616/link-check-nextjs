@@ -123,7 +123,7 @@ export async function POST() {
           message: 'Tables need to be created manually',
           sql_commands: [
             `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`,
-            `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds INTEGER NOT NULL, config JSONB NOT NULL, results JSONB NOT NULL);`,
+            `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, config JSONB NOT NULL, results JSONB NOT NULL);`,
             `CREATE TABLE IF NOT EXISTS scan_params (id TEXT PRIMARY KEY, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`
           ]
         }, { status: 202 }); // Status 202 Accepted - tables need to be created manually
@@ -135,7 +135,7 @@ export async function POST() {
         error: 'Failed to set up Supabase tables. You may need to run these SQL commands manually in the Supabase dashboard SQL editor:',
         sql_commands: [
           `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`,
-          `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds INTEGER NOT NULL, config JSONB NOT NULL, results JSONB NOT NULL);`,
+          `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, config JSONB NOT NULL, results JSONB NOT NULL);`,
           `CREATE TABLE IF NOT EXISTS scan_params (id TEXT PRIMARY KEY, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`
         ]
       }, { status: 500 });
