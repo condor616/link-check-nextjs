@@ -85,6 +85,13 @@ function ScanDetailsContent() {
       setIsLoading(true);
       setError(null);
       
+      // Validate scanId
+      if (!scanId || scanId === 'null' || scanId === 'undefined') {
+        setError('Scan not found');
+        setIsLoading(false);
+        return;
+      }
+      
       try {
         const response = await fetch(`/api/history/${scanId}`);
         const data = await response.json();
@@ -207,6 +214,17 @@ function ScanDetailsContent() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
+              {error === 'Scan not found' && (
+                <div className="mt-4">
+                  <p className="mb-2">The scan you're looking for doesn't exist or may have been deleted.</p>
+                  <Link href="/history">
+                    <Button variant="outline" size="sm">
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Return to Scan History
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </Alert>
           ) : scan ? (
             <div className="space-y-8">

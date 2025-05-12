@@ -313,7 +313,13 @@ export default function HomePage() {
         const response = await fetch('/api/last-scan');
         if (response.ok) {
           const data = await response.json();
-          setLastScan(data);
+          // Only set lastScan if the data has a valid ID
+          if (data && data.id) {
+            setLastScan(data);
+          } else {
+            // If no valid ID, treat as if no scan was found
+            setLastScan(null);
+          }
         }
       } catch (error) {
         console.error('Error fetching last scan:', error);
@@ -412,12 +418,18 @@ export default function HomePage() {
               </div>
             </CardContent>
             <CardFooter>
-              <TransitionLink href={`/history/${lastScan.id}`} className="w-full">
-                <Button variant="outline" className="w-full">
-                  View Details
-                  <ArrowRight className="ml-2 h-4 w-4" />
+              {lastScan.id ? (
+                <TransitionLink href={`/history/${lastScan.id}`} className="w-full">
+                  <Button variant="outline" className="w-full">
+                    View Details
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </TransitionLink>
+              ) : (
+                <Button variant="outline" className="w-full" disabled>
+                  No Details Available
                 </Button>
-              </TransitionLink>
+              )}
             </CardFooter>
           </Card>
         ) : (
