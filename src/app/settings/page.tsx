@@ -55,10 +55,10 @@ export default function SettingsPage() {
 
   // Check if tables exist whenever Supabase credentials change or after operations
   useEffect(() => {
-    if (supabaseUrl && supabaseKey) {
+    if (storageType === 'supabase' && supabaseUrl && supabaseKey) {
       checkTablesExist();
     }
-  }, [supabaseUrl, supabaseKey, resetSuccess, deleteSuccess, clearSuccess]);
+  }, [storageType, supabaseUrl, supabaseKey, resetSuccess, deleteSuccess, clearSuccess]);
 
   const fetchSettings = async () => {
     try {
@@ -124,6 +124,9 @@ export default function SettingsPage() {
       // After saving, check if tables exist
       if (storageType === 'supabase') {
         checkTablesExist();
+      } else {
+        // If using file storage, reset the tablesExist state
+        setTablesExist(false);
       }
     } catch (error) {
       console.error('Error saving settings:', error);
