@@ -6,7 +6,9 @@ import {
   History, 
   Settings, 
   LogOut,
-  Save
+  Save,
+  Home,
+  Search
 } from 'lucide-react';
 import { PageTransition } from "@/components/PageTransition";
 import { TransitionLink } from "@/components/TransitionLink";
@@ -46,7 +48,7 @@ export default function RootLayout({
                   className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
                   activeClassName="bg-purple-800"
                 >
-                  <AlertCircle size={20} />
+                  <Home size={20} />
                   <span>Home</span>
                 </TransitionLink>
                 
@@ -55,7 +57,7 @@ export default function RootLayout({
                   className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
                   activeClassName="bg-purple-800"
                 >
-                  <AlertCircle size={20} />
+                  <Search size={20} />
                   <span>New Scan</span>
                 </TransitionLink>
                 
