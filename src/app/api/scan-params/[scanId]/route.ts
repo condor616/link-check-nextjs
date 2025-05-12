@@ -27,13 +27,7 @@ export async function GET(
     
     if (useSupabase) {
       try {
-        // First try to get from scan_params table
-        const paramsResult = await getScanParamsFromSupabase(scanId);
-        if (paramsResult) {
-          return paramsResult;
-        }
-        
-        // If not found in scan_params, try to get from scan_history
+        // Get directly from scan_history table
         return await getScanParamsFromSupabaseHistory(scanId);
       } catch (supabaseError) {
         console.error('Error getting scan params from Supabase:', supabaseError);
@@ -100,39 +94,6 @@ async function getScanParamsFromFile(scanId: string) {
       { status: 500 }
     );
   }
-}
-
-// Get scan parameters from Supabase scan_params table
-async function getScanParamsFromSupabase(scanId: string) {
-  const supabase = await getSupabaseClient();
-  
-  if (!supabase) {
-    throw new Error('Supabase client is not available');
-  }
-  
-  const { data, error } = await supabase
-    .from('scan_params')
-    .select('*')
-    .eq('id', scanId)
-    .single();
-  
-  if (error) {
-    if (error.code === 'PGRST116') {
-      // Not found in scan_params table
-      return null;
-    }
-    throw new Error(`Supabase error: ${error.message}`);
-  }
-  
-  if (!data) {
-    return null;
-  }
-  
-  // Return the data in the expected format
-  return NextResponse.json({
-    url: data.url,
-    config: data.config
-  });
 }
 
 // Get scan parameters from Supabase scan_history table

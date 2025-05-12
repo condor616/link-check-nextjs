@@ -13,34 +13,7 @@ export async function POST() {
       );
     }
     
-    // Test the connection first
-    try {
-      const { data, error } = await supabase.from('_dummy_query_').select('*').limit(1);
-      
-      // If we get a "relation does not exist" error, this is actually good!
-      // It means we connected to the database successfully but the table doesn't exist (as expected)
-      if (error && !error.message.includes('relation') && !error.message.includes('does not exist')) {
-        // Only treat it as an auth error if it's NOT a "relation does not exist" error
-        console.error('Clear Data: Authentication error with Supabase', error);
-        return NextResponse.json(
-          { error: 'Cannot connect to Supabase. Please check your credentials.' },
-          { status: 401 }
-        );
-      }
-      
-      // If we get here, either there was no error (unlikely) or we got the expected
-      // "relation does not exist" error, which means the connection is working
-      console.log('Clear Data: Connection to Supabase successful');
-      
-    } catch (connectionError) {
-      console.error('Clear Data: Connection test failed', connectionError);
-      return NextResponse.json(
-        { error: 'Failed to connect to Supabase. Please verify your URL and key.' },
-        { status: 400 }
-      );
-    }
-    
-    // Track table existence and data clearing
+    // Variables to track if tables exist and if data was cleared
     let tablesExist = false;
     let dataCleared = false;
     
@@ -85,28 +58,6 @@ export async function POST() {
         if (historyError) {
           console.error('Clear Data: Error clearing scan_history table', historyError);
           throw new Error(`Error clearing scan_history table: ${historyError.message}`);
-        }
-        
-        dataCleared = true;
-      }
-      
-      // 3. Check if scan_params exists
-      const { data: paramsData, error: paramsCheckError } = await supabase
-        .from('scan_params')
-        .select('id')
-        .limit(1);
-        
-      if (!paramsCheckError) {
-        // Table exists, delete all data
-        tablesExist = true;
-        const { error: paramsError } = await supabase
-          .from('scan_params')
-          .delete()
-          .lt('id', 'z'); // This will match all IDs and delete them
-        
-        if (paramsError) {
-          console.error('Clear Data: Error clearing scan_params table', paramsError);
-          throw new Error(`Error clearing scan_params table: ${paramsError.message}`);
         }
         
         dataCleared = true;

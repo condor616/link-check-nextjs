@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const useSupabase = await isUsingSupabase();
     
     if (useSupabase) {
-      return await saveParamsToSupabase(sanitizedId, payload.url, payload.config);
+      return await saveParamsToSupabaseHistory(sanitizedId, payload.url, payload.config);
     } else {
       return await saveParamsToFile(sanitizedId, payload.url, payload.config);
     }
@@ -94,26 +94,53 @@ async function saveParamsToFile(id: string, url: string, config: ScanConfig) {
   );
 }
 
-// Save scan parameters to Supabase
-async function saveParamsToSupabase(id: string, url: string, config: ScanConfig) {
+// Save scan parameters to Supabase history table
+async function saveParamsToSupabaseHistory(id: string, url: string, config: ScanConfig) {
   const supabase = await getSupabaseClient();
   
   if (!supabase) {
     throw new Error('Supabase client is not available');
   }
   
-  // Insert scan parameters into database
-  const { error } = await supabase
-    .from('scan_params')
-    .upsert({
-      id: id,
-      url: url,
-      config: config,
-      created_at: new Date().toISOString()
-    });
+  // First check if the scan already exists in history
+  const { data, error: checkError } = await supabase
+    .from('scan_history')
+    .select('id')
+    .eq('id', id)
+    .single();
+    
+  if (checkError && checkError.code !== 'PGRST116') {
+    throw new Error(`Supabase error: ${checkError.message}`);
+  }
   
-  if (error) {
-    throw new Error(`Supabase error: ${error.message}`);
+  // If scan exists in history, update it
+  if (data) {
+    const { error } = await supabase
+      .from('scan_history')
+      .update({
+        config: config
+      })
+      .eq('id', id);
+      
+    if (error) {
+      throw new Error(`Supabase error: ${error.message}`);
+    }
+  } else {
+    // If scan doesn't exist, insert a minimal record
+    const { error } = await supabase
+      .from('scan_history')
+      .insert({
+        id: id,
+        scan_url: url,
+        scan_date: new Date().toISOString(),
+        duration_seconds: 0,
+        config: config,
+        results: []
+      });
+      
+    if (error) {
+      throw new Error(`Supabase error: ${error.message}`);
+    }
   }
   
   return NextResponse.json(
