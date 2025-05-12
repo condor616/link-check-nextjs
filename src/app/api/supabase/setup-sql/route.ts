@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    // Check if this is just a connection test or a full setup request
+    let isConnectionTestOnly = false;
+    try {
+      const body = await request.json();
+      isConnectionTestOnly = body.connectionTestOnly === true;
+    } catch (e) {
+      // If no body or parsing fails, assume it's not just a test
+    }
+    
     const supabase = await getSupabaseClient();
     
     if (!supabase) {
@@ -31,6 +40,14 @@ export async function POST() {
       // If we get here, either there was no error (unlikely) or we got the expected
       // "relation does not exist" error, which means the connection is working
       console.log('Setup SQL: Connection to Supabase successful');
+      
+      // If this is just a connection test, return success here
+      if (isConnectionTestOnly) {
+        return NextResponse.json({ 
+          message: 'Connection to Supabase successful',
+          needsInitialization: true
+        }, { status: 200 });
+      }
       
     } catch (connectionError) {
       console.error('Setup SQL: Connection test failed', connectionError);

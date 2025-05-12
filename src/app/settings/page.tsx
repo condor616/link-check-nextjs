@@ -44,6 +44,8 @@ export default function SettingsPage() {
   const [isClearing, setIsClearing] = useState(false);
   const [clearSuccess, setClearSuccess] = useState(false);
   const [clearError, setClearError] = useState<string | null>(null);
+  const [needsInitialization, setNeedsInitialization] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   
   // Get notification context to show global notifications
   const { addNotification } = useNotification();
@@ -154,11 +156,16 @@ export default function SettingsPage() {
     
     setIsTesting(true);
     setConnectionTestResult(null);
+    setNeedsInitialization(false);
     
     try {
       // Make a simple request to test the connection
       const response = await fetch('/api/supabase/setup-sql', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ connectionTestOnly: true }),
       });
       
       if (!response.ok) {
@@ -179,9 +186,14 @@ export default function SettingsPage() {
         throw new Error(data.error || 'Failed to connect to Supabase');
       }
       
+      const data = await response.json();
+      setNeedsInitialization(!!data.needsInitialization);
+      
       setConnectionTestResult({
         success: true,
-        message: 'Connection successful!'
+        message: data.needsInitialization 
+          ? 'Connection to Supabase is successful! You need to initialize your database by clicking on "Initialize Schema".' 
+          : 'Connection successful!'
       });
       
     } catch (error) {
@@ -192,6 +204,42 @@ export default function SettingsPage() {
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+  
+  const initializeSchema = async () => {
+    if (!supabaseUrl || !supabaseKey) {
+      return;
+    }
+    
+    setIsInitializing(true);
+    setSqlCommands(null);
+    
+    try {
+      // Call the setup-sql endpoint to initialize the schema
+      const response = await fetch('/api/supabase/setup-sql', {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (response.status === 202 || data.sql_commands) {
+        // We need to show SQL commands
+        setSqlCommands(data.sql_commands);
+        setShowSqlCommands(true);
+      } else if (response.ok) {
+        // Tables were created successfully
+        setNeedsInitialization(false);
+        addNotification('success', 'Database schema initialized successfully');
+        checkTablesExist();
+      } else {
+        throw new Error(data.error || 'Failed to initialize schema');
+      }
+    } catch (error) {
+      console.error('Schema initialization error:', error);
+      addNotification('error', `Failed to initialize schema: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsInitializing(false);
     }
   };
   
@@ -590,7 +638,7 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-col sm:flex-row gap-2">
                       <Button 
                         variant="outline" 
                         onClick={testSupabaseConnection}
@@ -601,22 +649,34 @@ export default function SettingsPage() {
                         {isTesting ? "Testing..." : "Test Connection"}
                       </Button>
                       
-                      {connectionTestResult && (
-                        <Alert 
-                          className={`mt-2 ${connectionTestResult.success 
-                            ? "bg-green-50 text-green-800 border-green-200" 
-                            : "bg-red-50 text-red-800 border-red-200"}`}
+                      {connectionTestResult?.success && needsInitialization && (
+                        <Button 
+                          variant="default" 
+                          onClick={initializeSchema}
+                          disabled={isInitializing || !supabaseUrl || !supabaseKey}
+                          className="w-full md:w-auto justify-start flex items-center gap-2"
                         >
-                          {connectionTestResult.success 
-                            ? <Check className="h-5 w-5" />
-                            : <AlertCircle className="h-5 w-5" />
-                          }
-                          <AlertDescription>
-                            {connectionTestResult.message}
-                          </AlertDescription>
-                        </Alert>
+                          <Database className="h-4 w-4" />
+                          {isInitializing ? "Initializing..." : "Initialize Schema"}
+                        </Button>
                       )}
                     </div>
+
+                    {connectionTestResult && (
+                      <Alert 
+                        className={`mt-2 ${connectionTestResult.success 
+                          ? "bg-green-50 text-green-800 border-green-200" 
+                          : "bg-red-50 text-red-800 border-red-200"}`}
+                      >
+                        {connectionTestResult.success 
+                          ? <Check className="h-5 w-5" />
+                          : <AlertCircle className="h-5 w-5" />
+                        }
+                        <AlertDescription>
+                          {connectionTestResult.message}
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
                     <div className="pt-4 space-y-4 border-t">
                       <h3 className="font-medium">Supabase Management</h3>
