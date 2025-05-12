@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { ScanConfig } from '@/lib/scanner';
+import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 
 // Define the expected structure for saving scan parameters
 interface SaveScanParamsPayload {
@@ -24,7 +25,6 @@ async function ensureParamsDir() {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureParamsDir();
     const payload = await request.json() as SaveScanParamsPayload;
 
     // Validate payload
@@ -45,25 +45,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the file path
-    const paramsFilePath = path.join(process.cwd(), SCAN_PARAMS_DIR, `${sanitizedId}.json`);
+    // Check if using Supabase
+    const useSupabase = await isUsingSupabase();
     
-    // Save the parameters to file
-    await fs.writeFile(
-      paramsFilePath, 
-      JSON.stringify({
-        url: payload.url,
-        config: payload.config
-      }, null, 2)
-    );
-
-    return NextResponse.json(
-      { 
-        message: 'Scan parameters saved successfully',
-        id: sanitizedId
-      },
-      { status: 201 }
-    );
+    if (useSupabase) {
+      return await saveParamsToSupabase(sanitizedId, payload.url, payload.config);
+    } else {
+      return await saveParamsToFile(sanitizedId, payload.url, payload.config);
+    }
 
   } catch (error) {
     console.error('Error saving scan parameters:', error);
@@ -78,4 +67,60 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Save scan parameters to file
+async function saveParamsToFile(id: string, url: string, config: ScanConfig) {
+  await ensureParamsDir();
+  
+  // Create the file path
+  const paramsFilePath = path.join(process.cwd(), SCAN_PARAMS_DIR, `${id}.json`);
+  
+  // Save the parameters to file
+  await fs.writeFile(
+    paramsFilePath, 
+    JSON.stringify({
+      url: url,
+      config: config
+    }, null, 2)
+  );
+
+  return NextResponse.json(
+    { 
+      message: 'Scan parameters saved successfully to file',
+      id: id
+    },
+    { status: 201 }
+  );
+}
+
+// Save scan parameters to Supabase
+async function saveParamsToSupabase(id: string, url: string, config: ScanConfig) {
+  const supabase = await getSupabaseClient();
+  
+  if (!supabase) {
+    throw new Error('Supabase client is not available');
+  }
+  
+  // Insert scan parameters into database
+  const { error } = await supabase
+    .from('scan_params')
+    .upsert({
+      id: id,
+      url: url,
+      config: config,
+      created_at: new Date().toISOString()
+    });
+  
+  if (error) {
+    throw new Error(`Supabase error: ${error.message}`);
+  }
+  
+  return NextResponse.json(
+    { 
+      message: 'Scan parameters saved successfully to Supabase',
+      id: id
+    },
+    { status: 201 }
+  );
 } 

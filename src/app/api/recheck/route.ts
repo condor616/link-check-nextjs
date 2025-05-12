@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { ScanConfig, ScanResult } from '@/lib/scanner';
+import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 
 interface RecheckRequest {
   url: string;
@@ -139,6 +140,85 @@ function getAuthMessage(authDecision: string, originalScanUrl: string, checkedUr
   }
 }
 
+// Get scan data from file
+async function getScanDataFromFile(scanId: string) {
+  // Get the scan file path
+  const scanFilePath = path.join(process.cwd(), '.scan_history', `${scanId}.json`);
+
+  // Check if scan file exists
+  try {
+    await fs.access(scanFilePath);
+  } catch (_) {
+    return null;
+  }
+
+  // Read the scan file
+  const scanFileContent = await fs.readFile(scanFilePath, 'utf-8');
+  return JSON.parse(scanFileContent);
+}
+
+// Get scan data from Supabase
+async function getScanDataFromSupabase(scanId: string) {
+  const supabase = await getSupabaseClient();
+  
+  if (!supabase) {
+    throw new Error('Supabase client is not available');
+  }
+  
+  const { data, error } = await supabase
+    .from('scan_history')
+    .select('*')
+    .eq('id', scanId)
+    .single();
+  
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    throw new Error(`Supabase error: ${error.message}`);
+  }
+  
+  if (!data) {
+    return null;
+  }
+  
+  // Format data to match the file-based format
+  return {
+    id: data.id,
+    scanUrl: data.scan_url,
+    scanDate: data.scan_date,
+    durationSeconds: data.duration_seconds,
+    results: data.results || [],
+    config: data.config || {}
+  };
+}
+
+// Save updated scan data to file
+async function saveScanDataToFile(scanId: string, scanData: any) {
+  const scanFilePath = path.join(process.cwd(), '.scan_history', `${scanId}.json`);
+  await fs.writeFile(scanFilePath, JSON.stringify(scanData, null, 2));
+}
+
+// Save updated scan data to Supabase
+async function saveScanDataToSupabase(scanId: string, scanData: any) {
+  const supabase = await getSupabaseClient();
+  
+  if (!supabase) {
+    throw new Error('Supabase client is not available');
+  }
+  
+  const { error } = await supabase
+    .from('scan_history')
+    .update({
+      results: scanData.results
+    })
+    .eq('id', scanId);
+  
+  if (error) {
+    throw new Error(`Supabase error updating scan: ${error.message}`);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Validate request body
@@ -166,19 +246,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
     }
 
-    // Get the scan file path
-    const scanFilePath = path.join(process.cwd(), '.scan_history', `${scanId}.json`);
-
-    // Check if scan file exists
-    try {
-      await fs.access(scanFilePath);
-    } catch (_) {
+    // Check if using Supabase
+    const useSupabase = await isUsingSupabase();
+    
+    // Get scan data
+    let scanData;
+    if (useSupabase) {
+      scanData = await getScanDataFromSupabase(scanId);
+      if (!scanData) {
+        // Try file as fallback
+        scanData = await getScanDataFromFile(scanId);
+      }
+    } else {
+      scanData = await getScanDataFromFile(scanId);
+    }
+    
+    // Check if scan exists
+    if (!scanData) {
       return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
     }
-
-    // Read the scan file
-    const scanFileContent = await fs.readFile(scanFilePath, 'utf-8');
-    const scanData = JSON.parse(scanFileContent);
 
     // Get authentication credentials - first use the ones provided in the request,
     // if not available, check the original scan config
@@ -223,7 +309,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Save the updated scan data
-      await fs.writeFile(scanFilePath, JSON.stringify(scanData, null, 2));
+      if (useSupabase) {
+        await saveScanDataToSupabase(scanId, scanData);
+      } else {
+        await saveScanDataToFile(scanId, scanData);
+      }
 
       // Return the updated result
       return NextResponse.json({
@@ -248,26 +338,22 @@ export async function POST(request: NextRequest) {
       } 
       
       if (scanError instanceof Error && scanError.message.includes('timeout')) {
-        return NextResponse.json({
-          error: `The request timed out. Try increasing the timeout value.`,
+        return NextResponse.json({ 
+          error: `Request timed out after ${(configWithAuth?.requestTimeout ?? 30000)/1000} seconds`,
           status: 'error'
         }, { status: 504 });
       }
       
       return NextResponse.json({ 
-        error: scanError instanceof Error ? scanError.message : 'Re-check process failed',
+        error: scanError instanceof Error ? scanError.message : 'Unknown error occurred',
         status: 'error'
       }, { status: 500 });
     }
-
   } catch (error) {
-    console.error('Error processing re-check request:', error);
-    return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : 'Unknown server error',
-        status: 'error'
-      }, 
-      { status: 500 }
-    );
+    console.error("Re-check endpoint error:", error);
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Internal server error',
+      status: 'error'
+    }, { status: 500 });
   }
 } 
