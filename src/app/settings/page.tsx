@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [clearError, setClearError] = useState<string | null>(null);
   const [needsInitialization, setNeedsInitialization] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [showConfirmClearDialog, setShowConfirmClearDialog] = useState(false);
   
   // Get notification context to show global notifications
   const { addNotification } = useNotification();
@@ -334,7 +335,6 @@ export default function SettingsPage() {
     setResetSuccess(false);
     setResetError(null);
     setSqlCommands(null);
-    setShowSqlCommands(false);
 
     try {
       const response = await fetch('/api/supabase/setup-sql', {
@@ -387,7 +387,6 @@ export default function SettingsPage() {
     setDeleteSuccess(false);
     setDeleteError(null);
     setSqlCommands(null);
-    setShowSqlCommands(false);
 
     try {
       // First save the settings to ensure API calls use the current values
@@ -452,10 +451,12 @@ export default function SettingsPage() {
       return;
     }
 
-    if (!confirm('Are you sure you want to clear all data from the tables? This action cannot be undone.')) {
-      return;
-    }
+    // Show confirmation dialog
+    setShowConfirmClearDialog(true);
+  };
 
+  const confirmClearData = async () => {
+    setShowConfirmClearDialog(false);
     setIsClearing(true);
     setClearSuccess(false);
     setClearError(null);
@@ -490,49 +491,6 @@ export default function SettingsPage() {
     } finally {
       setIsClearing(false);
     }
-  };
-
-  const SqlCommandsDisplay = () => {
-    if (!showSqlCommands || !sqlCommands) return null;
-    
-    return (
-      <div className="mt-4 p-4 border rounded bg-gray-50">
-        <h4 className="font-medium mb-2">SQL Commands to Run in Supabase</h4>
-        <p className="text-sm mb-3">
-          Copy and run these commands in the Supabase SQL Editor to delete your tables:
-        </p>
-        <div className="bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto text-sm">
-          <pre>{sqlCommands.join('\n\n')}</pre>
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              navigator.clipboard.writeText(sqlCommands.join('\n\n'));
-              addNotification('success', 'SQL commands copied to clipboard');
-            }}
-          >
-            Copy to Clipboard
-          </Button>
-          <a 
-            href="https://app.supabase.com/" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center h-9 px-4 py-2 text-sm font-medium border rounded-md border-input bg-background hover:bg-accent hover:text-accent-foreground"
-          >
-            Open Supabase
-          </a>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSqlCommands(false)}
-          >
-            Hide
-          </Button>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -728,8 +686,6 @@ export default function SettingsPage() {
                         </Alert>
                       )}
 
-                      <SqlCommandsDisplay />
-
                       {deleteSuccess && (
                         <Alert className="bg-green-50 text-green-800 border-green-200">
                           <Check className="h-5 w-5" />
@@ -854,6 +810,68 @@ export default function SettingsPage() {
             <DialogClose asChild>
               <Button>Close</Button>
             </DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* SQL Commands Dialog */}
+      <Dialog open={showSqlCommands} onOpenChange={setShowSqlCommands}>
+        <DialogContent className="max-w-md md:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Database className="h-5 w-5" />
+              SQL Commands
+            </DialogTitle>
+            <DialogDescription>
+              Run these commands in the Supabase SQL Editor
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            <div className="bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto text-sm">
+              <pre>{sqlCommands ? sqlCommands.join('\n\n') : ''}</pre>
+            </div>
+          </div>
+          
+          <div className="flex justify-between mt-6">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (sqlCommands) {
+                  navigator.clipboard.writeText(sqlCommands.join('\n\n'));
+                  addNotification('success', 'SQL commands copied to clipboard');
+                }
+              }}
+            >
+              Copy to Clipboard
+            </Button>
+            <DialogClose asChild>
+              <Button>Close</Button>
+            </DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Clear Data Dialog */}
+      <Dialog open={showConfirmClearDialog} onOpenChange={setShowConfirmClearDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Confirm Data Deletion
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to clear all data from the tables? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={() => setShowConfirmClearDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmClearData}>
+              Yes, Clear All Data
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
