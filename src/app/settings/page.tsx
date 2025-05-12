@@ -26,14 +26,8 @@ export default function SettingsPage() {
   const [supabaseUrl, setSupabaseUrl] = useState('');
   const [supabaseKey, setSupabaseKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteSuccess, setDeleteSuccess] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState(false);
-  const [resetError, setResetError] = useState<string | null>(null);
   const [sqlCommands, setSqlCommands] = useState<string[] | null>(null);
   const [showSqlCommands, setShowSqlCommands] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
@@ -42,11 +36,10 @@ export default function SettingsPage() {
   const [tablesExist, setTablesExist] = useState(false);
   const [isCheckingTables, setIsCheckingTables] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [clearSuccess, setClearSuccess] = useState(false);
-  const [clearError, setClearError] = useState<string | null>(null);
   const [needsInitialization, setNeedsInitialization] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [showConfirmClearDialog, setShowConfirmClearDialog] = useState(false);
+  const [showConnectionSuccessDialog, setShowConnectionSuccessDialog] = useState(false);
   
   // Get notification context to show global notifications
   const { addNotification } = useNotification();
@@ -61,7 +54,7 @@ export default function SettingsPage() {
     if (storageType === 'supabase' && supabaseUrl && supabaseKey) {
       checkTablesExist();
     }
-  }, [storageType, supabaseUrl, supabaseKey, resetSuccess, deleteSuccess, clearSuccess]);
+  }, [storageType, supabaseUrl, supabaseKey]);
 
   const fetchSettings = async () => {
     try {
@@ -83,8 +76,6 @@ export default function SettingsPage() {
 
   const saveSettings = async () => {
     setIsSaving(true);
-    setSaveSuccess(false);
-    setSaveError(null);
 
     try {
       // Validate Supabase URL and key if selecting Supabase storage
@@ -121,7 +112,6 @@ export default function SettingsPage() {
         throw new Error(data.error || 'Failed to save settings');
       }
 
-      setSaveSuccess(true);
       addNotification('success', 'Settings saved successfully');
       
       // After saving, check if tables exist
@@ -133,7 +123,7 @@ export default function SettingsPage() {
       }
     } catch (error) {
       console.error('Error saving settings:', error);
-      setSaveError(error instanceof Error ? error.message : 'Unknown error occurred');
+      addNotification('error', error instanceof Error ? error.message : 'Unknown error occurred');
     } finally {
       setIsSaving(false);
     }
@@ -148,10 +138,7 @@ export default function SettingsPage() {
   
   const testSupabaseConnection = async () => {
     if (!supabaseUrl || !supabaseKey) {
-      setConnectionTestResult({
-        success: false,
-        message: 'Please enter both Supabase URL and key before testing connection'
-      });
+      addNotification('error', 'Please enter both Supabase URL and key before testing connection');
       return;
     }
     
@@ -193,9 +180,16 @@ export default function SettingsPage() {
       setConnectionTestResult({
         success: true,
         message: data.needsInitialization 
-          ? 'Connection to Supabase is successful! You need to initialize your database by clicking on "Initialize Schema".' 
-          : 'Connection successful!'
+          ? 'Connection to Supabase is successful!' 
+          : 'Connection successful! Your Supabase database is properly configured.'
       });
+      
+      // If initialization is needed, show the dialog to guide the user
+      if (data.needsInitialization) {
+        setShowConnectionSuccessDialog(true);
+      } else {
+        addNotification('success', 'Connection successful! Your Supabase database is properly configured.');
+      }
       
     } catch (error) {
       console.error('Connection test error:', error);
@@ -203,6 +197,7 @@ export default function SettingsPage() {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown connection error'
       });
+      addNotification('error', error instanceof Error ? error.message : 'Unknown connection error');
     } finally {
       setIsTesting(false);
     }
@@ -217,6 +212,45 @@ export default function SettingsPage() {
     setSqlCommands(null);
     
     try {
+      // First check if tables already exist
+      const tableNames = ['scan_configs', 'scan_history', 'scan_params'];
+      let allTablesExist = true;
+      
+      for (const table of tableNames) {
+        try {
+          const response = await fetch('/api/supabase/check-table', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ table })
+          });
+          
+          if (!response.ok) {
+            allTablesExist = false;
+            break;
+          }
+          
+          const data = await response.json();
+          if (!data.exists) {
+            allTablesExist = false;
+            break;
+          }
+        } catch (error) {
+          console.error(`Error checking table ${table}:`, error);
+          allTablesExist = false;
+          break;
+        }
+      }
+      
+      // If tables already exist, show success message and return
+      if (allTablesExist) {
+        setTablesExist(true);
+        setNeedsInitialization(false);
+        addNotification('success', 'Database schema is already initialized');
+        return;
+      }
+      
       // Call the setup-sql endpoint to initialize the schema
       const response = await fetch('/api/supabase/setup-sql', {
         method: 'POST',
@@ -231,8 +265,8 @@ export default function SettingsPage() {
       } else if (response.ok) {
         // Tables were created successfully
         setNeedsInitialization(false);
+        setTablesExist(true);
         addNotification('success', 'Database schema initialized successfully');
-        checkTablesExist();
       } else {
         throw new Error(data.error || 'Failed to initialize schema');
       }
@@ -327,14 +361,10 @@ export default function SettingsPage() {
     // First check if Supabase is configured
     if (!checkSupabaseConfig()) {
       addNotification('error', 'Please configure Supabase URL and key before initializing tables');
-      setResetError('Supabase is not properly configured. Please enter URL and key first.');
       return;
     }
 
     setIsResetting(true);
-    setResetSuccess(false);
-    setResetError(null);
-    setSqlCommands(null);
 
     try {
       const response = await fetch('/api/supabase/setup-sql', {
@@ -347,7 +377,6 @@ export default function SettingsPage() {
         // Tables need to be created manually
         setSqlCommands(data.sql_commands);
         setShowSqlCommands(true);
-        setResetError('Tables do not exist in your Supabase database. Please run the provided SQL commands in the Supabase SQL editor.');
         addNotification('warning', 'Tables need to be created manually in Supabase');
         return;
       }
@@ -360,7 +389,6 @@ export default function SettingsPage() {
         throw new Error(data.error || 'Failed to reset Supabase tables');
       }
 
-      setResetSuccess(true);
       addNotification('success', 'Supabase tables were initialized successfully');
       
       // After successful reset, update tablesExist
@@ -368,7 +396,6 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error resetting tables:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setResetError(errorMessage);
       addNotification('error', `Failed to initialize tables: ${errorMessage}`);
     } finally {
       setIsResetting(false);
@@ -379,14 +406,10 @@ export default function SettingsPage() {
     // First check if Supabase is configured
     if (!checkSupabaseConfig()) {
       addNotification('error', 'Please configure Supabase URL and key before attempting to delete tables');
-      setDeleteError('Supabase is not properly configured. Please enter URL and key first.');
       return;
     }
 
     setIsDeleting(true);
-    setDeleteSuccess(false);
-    setDeleteError(null);
-    setSqlCommands(null);
 
     try {
       // First save the settings to ensure API calls use the current values
@@ -419,7 +442,6 @@ export default function SettingsPage() {
 
       // If no tables exist
       if (data.message && data.message.includes('No tables found')) {
-        setDeleteSuccess(true);
         addNotification('info', 'No tables to delete - your Supabase database is already empty');
         setTablesExist(false);
         return;
@@ -436,7 +458,6 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error getting SQL commands:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setDeleteError(errorMessage);
       addNotification('error', `Failed to get SQL commands: ${errorMessage}`);
     } finally {
       setIsDeleting(false);
@@ -447,7 +468,6 @@ export default function SettingsPage() {
     // First check if Supabase is configured
     if (!checkSupabaseConfig()) {
       addNotification('error', 'Please configure Supabase URL and key before clearing data');
-      setClearError('Supabase is not properly configured. Please enter URL and key first.');
       return;
     }
 
@@ -458,8 +478,6 @@ export default function SettingsPage() {
   const confirmClearData = async () => {
     setShowConfirmClearDialog(false);
     setIsClearing(true);
-    setClearSuccess(false);
-    setClearError(null);
 
     try {
       // This endpoint doesn't exist yet, but we'll implement it
@@ -473,7 +491,6 @@ export default function SettingsPage() {
       if (!response.ok) {
         // Check if the error is because tables don't exist
         if (data.error && data.error.includes('does not exist')) {
-          setClearError('No tables exist to clear data from.');
           addNotification('info', 'No tables exist to clear data from.');
           return;
         }
@@ -481,12 +498,10 @@ export default function SettingsPage() {
         throw new Error(data.error || 'Failed to clear data from Supabase tables');
       }
 
-      setClearSuccess(true);
       addNotification('success', 'Data was successfully cleared from all tables');
     } catch (error) {
       console.error('Error clearing data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setClearError(errorMessage);
       addNotification('error', `Failed to clear data: ${errorMessage}`);
     } finally {
       setIsClearing(false);
@@ -596,7 +611,7 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     
-                    <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                    <div className="mt-2">
                       <Button 
                         variant="outline" 
                         onClick={testSupabaseConnection}
@@ -606,30 +621,13 @@ export default function SettingsPage() {
                         <RefreshCw className={`h-4 w-4 ${isTesting ? "animate-spin" : ""}`} />
                         {isTesting ? "Testing..." : "Test Connection"}
                       </Button>
-                      
-                      {connectionTestResult?.success && needsInitialization && (
-                        <Button 
-                          variant="default" 
-                          onClick={initializeSchema}
-                          disabled={isInitializing || !supabaseUrl || !supabaseKey}
-                          className="w-full md:w-auto justify-start flex items-center gap-2"
-                        >
-                          <Database className="h-4 w-4" />
-                          {isInitializing ? "Initializing..." : "Initialize Schema"}
-                        </Button>
-                      )}
                     </div>
 
-                    {connectionTestResult && (
+                    {connectionTestResult && !connectionTestResult.success && (
                       <Alert 
-                        className={`mt-2 ${connectionTestResult.success 
-                          ? "bg-green-50 text-green-800 border-green-200" 
-                          : "bg-red-50 text-red-800 border-red-200"}`}
+                        className="mt-2 bg-red-50 text-red-800 border-red-200"
                       >
-                        {connectionTestResult.success 
-                          ? <Check className="h-5 w-5" />
-                          : <AlertCircle className="h-5 w-5" />
-                        }
+                        <AlertCircle className="h-5 w-5" />
                         <AlertDescription>
                           {connectionTestResult.message}
                         </AlertDescription>
@@ -670,54 +668,6 @@ export default function SettingsPage() {
                         </Button>
                       </div>
 
-                      {resetSuccess && (
-                        <Alert className="bg-green-50 text-green-800 border-green-200">
-                          <Check className="h-5 w-5" />
-                          <AlertDescription>
-                            Supabase tables were successfully initialized/reset.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {resetError && (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-5 w-5" />
-                          <AlertDescription>{resetError}</AlertDescription>
-                        </Alert>
-                      )}
-
-                      {deleteSuccess && (
-                        <Alert className="bg-green-50 text-green-800 border-green-200">
-                          <Check className="h-5 w-5" />
-                          <AlertDescription>
-                            No tables found in your Supabase database.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {deleteError && (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-5 w-5" />
-                          <AlertDescription>{deleteError}</AlertDescription>
-                        </Alert>
-                      )}
-                      
-                      {clearSuccess && (
-                        <Alert className="bg-green-50 text-green-800 border-green-200">
-                          <Check className="h-5 w-5" />
-                          <AlertDescription>
-                            Data was successfully cleared from all tables.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {clearError && (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-5 w-5" />
-                          <AlertDescription>{clearError}</AlertDescription>
-                        </Alert>
-                      )}
-
                       {!supabaseUrl || !supabaseKey ? (
                         <Alert className="bg-amber-50 text-amber-800 border-amber-200">
                           <AlertCircle className="h-5 w-5" />
@@ -738,22 +688,6 @@ export default function SettingsPage() {
                   >
                     {isSaving ? "Saving..." : "Save Settings"}
                   </Button>
-
-                  {saveSuccess && (
-                    <Alert className="bg-green-50 text-green-800 border-green-200 mt-4">
-                      <Check className="h-5 w-5" />
-                      <AlertDescription>
-                        Settings saved successfully.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {saveError && (
-                    <Alert variant="destructive" className="mt-4">
-                      <AlertCircle className="h-5 w-5" />
-                      <AlertDescription>{saveError}</AlertDescription>
-                    </Alert>
-                  )}
                 </div>
               </div>
             </CardContent>
@@ -816,7 +750,7 @@ export default function SettingsPage() {
 
       {/* SQL Commands Dialog */}
       <Dialog open={showSqlCommands} onOpenChange={setShowSqlCommands}>
-        <DialogContent className="max-w-md md:max-w-2xl">
+        <DialogContent className="max-w-md md:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <Database className="h-5 w-5" />
@@ -828,8 +762,8 @@ export default function SettingsPage() {
           </DialogHeader>
           
           <div className="mt-4">
-            <div className="bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto text-sm">
-              <pre>{sqlCommands ? sqlCommands.join('\n\n') : ''}</pre>
+            <div className="bg-gray-900 text-gray-100 p-3 rounded overflow-auto max-h-[60vh] text-sm">
+              <pre className="whitespace-pre-wrap break-all">{sqlCommands ? sqlCommands.join('\n\n') : ''}</pre>
             </div>
           </div>
           
@@ -872,6 +806,46 @@ export default function SettingsPage() {
             <Button variant="destructive" onClick={confirmClearData}>
               Yes, Clear All Data
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Connection Success Dialog */}
+      <Dialog open={showConnectionSuccessDialog} onOpenChange={setShowConnectionSuccessDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Check className="h-5 w-5 text-green-500" />
+              Connection Successful
+            </DialogTitle>
+            <DialogDescription>
+              Your Supabase connection is working correctly, but you need to initialize the database schema.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            <p className="text-sm mb-4">
+              Initialize your database schema to start using Supabase storage.
+            </p>
+            
+            <div className="flex justify-between">
+              <Button 
+                variant="default" 
+                onClick={() => {
+                  setShowConnectionSuccessDialog(false);
+                  initializeSchema();
+                }}
+                disabled={isInitializing}
+                className="flex items-center gap-2"
+              >
+                <Database className="h-4 w-4" />
+                {isInitializing ? "Initializing..." : "Initialize Schema"}
+              </Button>
+              
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
