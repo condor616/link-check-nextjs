@@ -14,7 +14,7 @@ export async function POST() {
     }
     
     // Define the tables to delete
-    const tablesToDrop = ['scan_configs', 'scan_history', 'scan_params'];
+    const tablesToDrop = ['scan_configs', 'scan_history'];
     
     // Check if any tables exist
     let tablesExist = false;
@@ -46,7 +46,7 @@ export async function POST() {
     console.error('Error in delete-tables endpoint:', error);
     return NextResponse.json({
       error: 'Failed to check tables: ' + (error instanceof Error ? error.message : String(error)),
-      sql_commands: ['DROP TABLE IF EXISTS scan_configs CASCADE;', 'DROP TABLE IF EXISTS scan_history CASCADE;', 'DROP TABLE IF EXISTS scan_params CASCADE;'],
+      sql_commands: ['DROP TABLE IF EXISTS scan_configs CASCADE;', 'DROP TABLE IF EXISTS scan_history CASCADE;'],
     }, { status: 500 });
   }
 }
