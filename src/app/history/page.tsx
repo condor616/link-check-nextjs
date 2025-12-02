@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-// import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Card,
@@ -31,11 +30,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Trash2, AlertCircle, ExternalLink, FileDown, Clock, Calendar, Database, FileJson, Settings } from 'lucide-react';
-import { Input } from "@/components/ui/input";
+import { Loader2, Trash2, AlertCircle, ExternalLink, FileDown, Clock, Calendar, Database, FileJson, Settings, PlayCircle } from 'lucide-react';
 import { useNotification } from "@/components/NotificationContext";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { Progress } from "@/components/ui/progress";
 
 // Define the scan summary structure (from API response)
 interface ScanSummary {
@@ -45,31 +44,27 @@ interface ScanSummary {
   durationSeconds: number;
   resultsCount: number;
   brokenLinksCount: number;
+  status?: string; // Add status for unified view
 }
 
-// Define the full scan record structure received from the API
-interface ScanRecord {
+interface ScanJob {
   id: string;
-  scanUrl: string;
-  scanDate: string;
-  durationSeconds: number;
-  results: Array<{
-    url: string;
-    status: string;
-    statusCode?: number;
-    errorMessage?: string;
-    foundOn?: string[] | Set<string>;
-  }>;
-  config: {
-    depth: number;
-    scanSameLinkOnce: boolean;
-    concurrency: number;
-  };
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  scan_url: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  progress_percent: number;
+  current_url?: string;
+  urls_scanned: number;
+  total_urls: number;
+  scan_config: any;
+  error?: string;
 }
 
 export default function HistoryPage() {
-  // const router = useRouter(); // Uncomment when needed for navigation
   const [scans, setScans] = useState<ScanSummary[]>([]);
+  const [jobs, setJobs] = useState<ScanJob[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -79,14 +74,40 @@ export default function HistoryPage() {
   const { addNotification } = useNotification();
   const router = useRouter();
 
-  // Load scans on initial render
+  // Load scans and jobs on initial render
   useEffect(() => {
-    fetchScans();
+    fetchData();
+
+    // Poll for job updates if there are active jobs
+    const interval = setInterval(() => {
+      // We could optimize this to only poll if we know there are active jobs,
+      // but for simplicity let's just refresh jobs every 5 seconds
+      fetchJobs();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  // Function to fetch all scans
-  const fetchScans = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
+    await Promise.all([fetchScans(), fetchJobs()]);
+    setIsLoading(false);
+  };
+
+  const fetchJobs = async () => {
+    try {
+      const response = await fetch('/api/jobs');
+      if (response.ok) {
+        const data = await response.json();
+        setJobs(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch jobs", e);
+    }
+  };
+
+  // Function to fetch all scans (history)
+  const fetchScans = async () => {
     setError(null);
     setIsSupabaseError(false);
 
@@ -97,16 +118,16 @@ export default function HistoryPage() {
         const settingsData = await settingsResponse.json();
         setSettingsType(settingsData.storageType || 'file');
       }
-      
+
       const response = await fetch('/api/history');
       const data = await response.json();
 
       if (!response.ok) {
         // Check if this is a Supabase connection error
-        if (data.error && typeof data.error === 'string' && 
-            (data.error.includes('Supabase') || 
-             data.error.includes('database') || 
-             data.error.includes('connection'))) {
+        if (data.error && typeof data.error === 'string' &&
+          (data.error.includes('Supabase') ||
+            data.error.includes('database') ||
+            data.error.includes('connection'))) {
           setIsSupabaseError(true);
           throw new Error(`Database connection error: ${data.error}`);
         }
@@ -122,7 +143,8 @@ export default function HistoryPage() {
           scanDate: item.scanDate,
           durationSeconds: item.durationSeconds,
           resultsCount: item.resultsCount ?? 0,
-          brokenLinksCount: item.brokenLinksCount ?? 0
+          brokenLinksCount: item.brokenLinksCount ?? 0,
+          status: 'completed'
         }));
         setScans(summaries);
       } else {
@@ -135,8 +157,6 @@ export default function HistoryPage() {
           ? err.message
           : 'Failed to load scan history'
       );
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -268,11 +288,16 @@ export default function HistoryPage() {
 
   // Get the exact time of the last scan
   const getLastScanDateTime = () => {
-    if (scans.length === 0) return '-';
+    // Combine scans and completed jobs for this metric
+    const allCompleted = [...scans];
+    // Add completed jobs that aren't already in scans (if any overlap, though usually they are separate sources)
+    // For now just use scans as they represent "History"
+
+    if (allCompleted.length === 0) return '-';
 
     try {
       // Simple approach - sort the scans by date and take the most recent
-      const sortedScans = [...scans].sort((a, b) => {
+      const sortedScans = [...allCompleted].sort((a, b) => {
         const dateA = new Date(a.scanDate).getTime();
         const dateB = new Date(b.scanDate).getTime();
 
@@ -292,8 +317,8 @@ export default function HistoryPage() {
       }
 
       // Fallback - try the first scan regardless
-      if (scans.length > 0) {
-        const firstScan = scans[0];
+      if (allCompleted.length > 0) {
+        const firstScan = allCompleted[0];
         return formatDate(firstScan.scanDate, true);
       }
 
@@ -304,7 +329,12 @@ export default function HistoryPage() {
     }
   };
 
-  // TODO: Export scan function
+  // Filter active jobs
+  const activeJobs = jobs.filter(j => j.status === 'queued' || j.status === 'running');
+  // Filter completed/failed jobs to show in list if not already in history (optional, but for now let's show them separately or merge)
+  // Actually, let's just show active jobs in a separate card, and history below.
+  // We can also show completed jobs in the history list if we want, but they might duplicate if we sync them.
+  // For now, let's just show active jobs.
 
   return (
     <div className="container mx-auto p-4 max-w-none">
@@ -330,7 +360,7 @@ export default function HistoryPage() {
             </Button>
 
             <Button
-              onClick={fetchScans}
+              onClick={fetchData}
               variant="outline"
               disabled={isLoading}
               className="whitespace-nowrap"
@@ -347,58 +377,103 @@ export default function HistoryPage() {
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-  {/* Total Scans Card */}
-  <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
-    <CardContent className="p-6">
-      <div className="flex flex-col items-center justify-center h-full space-y-6">
-        <div className="rounded-full bg-purple-50 p-3 group-hover:bg-purple-100 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 13v5m4-9v9m4-3v3" /></svg>
-        </div>
-        <div className="flex flex-col items-center justify-center flex-grow">
-          <span className="text-3xl font-extrabold text-purple-700">{scans.length}</span>
-        </div>
-        <span className="text-sm text-muted-foreground">Total Scans</span>
-      </div>
-    </CardContent>
-  </Card>
+          {/* Total Scans Card */}
+          <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center justify-center h-full space-y-6">
+                <div className="rounded-full bg-purple-50 p-3 group-hover:bg-purple-100 transition-colors">
+                  <Database className="h-8 w-8 text-purple-600" />
+                </div>
+                <div className="flex flex-col items-center justify-center flex-grow">
+                  <span className="text-3xl font-extrabold text-purple-700">{scans.length}</span>
+                </div>
+                <span className="text-sm text-muted-foreground">Total Scans</span>
+              </div>
+            </CardContent>
+          </Card>
 
-  {/* Total Links Checked Card */}
-  <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
-    <CardContent className="p-6">
-      <div className="flex flex-col items-center justify-center h-full space-y-6">
-        <div className="rounded-full bg-blue-50 p-3 group-hover:bg-blue-100 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 13a5 5 0 007 7l1-1a5 5 0 00-7-7l-1 1zm4-4a5 5 0 00-7-7l-1 1a5 5 0 007 7l1-1z" /></svg>
-        </div>
-        <div className="flex flex-col items-center justify-center flex-grow">
-          <span className="text-3xl font-extrabold text-blue-700">{scans.reduce((sum, scan) => sum + scan.resultsCount, 0)}</span>
-        </div>
-        <span className="text-sm text-muted-foreground">Total Links Checked</span>
-      </div>
-    </CardContent>
-  </Card>
+          {/* Active Jobs Card */}
+          <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center justify-center h-full space-y-6">
+                <div className="rounded-full bg-blue-50 p-3 group-hover:bg-blue-100 transition-colors">
+                  <PlayCircle className="h-8 w-8 text-blue-600" />
+                </div>
+                <div className="flex flex-col items-center justify-center flex-grow">
+                  <span className="text-3xl font-extrabold text-blue-700">{activeJobs.length}</span>
+                </div>
+                <span className="text-sm text-muted-foreground">Active Scans</span>
+              </div>
+            </CardContent>
+          </Card>
 
-  {/* Last Scan Card */}
-  <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
-    <CardContent className="p-6">
-      <div className="flex flex-col items-center justify-center h-full space-y-6">
-        <div className="rounded-full bg-green-50 p-3 group-hover:bg-green-100 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          {/* Last Scan Card */}
+          <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center justify-center h-full space-y-6">
+                <div className="rounded-full bg-green-50 p-3 group-hover:bg-green-100 transition-colors">
+                  <Clock className="h-8 w-8 text-green-600" />
+                </div>
+                <div className="flex flex-col items-center justify-center flex-grow">
+                  {getLastScanDateTime()}
+                </div>
+                <span className="text-sm text-muted-foreground">Last Scan</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        <div className="flex flex-col items-center justify-center flex-grow">
-          {getLastScanDateTime()}
-        </div>
-        <span className="text-sm text-muted-foreground">Last Scan</span>
-      </div>
-    </CardContent>
-  </Card>
-</div>
 
+        {/* Active Jobs Section */}
+        {activeJobs.length > 0 && (
+          <Card className="bg-white shadow mb-8">
+            <CardHeader>
+              <CardTitle>Active Scans</CardTitle>
+              <CardDescription>Currently running or queued scans</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {activeJobs.map(job => (
+                  <div key={job.id} className="border rounded-lg p-4 flex flex-col gap-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold truncate max-w-[300px]">{job.scan_url}</h3>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                          <span className={`capitalize px-2 py-0.5 rounded-full text-xs ${job.status === 'running' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                            {job.status}
+                          </span>
+                          <span>•</span>
+                          <span>Started {formatDate(job.created_at)}</span>
+                        </div>
+                      </div>
+                      <Link href={`/history/${job.id}`}>
+                        <Button size="sm" variant="outline">View Progress</Button>
+                      </Link>
+                    </div>
+                    {job.status === 'running' && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{job.urls_scanned} URLs scanned</span>
+                          <span>{job.progress_percent}%</span>
+                        </div>
+                        <Progress value={job.progress_percent} className="h-2" />
+                        <p className="text-xs text-muted-foreground truncate">Current: {job.current_url}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* History Section */}
         <Card className="bg-white shadow">
           <CardHeader>
             <CardTitle>Recent Scans</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isLoading && scans.length === 0 ? (
               <div className="flex justify-center items-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
               </div>
@@ -433,11 +508,11 @@ export default function HistoryPage() {
                   </div>
                 </div>
               ) : (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )
             ) : scans.length === 0 ? (
               <div className="text-center py-8">

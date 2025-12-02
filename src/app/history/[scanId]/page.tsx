@@ -6,9 +6,10 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertCircle, ArrowLeft, Trash2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Trash2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { ScanResult } from '@/lib/scanner';
 import ScanResults from '@/components/ScanResults';
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +43,22 @@ interface SavedScan {
   results: SerializedScanResult[];
 }
 
+interface ScanJob {
+  id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  scan_url: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  progress_percent: number;
+  current_url?: string;
+  urls_scanned: number;
+  total_urls: number;
+  scan_config: any;
+  error?: string;
+  results?: SerializedScanResult[];
+}
+
 // Loading fallback for Suspense
 function ScanDetailsLoading() {
   return (
@@ -73,49 +90,84 @@ function ScanDetailsContent() {
   const router = useRouter();
   const params = useParams();
   const scanId = params.scanId as string;
-  
+
   const [scan, setScan] = useState<SavedScan | null>(null);
+  const [job, setJob] = useState<ScanJob | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  
+
   useEffect(() => {
-    // Fetch the scan data
-    const fetchScan = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      // Validate scanId
-      if (!scanId || scanId === 'null' || scanId === 'undefined') {
-        setError('Scan not found');
-        setIsLoading(false);
-        return;
-      }
-      
+    let pollInterval: NodeJS.Timeout;
+
+    const fetchScanOrJob = async () => {
       try {
-        const response = await fetch(`/api/history/${scanId}`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || `Failed to fetch scan data (${response.status})`);
+        // Try fetching as a job first
+        const jobResponse = await fetch(`/api/jobs/${scanId}`);
+        if (jobResponse.ok) {
+          const jobData = await jobResponse.json();
+          setJob(jobData);
+
+          if (jobData.status === 'completed' && jobData.results) {
+            // Map job to SavedScan format for display
+            setScan({
+              id: jobData.id,
+              scanUrl: jobData.scan_url,
+              scanDate: jobData.created_at,
+              durationSeconds: jobData.completed_at && jobData.started_at
+                ? (new Date(jobData.completed_at).getTime() - new Date(jobData.started_at).getTime()) / 1000
+                : 0,
+              config: jobData.scan_config,
+              results: jobData.results
+            });
+            setIsLoading(false);
+            return; // Stop polling if completed
+          } else if (jobData.status === 'failed') {
+            setError(jobData.error || 'Scan failed');
+            setIsLoading(false);
+            return; // Stop polling if failed
+          } else {
+            // Still running or queued, keep polling
+            setIsLoading(false);
+          }
+        } else {
+          // Not a job, try fetching as history (legacy)
+          const historyResponse = await fetch(`/api/history/${scanId}`);
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json();
+            setScan(historyData);
+            setIsLoading(false);
+            return; // No need to poll for history
+          } else {
+            throw new Error('Scan not found');
+          }
         }
-        
-        setScan(data);
       } catch (err: unknown) {
         console.error(`Failed to fetch scan ${scanId}:`, err);
-        setError(
-          err instanceof Error 
-            ? err.message 
-            : 'Failed to load scan details'
-        );
-      } finally {
+        // Only set error if we haven't loaded anything yet
+        if (!job && !scan) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to load scan details'
+          );
+        }
         setIsLoading(false);
       }
     };
-    
-    fetchScan();
-  }, [scanId]);
-  
+
+    fetchScanOrJob();
+
+    // Set up polling if job is active
+    pollInterval = setInterval(() => {
+      if (job && (job.status === 'queued' || job.status === 'running')) {
+        fetchScanOrJob();
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [scanId, job?.status]); // Re-run effect if job status changes to potentially stop polling
+
   // Format date for display
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -128,40 +180,133 @@ function ScanDetailsContent() {
       second: '2-digit',
     }).format(date);
   };
-  
+
   // Delete the scan
   const deleteScan = async () => {
     setIsDeleting(true);
     try {
+      // Try deleting as job first
+      if (job) {
+        // We might need a delete endpoint for jobs, or just use the history one if we unify
+        // For now, let's assume we can't delete running jobs easily without a specific endpoint
+        // But if it's completed, it might be in history?
+        // Actually, let's just try the history delete endpoint, or we need a job delete endpoint.
+        // I'll assume for now we can't delete running jobs from UI yet.
+        alert("Deletion of jobs is not yet implemented.");
+        setIsDeleting(false);
+        return;
+      }
+
       const response = await fetch(`/api/history/${scanId}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || `Failed to delete scan (${response.status})`);
       }
-      
+
       router.push('/history');
     } catch (err: unknown) {
       console.error(`Failed to delete scan ${scanId}:`, err);
       setError(
-        err instanceof Error 
-          ? err.message 
+        err instanceof Error
+          ? err.message
           : 'Failed to delete scan'
       );
       setIsDeleting(false);
     }
   };
-  
+
   // Filter broken links
   const brokenLinks = scan?.results?.filter(r => r.status === 'broken' || r.status === 'error') || [];
-  
-  // Count different types of links
-  const okLinks = scan?.results?.filter(r => r.status === 'ok') || [];
-  const externalLinks = scan?.results?.filter(r => r.status === 'external') || [];
-  const skippedLinks = scan?.results?.filter(r => r.status === 'skipped') || [];
-  
+
+  if (isLoading) {
+    return <ScanDetailsLoading />;
+  }
+
+  if (error) {
+    return (
+      <main className="container mx-auto p-4 max-w-none">
+        <Card className="w-full bg-white shadow">
+          <CardContent className="pt-6">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+              <div className="mt-4">
+                <Link href="/history">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Return to Scan History
+                  </Button>
+                </Link>
+              </div>
+            </Alert>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  // Show Job Progress
+  if (job && (job.status === 'queued' || job.status === 'running')) {
+    return (
+      <main className="container mx-auto p-4 max-w-none">
+        <Card className="w-full bg-white shadow">
+          <CardHeader>
+            <div className="flex items-center justify-between mb-4">
+              <Button variant="ghost" className="p-0" asChild>
+                <Link href="/history">
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to History
+                </Link>
+              </Button>
+            </div>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              Scan in Progress
+              <span className="text-sm font-normal text-muted-foreground">
+                ({job.scan_url})
+              </span>
+            </CardTitle>
+            <CardDescription>
+              Status: <span className="font-semibold capitalize">{job.status}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Progress</span>
+                <span>{job.progress_percent}%</span>
+              </div>
+              <Progress value={job.progress_percent} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-muted-foreground">Scanned URLs</p>
+                <p className="text-xl font-semibold">{job.urls_scanned}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-muted-foreground">Current URL</p>
+                <p className="font-medium truncate" title={job.current_url}>{job.current_url || 'Waiting...'}</p>
+              </div>
+            </div>
+
+            {job.status === 'queued' && (
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertTitle>Queued</AlertTitle>
+                <AlertDescription>Waiting for a worker to pick up the job...</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  // Show Completed Scan
   return (
     <main className="container mx-auto p-4 max-w-none">
       <Card className="w-full bg-white shadow">
@@ -173,7 +318,7 @@ function ScanDetailsContent() {
                 Back to History
               </Link>
             </Button>
-            
+
             <div className="flex gap-2">
               {scan && (
                 <Link href={`/scan?id=${scanId}`}>
@@ -185,7 +330,7 @@ function ScanDetailsContent() {
               )}
             </div>
           </div>
-          
+
           <CardTitle className="text-2xl flex items-center gap-2">
             Scan Details
             {scan && (
@@ -194,39 +339,18 @@ function ScanDetailsContent() {
               </span>
             )}
           </CardTitle>
-          
+
           {scan && (
             <CardDescription>
-              Scanned on {formatDate(scan.scanDate)} • 
+              Scanned on {formatDate(scan.scanDate)} •
               Duration: {scan.durationSeconds.toFixed(2)}s •
               Found {scan.results.length} links ({brokenLinks.length} broken)
             </CardDescription>
           )}
         </CardHeader>
-        
+
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : error ? (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-              {error === 'Scan not found' && (
-                <div className="mt-4">
-                  <p className="mb-2">The scan you're looking for doesn't exist or may have been deleted.</p>
-                  <Link href="/history">
-                    <Button variant="outline" size="sm">
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Return to Scan History
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </Alert>
-          ) : scan ? (
+          {scan ? (
             <div className="space-y-8">
               {/* Configuration Summary */}
               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
@@ -240,12 +364,12 @@ function ScanDetailsContent() {
                   <span className="font-medium">Concurrency:</span> {scan.config.concurrency}
                 </div>
               </div>
-              
+
               {/* Scan Results */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Results</h3>
-                  
+
                   {scan && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -273,7 +397,7 @@ function ScanDetailsContent() {
                     </AlertDialog>
                   )}
                 </div>
-                
+
                 <ScanResults
                   results={scan.results}
                   scanUrl={scan.scanUrl}

@@ -30,8 +30,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Hotfix: Remove invalid localStorage polyfill that causes SSR errors
+  if (typeof global !== 'undefined' && (global as any).localStorage && typeof (global as any).localStorage.getItem !== 'function') {
+    delete (global as any).localStorage;
+  }
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`antialiased ${geistSans.variable} font-sans bg-gray-100 text-gray-900 min-h-screen`}>
         <NotificationProvider>
           <div className="flex h-screen overflow-hidden">

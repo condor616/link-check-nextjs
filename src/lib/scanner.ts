@@ -45,11 +45,11 @@ export interface ScanResult {
  * Interface for callbacks to provide real-time updates about the scanning process
  */
 export interface ScanCallbacks {
-  onStart?: (estimatedUrls: number) => void;
-  onProgress?: (processedCount: number, currentUrl: string) => void;
-  onResult?: (result: ScanResult) => void;
-  onComplete?: (results: ScanResult[]) => void;
-  onError?: (error: Error) => void;
+    onStart?: (estimatedUrls: number) => void;
+    onProgress?: (processedCount: number, currentUrl: string) => void;
+    onResult?: (result: ScanResult) => void;
+    onComplete?: (results: ScanResult[]) => void;
+    onError?: (error: Error) => void;
 }
 
 // Use classes for better state management during a scan
@@ -71,7 +71,9 @@ class Scanner {
     // Domain cache to optimize hostname lookups
     protected domainCache: Map<string, string> = new Map();
 
-    constructor(startUrl: string, config: ScanConfig = {}) {
+    protected callbacks: ScanCallbacks;
+
+    constructor(startUrl: string, config: ScanConfig = {}, callbacks: ScanCallbacks = {}) {
         const normalizedStart = this.normalizeUrl(startUrl, startUrl);
         if (!normalizedStart) {
             throw new Error(`Invalid start URL: ${startUrl}`);
@@ -98,7 +100,7 @@ class Scanner {
         };
 
         if (this.config.concurrency <= 0) {
-             throw new Error("Concurrency must be a positive number.");
+            throw new Error("Concurrency must be a positive number.");
         }
 
         if (this.config.requestTimeout <= 0) {
@@ -119,7 +121,8 @@ class Scanner {
                 'Connection': 'keep-alive' // Enable connection reuse
             };
         }
-        
+
+        this.callbacks = callbacks;
         this.visitedLinks = new Set<string>();
         this.queuedLinks = new Set<string>();
         this.results = new Map<string, ScanResult>();
@@ -132,13 +135,13 @@ class Scanner {
         if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('javascript:')) {
             return null;
         }
-        
+
         try {
             // Handle mailto:, tel:, etc. which are valid but not scannable http links
             if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('#')) {
-                 if (/^[a-zA-Z]+:/.test(url)) { // Check for other protocols like mailto:, tel:
+                if (/^[a-zA-Z]+:/.test(url)) { // Check for other protocols like mailto:, tel:
                     return null;
-                 }
+                }
             }
 
             if (url.startsWith('#')) {
@@ -165,7 +168,7 @@ class Scanner {
         try {
             const urlObj = new URL(url);
             const baseObj = new URL(this.baseUrl);
-            
+
             // Extract root domains to handle subdomains
             const getBaseDomain = (domain: string) => {
                 // Extract the base domain (e.g., example.com from sub.example.com)
@@ -177,10 +180,10 @@ class Scanner {
                 }
                 return domain;
             };
-            
+
             const urlBaseDomain = getBaseDomain(urlObj.hostname);
             const baseUrlBaseDomain = getBaseDomain(baseObj.hostname);
-            
+
             return urlBaseDomain === baseUrlBaseDomain;
         } catch {
             return false;
@@ -193,29 +196,33 @@ class Scanner {
         if (entry) {
             if (sourceUrl !== 'initial') {
                 entry.foundOn.add(sourceUrl);
-                
+
                 // Add HTML context
                 if (!entry.htmlContexts) {
                     entry.htmlContexts = new Map<string, string[]>();
                 }
-                
+
                 if (!entry.htmlContexts.has(sourceUrl)) {
                     entry.htmlContexts.set(sourceUrl, [htmlContext]);
                 } else {
                     entry.htmlContexts.get(sourceUrl)?.push(htmlContext);
                 }
             }
-            
+
             // Logic to prevent overwriting definitive status with less definitive one
             if (!(entry.status && entry.status !== 'external' && (partialResult.status === 'skipped' || partialResult.status === 'external'))) {
                 Object.assign(entry, partialResult);
+            }
+
+            if (this.callbacks.onResult) {
+                this.callbacks.onResult(entry);
             }
         } else {
             const htmlContexts = new Map<string, string[]>();
             if (sourceUrl !== 'initial') {
                 htmlContexts.set(sourceUrl, [htmlContext]);
             }
-            
+
             entry = {
                 url: linkUrl,
                 status: partialResult.status ?? 'external',
@@ -226,19 +233,23 @@ class Scanner {
                 htmlContexts
             };
             this.results.set(linkUrl, entry);
+
+            if (this.callbacks.onResult) {
+                this.callbacks.onResult(entry);
+            }
         }
     }
 
     // Function to process a single URL
     protected async processUrl(urlToProcess: string, depth: number): Promise<void> {
-         if (!this.limit) throw new Error("Scanner not running"); // Should not happen
+        if (!this.limit) throw new Error("Scanner not running"); // Should not happen
 
-         const currentResult = this.results.get(urlToProcess);
-         // Should always exist as it's added before queuing, but check defensively
-         if (!currentResult) {
-             console.error(`Error: Result object missing for ${urlToProcess} at depth ${depth}`);
-             return;
-         }
+        const currentResult = this.results.get(urlToProcess);
+        // Should always exist as it's added before queuing, but check defensively
+        if (!currentResult) {
+            console.error(`Error: Result object missing for ${urlToProcess} at depth ${depth}`);
+            return;
+        }
 
         // Check if URL should be processed
         if (this.shouldSkipUrl(urlToProcess, depth, currentResult)) {
@@ -247,7 +258,7 @@ class Scanner {
 
         // Mark as visited *before* fetching to prevent race conditions in queuing
         this.visitedLinks.add(urlToProcess);
-        
+
         // Use optional chaining for limit properties in log
         console.log(`[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
 
@@ -256,12 +267,12 @@ class Scanner {
             // Only use auth headers for the same domain or when configured to use for all domains
             const isSameDomainUrl = this.isSameDomain(urlToProcess);
             const shouldUseAuth = isSameDomainUrl || this.config.useAuthForAllDomains;
-            
+
             // Choose appropriate timeout based on whether it's same domain
-            const timeoutDuration = isSameDomainUrl ? 
-                this.config.requestTimeout : 
+            const timeoutDuration = isSameDomainUrl ?
+                this.config.requestTimeout :
                 Math.min(this.config.requestTimeout, 15000); // 15s max for external domains
-            
+
             const fetchOptions: RequestInit = {
                 headers: shouldUseAuth ? this.authHeadersCache || {
                     'User-Agent': 'LinkCheckerProBot/1.0',
@@ -275,7 +286,7 @@ class Scanner {
                 cache: 'no-store',
                 keepalive: true
             };
-            
+
             const response = await fetch(urlToProcess, fetchOptions);
 
             const status = response.status;
@@ -298,11 +309,11 @@ class Scanner {
             }
         } catch (error: any) {
             console.error(`Error scanning ${urlToProcess}:`, error.name, error.message);
-            
+
             // Properly handle timeout errors with a specific message
             if (error.name === 'TimeoutError' || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
                 currentResult.status = 'broken';
-                currentResult.errorMessage = `Request timed out after ${this.config.requestTimeout/1000} seconds`;
+                currentResult.errorMessage = `Request timed out after ${this.config.requestTimeout / 1000} seconds`;
             } else {
                 currentResult.status = 'error';
                 currentResult.errorMessage = error.message || 'Unknown error occurred';
@@ -315,11 +326,11 @@ class Scanner {
         if (!this.limit) return; // Safety check
 
         const $ = cheerio.load(html);
-        
+
         // Get all links that are not in excluded CSS selectors
         let links = $('a[href]');
         let skippedLinks = new Set<string>();
-        
+
         // Filter out links based on CSS selectors if configured
         if (this.config.cssSelectors && this.config.cssSelectors.length > 0) {
             // For each CSS selector, mark links that should be excluded
@@ -327,27 +338,27 @@ class Scanner {
                 try {
                     // Select the elements with the selector first, then find all links within them
                     const selectedElements = $(selector);
-                    
+
                     // Then find all links within those elements
                     selectedElements.find('a[href]').each((_, el) => {
                         // Mark elements to be excluded
                         $(el).attr('data-link-checker-exclude', 'true');
-                        
+
                         // Track the URL to mark as skipped
                         const href = $(el).attr('href')?.trim();
                         if (href) {
                             const nextUrl = this.normalizeUrl(href, pageUrl);
                             if (nextUrl) {
                                 skippedLinks.add(nextUrl);
-                                
+
                                 // Add as skipped to results immediately
                                 this.addOrUpdateResultWithContext(
-                                    nextUrl, 
-                                    pageUrl, 
-                                    $.html(el), 
-                                    { 
+                                    nextUrl,
+                                    pageUrl,
+                                    $.html(el),
+                                    {
                                         status: 'skipped',
-                                        errorMessage: 'Excluded by CSS selector' 
+                                        errorMessage: 'Excluded by CSS selector'
                                     }
                                 );
 
@@ -363,7 +374,7 @@ class Scanner {
                     console.warn(`Invalid CSS selector: ${selector}`);
                 }
             });
-            
+
             // Filter out the marked links
             links = links.filter((_, el) => !$(el).attr('data-link-checker-exclude'));
         }
@@ -377,7 +388,7 @@ class Scanner {
 
             const nextUrl = this.normalizeUrl(href, pageUrl);
             if (!nextUrl) return;
-            
+
             // Skip processing links we've already marked as skipped
             if (skippedLinks.has(nextUrl)) {
                 return;
@@ -388,7 +399,7 @@ class Scanner {
             if (isExternal) {
                 // Always create a basic result entry for external links
                 this.addOrUpdateResultWithContext(nextUrl, pageUrl, $.html(element), { status: 'external' });
-                
+
                 // If skipExternalDomains is true, don't queue external links for processing
                 if (this.config.skipExternalDomains) {
                     return;
@@ -399,8 +410,8 @@ class Scanner {
             let htmlContext = '';
             try {
                 const parent = $(element).parent();
-                htmlContext = parent.length ? 
-                    $.html(parent).substring(0, 200) : 
+                htmlContext = parent.length ?
+                    $.html(parent).substring(0, 200) :
                     $.html(element);
             } catch (e) {
                 htmlContext = $.html(element);
@@ -424,10 +435,10 @@ class Scanner {
     protected queueLinkForProcessing(url: string, depth: number): void {
         // Skip if already queued
         if (this.queuedLinks.has(url)) return;
-        
+
         // Add to queue set to prevent duplicates
         this.queuedLinks.add(url);
-        
+
         // Schedule processing with the limiter
         if (this.limit) {
             this.limit(() => this.processUrl(url, depth)).catch(error => {
@@ -445,17 +456,17 @@ class Scanner {
                 // Contains a slash, could be domain + path like "example.com/about/*"
                 const parts = pattern.split('/', 2);
                 const domainPart = parts[0];
-                
+
                 try {
                     // Try to extract the domain from the URL
                     const urlObj = new URL(text);
-                    
+
                     // Check if domain matches (supports subdomains)
-                    if (!urlObj.hostname.endsWith(domainPart) && 
+                    if (!urlObj.hostname.endsWith(domainPart) &&
                         !urlObj.hostname.replace('www.', '').endsWith(domainPart)) {
                         return false;
                     }
-                    
+
                     // For domain matches, we want to match the rest of the pattern against the pathname
                     // Rebuild the pattern as a path-only pattern
                     const pathPattern = pattern.substring(domainPart.length);
@@ -479,21 +490,21 @@ class Scanner {
                 try {
                     const urlObj = new URL(text);
                     // Check both with and without www prefix
-                    return urlObj.hostname.endsWith(pattern) || 
-                           urlObj.hostname.replace('www.', '').endsWith(pattern);
+                    return urlObj.hostname.endsWith(pattern) ||
+                        urlObj.hostname.replace('www.', '').endsWith(pattern);
                 } catch (e) {
                     // If URL parsing fails, fall back to direct string matching
                 }
             }
         }
-        
+
         // Convert wildcard pattern to regex
         // Escape special regex chars, but convert * to .* and ? to .
         const regexPattern = pattern
             .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special chars except * and ?
             .replace(/\*/g, '.*')                 // * becomes .*
             .replace(/\?/g, '.');                 // ? becomes .
-        
+
         const regex = new RegExp(`^${regexPattern}$`);
         return regex.test(text);
     }
@@ -517,7 +528,7 @@ class Scanner {
         // 3. Check if external (different hostname)
         const urlObj = new URL(url);
         const isExternal = !url.startsWith(this.baseUrl);
-        
+
         if (isExternal) {
             result.status = 'external';
         }
@@ -527,7 +538,7 @@ class Scanner {
             // Extract the root domain from the base URL
             const baseHostname = new URL(this.startUrl).hostname;
             const rootDomain = extractRootDomain(baseHostname);
-            
+
             // Check if the URL is a subdomain of the root domain, but not the same as the base hostname
             if (urlObj.hostname !== baseHostname && isSubdomainOfRoot(urlObj.hostname, rootDomain)) {
                 result.status = 'skipped';
@@ -576,16 +587,17 @@ class Scanner {
  * Main function to scan a website and collect link information
  * @param startUrl The URL to start scanning from
  * @param config Configuration options for the scan
+ * @param callbacks Optional callbacks for real-time updates
  * @returns A promise that resolves to an array of ScanResult objects
  */
-export async function scanWebsite(startUrl: string, config: ScanConfig = {}): Promise<ScanResult[]> {
+export async function scanWebsite(startUrl: string, config: ScanConfig = {}, callbacks: ScanCallbacks = {}): Promise<ScanResult[]> {
     // Create a new scanner instance with domain filtering enabled by default
     const scanner = new WebsiteScanner(startUrl, {
         ...config,
         // Preserve user's explicit choice, otherwise default to true
         skipExternalDomains: config.skipExternalDomains !== undefined ? config.skipExternalDomains : true
-    });
-    
+    }, callbacks);
+
     // Run the scan
     return await scanner.scan();
 }
@@ -606,10 +618,14 @@ class WebsiteScanner extends Scanner {
 
         console.log(`Starting scan of ${this.startUrl} with domain filtering ${this.config.skipExternalDomains ? 'enabled' : 'disabled'}`);
 
+        if (this.callbacks.onStart) {
+            this.callbacks.onStart(1); // Start with 1 URL
+        }
+
         try {
             // Start scanning from the initial URL at depth 0
             await this.processUrl(this.startUrl, 0);
-            
+
             // Create a timer to check periodically if all tasks are complete
             const waitForComplete = () => {
                 return new Promise<void>(resolve => {
@@ -624,12 +640,23 @@ class WebsiteScanner extends Scanner {
                     checkComplete();
                 });
             };
-            
+
             // Wait for all tasks to complete
             await waitForComplete();
-            
+
             // Convert results map to array
-            return Array.from(this.results.values());
+            const resultsArray = Array.from(this.results.values());
+
+            if (this.callbacks.onComplete) {
+                this.callbacks.onComplete(resultsArray);
+            }
+
+            return resultsArray;
+        } catch (error: any) {
+            if (this.callbacks.onError) {
+                this.callbacks.onError(error);
+            }
+            throw error;
         } finally {
             this.isRunning = false;
         }
@@ -666,16 +693,20 @@ class WebsiteScanner extends Scanner {
 
         // Mark as visited *before* fetching to prevent race conditions in queuing
         this.visitedLinks.add(urlToProcess);
-        
+
         // Use optional chaining for limit properties in log
         console.log(`[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
+
+        if (this.callbacks.onProgress) {
+            this.callbacks.onProgress(this.visitedLinks.size, urlToProcess);
+        }
 
         // Fetch and process
         try {
             // Determine if this URL is from the same domain as the start URL
             const isSameDomainUrl = this.isSameDomain(urlToProcess);
             const shouldUseAuth = isSameDomainUrl || this.config.useAuthForAllDomains;
-            
+
             // Log authentication decision
             if (this.config.auth) {
                 if (shouldUseAuth) {
@@ -684,12 +715,12 @@ class WebsiteScanner extends Scanner {
                     console.log(`Skipping HTTP Basic Auth for ${urlToProcess} (different domain than scan URL)`);
                 }
             }
-            
+
             // Choose appropriate timeout based on whether it's same domain
-            const timeoutDuration = isSameDomainUrl ? 
-                this.config.requestTimeout : 
+            const timeoutDuration = isSameDomainUrl ?
+                this.config.requestTimeout :
                 Math.min(this.config.requestTimeout, 15000); // 15s max for external domains
-            
+
             const fetchOptions: RequestInit = {
                 headers: shouldUseAuth ? this.authHeadersCache || {
                     'User-Agent': 'LinkCheckerProBot/1.0',
@@ -703,7 +734,7 @@ class WebsiteScanner extends Scanner {
                 cache: 'no-store',
                 keepalive: true
             };
-            
+
             const response = await fetch(urlToProcess, fetchOptions);
 
             const status = response.status;
@@ -718,9 +749,9 @@ class WebsiteScanner extends Scanner {
 
             // Parse HTML and queue new links if applicable
             // Only process HTML for links from the same domain or if skipExternalDomains is false
-            const shouldProcessHtml = !isBroken && 
-                contentType.includes('text/html') && 
-                this.config.processHtml && 
+            const shouldProcessHtml = !isBroken &&
+                contentType.includes('text/html') &&
+                this.config.processHtml &&
                 (!this.config.skipExternalDomains || isSameDomainUrl);
 
             if (shouldProcessHtml) {
@@ -733,11 +764,11 @@ class WebsiteScanner extends Scanner {
             }
         } catch (error: any) {
             console.error(`Error scanning ${urlToProcess}:`, error.name, error.message);
-            
+
             // Properly handle timeout errors with a specific message
             if (error.name === 'TimeoutError' || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
                 currentResult.status = 'broken';
-                currentResult.errorMessage = `Request timed out after ${this.config.requestTimeout/1000} seconds`;
+                currentResult.errorMessage = `Request timed out after ${this.config.requestTimeout / 1000} seconds`;
             } else {
                 currentResult.status = 'error';
                 currentResult.errorMessage = error.message || 'Unknown error occurred';
@@ -760,7 +791,7 @@ function extractRootDomain(hostname: string): string {
 function isSubdomainOfRoot(hostname: string, rootDomain: string): boolean {
     // Not a subdomain if it's the same as the root
     if (hostname === rootDomain) return false;
-    
+
     // Check if the hostname ends with the root domain
     return hostname.endsWith('.' + rootDomain);
 }
@@ -771,16 +802,16 @@ function isSubdomain(subdomain: string, parentDomain: string): boolean {
     if (subdomain === parentDomain) {
         return false;
     }
-    
+
     // Extract domain parts
     const subdomainParts = subdomain.split('.');
     const parentDomainParts = parentDomain.split('.');
-    
+
     // Subdomain must have more parts
     if (subdomainParts.length <= parentDomainParts.length) {
         return false;
     }
-    
+
     // Check if the subdomain ends with the parent domain
     // For example, "reporting.novartis.com" should be a subdomain of "novartis.com"
     const parentLength = parentDomainParts.length;
@@ -790,6 +821,6 @@ function isSubdomain(subdomain: string, parentDomain: string): boolean {
             return false;
         }
     }
-    
+
     return true;
 }
