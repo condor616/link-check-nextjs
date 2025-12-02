@@ -3,10 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import { ScanConfig, ScanResult } from './scanner';
 import { v4 as uuidv4 } from 'uuid';
+import { historyService, SaveScanPayload } from './history';
 
 // --- Types ---
 
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'pausing' | 'paused' | 'stopping' | 'stopped';
 
 export interface ScanJob {
     id: string;
@@ -22,6 +23,7 @@ export interface ScanJob {
     scan_config: ScanConfig;
     error?: string;
     results?: ScanResult[]; // Optional, might be stored separately or here
+    state?: string; // Serialized scan state for pause/resume
 }
 
 // --- Constants ---
@@ -155,6 +157,7 @@ export class JobService {
             ...(status === 'running' && !updates.started_at ? { started_at: new Date().toISOString() } : {}),
             ...(status === 'completed' && !updates.completed_at ? { completed_at: new Date().toISOString() } : {}),
             ...(status === 'failed' && !updates.completed_at ? { completed_at: new Date().toISOString() } : {}),
+            ...(status === 'stopped' && !updates.completed_at ? { completed_at: new Date().toISOString() } : {}),
         };
 
         if (this.useSupabase && this.supabase) {
@@ -171,6 +174,34 @@ export class JobService {
             if (job) {
                 const updatedJob = { ...job, ...updateData };
                 this.saveJobLocal(updatedJob);
+            }
+        }
+
+        // If the job is completed, save it to history
+        if (status === 'completed') {
+            try {
+                // Fetch the fully updated job to get all fields including results
+                const job = await this.getJob(id);
+
+                if (job && job.results) {
+                    const payload: SaveScanPayload = {
+                        scanUrl: job.scan_url,
+                        scanDate: job.created_at,
+                        durationSeconds: job.completed_at && job.started_at
+                            ? (new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000
+                            : 0,
+                        config: job.scan_config,
+                        results: job.results
+                    };
+
+                    // Save to history using the same ID
+                    await historyService.saveScan(payload, job.id);
+                    console.log(`Job ${id} automatically saved to history.`);
+                }
+            } catch (error) {
+                console.error(`Failed to save completed job ${id} to history:`, error);
+                // We don't throw here to avoid failing the job update itself, 
+                // but we log the error.
             }
         }
     }
@@ -201,6 +232,59 @@ export class JobService {
                 const updatedJob = { ...job, ...updateData };
                 this.saveJobLocal(updatedJob);
             }
+        }
+    }
+
+    /**
+     * Saves the scan state for a job.
+     */
+    async updateJobState(id: string, state: string): Promise<void> {
+        if (this.useSupabase && this.supabase) {
+            const { error } = await this.supabase
+                .from('scan_jobs')
+                .update({ state })
+                .eq('id', id);
+
+            if (error) {
+                console.error('Failed to update job state in Supabase:', error);
+            }
+        } else {
+            const job = this.getJobLocal(id);
+            if (job) {
+                const updatedJob = { ...job, state };
+                this.saveJobLocal(updatedJob);
+            }
+        }
+    }
+
+    /**
+     * Requests a job to pause.
+     */
+    async pauseJob(id: string): Promise<void> {
+        await this.updateJobStatus(id, 'pausing');
+    }
+
+    /**
+     * Resumes a paused job.
+     */
+    async resumeJob(id: string): Promise<void> {
+        // Reset status to queued so worker picks it up
+        await this.updateJobStatus(id, 'queued');
+    }
+
+    /**
+     * Requests a job to stop.
+     */
+    async stopJob(id: string): Promise<void> {
+        const job = await this.getJob(id);
+        if (!job) return;
+
+        if (job.status === 'paused' || job.status === 'queued') {
+            // If not running, stop immediately
+            await this.updateJobStatus(id, 'stopped');
+        } else {
+            // If running, signal to stop
+            await this.updateJobStatus(id, 'stopping');
         }
     }
 

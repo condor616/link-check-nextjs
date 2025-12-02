@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertCircle, ArrowLeft, Trash2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Trash2, CheckCircle2, XCircle, RefreshCw, Pause, Play, Square } from 'lucide-react';
 import { ScanResult } from '@/lib/scanner';
 import ScanResults from '@/components/ScanResults';
 import { Progress } from "@/components/ui/progress";
@@ -45,7 +45,7 @@ interface SavedScan {
 
 interface ScanJob {
   id: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'pausing' | 'paused' | 'stopping' | 'stopped';
   scan_url: string;
   created_at: string;
   started_at?: string;
@@ -85,7 +85,6 @@ function ScanDetailsLoading() {
   );
 }
 
-// Main content component that uses useParams
 function ScanDetailsContent() {
   const router = useRouter();
   const params = useParams();
@@ -96,6 +95,7 @@ function ScanDetailsContent() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isControlling, setIsControlling] = useState<boolean>(false);
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
@@ -104,6 +104,7 @@ function ScanDetailsContent() {
       try {
         // Try fetching as a job first
         const jobResponse = await fetch(`/api/jobs/${scanId}`);
+
         if (jobResponse.ok) {
           const jobData = await jobResponse.json();
           setJob(jobData);
@@ -130,27 +131,37 @@ function ScanDetailsContent() {
             // Still running or queued, keep polling
             setIsLoading(false);
           }
-        } else {
+        } else if (jobResponse.status === 404) {
           // Not a job, try fetching as history (legacy)
           const historyResponse = await fetch(`/api/history/${scanId}`);
+
           if (historyResponse.ok) {
             const historyData = await historyResponse.json();
             setScan(historyData);
             setIsLoading(false);
             return; // No need to poll for history
+          } else if (historyResponse.status === 404) {
+            // Definitely not found in either jobs or history
+            setJob(null);
+            setScan(null);
+            setError('Scan not found');
+            setIsLoading(false);
+            return;
           } else {
-            throw new Error('Scan not found');
+            throw new Error('Failed to fetch scan history');
           }
+        } else {
+          throw new Error(`Failed to fetch job: ${jobResponse.statusText}`);
         }
       } catch (err: unknown) {
         console.error(`Failed to fetch scan ${scanId}:`, err);
-        // Only set error if we haven't loaded anything yet
+
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load scan details';
+
+        // Only set error if we haven't loaded anything yet and it's not a transient error
+        // If we have a job/scan, we might just want to retry silently
         if (!job && !scan) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Failed to load scan details'
-          );
+          setError(errorMessage);
         }
         setIsLoading(false);
       }
@@ -158,9 +169,9 @@ function ScanDetailsContent() {
 
     fetchScanOrJob();
 
-    // Set up polling if job is active
+    // Set up polling if job is active or paused (to catch resume)
     pollInterval = setInterval(() => {
-      if (job && (job.status === 'queued' || job.status === 'running')) {
+      if (job && (job.status === 'queued' || job.status === 'running' || job.status === 'pausing' || job.status === 'stopping' || job.status === 'paused')) {
         fetchScanOrJob();
       }
     }, 2000);
@@ -221,6 +232,33 @@ function ScanDetailsContent() {
   // Filter broken links
   const brokenLinks = scan?.results?.filter(r => r.status === 'broken' || r.status === 'error') || [];
 
+  // Handle job control actions
+  const handleControl = async (action: 'pause' | 'resume' | 'stop') => {
+    setIsControlling(true);
+    try {
+      const response = await fetch(`/api/jobs/${scanId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || `Failed to ${action} job`);
+      }
+
+      // Optimistic update or just wait for poll
+      // For better UX, we could force a fetch immediately
+    } catch (err: unknown) {
+      console.error(`Failed to ${action} job:`, err);
+      alert(`Failed to ${action} job: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsControlling(false);
+    }
+  };
+
   if (isLoading) {
     return <ScanDetailsLoading />;
   }
@@ -250,7 +288,11 @@ function ScanDetailsContent() {
   }
 
   // Show Job Progress
-  if (job && (job.status === 'queued' || job.status === 'running')) {
+  if (job && (job.status === 'queued' || job.status === 'running' || job.status === 'pausing' || job.status === 'paused' || job.status === 'stopping' || job.status === 'stopped')) {
+    const isActive = job.status === 'running' || job.status === 'queued';
+    const isPaused = job.status === 'paused';
+    const isTransient = job.status === 'pausing' || job.status === 'stopping';
+
     return (
       <main className="container mx-auto p-4 max-w-none">
         <Card className="w-full bg-white shadow">
@@ -262,9 +304,50 @@ function ScanDetailsContent() {
                   Back to History
                 </Link>
               </Button>
+
+              <div className="flex gap-2">
+                {/* Control Buttons */}
+                {job.status !== 'stopped' && job.status !== 'stopping' && (
+                  <>
+                    {!isTransient && (
+                      isActive ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleControl('pause')}
+                          disabled={isControlling}
+                        >
+                          <Pause className="h-4 w-4 mr-2" />
+                          Pause
+                        </Button>
+                      ) : isPaused ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleControl('resume')}
+                          disabled={isControlling}
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Resume
+                        </Button>
+                      ) : null
+                    )}
+
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleControl('stop')}
+                      disabled={isControlling}
+                    >
+                      <Square className="h-4 w-4 mr-2" />
+                      Stop
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             <CardTitle className="text-2xl flex items-center gap-2">
-              Scan in Progress
+              Scan {isActive ? 'in Progress' : isPaused ? 'Paused' : job.status === 'stopped' ? 'Stopped' : 'Status'}
               <span className="text-sm font-normal text-muted-foreground">
                 ({job.scan_url})
               </span>
@@ -279,7 +362,7 @@ function ScanDetailsContent() {
                 <span>Progress</span>
                 <span>{job.progress_percent}%</span>
               </div>
-              <Progress value={job.progress_percent} />
+              <Progress value={job.progress_percent} className={isPaused ? "opacity-50" : ""} />
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -296,8 +379,30 @@ function ScanDetailsContent() {
             {job.status === 'queued' && (
               <Alert>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <AlertTitle>Queued</AlertTitle>
-                <AlertDescription>Waiting for a worker to pick up the job...</AlertDescription>
+                <AlertTitle>{job.urls_scanned > 0 ? "Resuming Scan" : "Queued"}</AlertTitle>
+                <AlertDescription>
+                  {job.urls_scanned > 0 ? "Worker is picking up the job..." : "Waiting for a worker to pick up the job..."}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {job.status === 'paused' && (
+              <Alert className="bg-yellow-50 border-yellow-200">
+                <Pause className="h-4 w-4 text-yellow-600" />
+                <AlertTitle className="text-yellow-800">Scan Paused</AlertTitle>
+                <AlertDescription className="text-yellow-700">
+                  The scan is currently paused. Click Resume to continue.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {job.status === 'stopped' && (
+              <Alert variant="destructive">
+                <Square className="h-4 w-4" />
+                <AlertTitle>Scan Stopped</AlertTitle>
+                <AlertDescription>
+                  This scan was manually stopped.
+                </AlertDescription>
               </Alert>
             )}
           </CardContent>
@@ -420,4 +525,4 @@ export default function ScanDetailsPage() {
       <ScanDetailsContent />
     </Suspense>
   );
-} 
+}

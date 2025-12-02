@@ -3,51 +3,98 @@ dotenv.config({ path: '.env.local' });
 dotenv.config(); // Fallback to .env
 
 import { jobService } from '../src/lib/jobs';
-import { scanWebsite, ScanResult } from '../src/lib/scanner';
+import { WebsiteScanner, ScanResult, ScanState } from '../src/lib/scanner';
 
-const POLLING_INTERVAL_MS = 2000;
+const POLLING_INTERVAL_MS = 1000;
 
 async function processJob(job: any) {
     console.log(`Processing job ${job.id} for URL: ${job.scan_url}`);
 
     try {
+        // If we are resuming, the status might already be 'queued' (set by resumeJob)
+        // We update to 'running'
         await jobService.updateJobStatus(job.id, 'running');
 
         let lastProgressUpdate = Date.now();
+        let lastStatusCheck = Date.now();
+        let stopReason: 'paused' | 'stopped' | null = null;
 
-        const results = await scanWebsite(job.scan_url, job.scan_config, {
+        // Parse initial state if it exists (for resume)
+        let initialState: ScanState | undefined;
+        if (job.state) {
+            try {
+                initialState = JSON.parse(job.state);
+                console.log(`Resuming job ${job.id} from saved state.`);
+            } catch (e) {
+                console.error(`Failed to parse job state for ${job.id}, starting fresh:`, e);
+            }
+        }
+
+        const scanner = new WebsiteScanner(job.scan_url, job.scan_config, {
             onStart: (estimatedUrls) => {
                 console.log(`Scan started. Estimated URLs: ${estimatedUrls}`);
             },
-            onProgress: (processedCount, currentUrl) => {
-                // Throttle updates to DB to avoid overwhelming it
+            onProgress: async (processedCount, currentUrl) => {
                 const now = Date.now();
+
+                // Throttle DB updates and checks
                 if (now - lastProgressUpdate > 1000) {
+                    // Update progress
                     jobService.updateJobProgress(job.id, {
-                        percent: 0, // We don't know total yet really, unless we estimate
+                        percent: 0,
                         currentUrl,
                         scanned: processedCount,
-                        total: 0 // Unknown
+                        total: 0
                     }).catch(err => console.error('Failed to update progress:', err));
+
                     lastProgressUpdate = now;
+                }
+
+                // Check for status changes (pause/stop signals)
+                if (now - lastStatusCheck > 1000) {
+                    try {
+                        const currentJob = await jobService.getJob(job.id);
+                        if (currentJob) {
+                            if (currentJob.status === 'pausing') {
+                                console.log(`Job ${job.id} pause requested.`);
+                                stopReason = 'paused';
+                                // Pause the scanner and get state
+                                const state = await scanner.pause();
+                                // Save state and update status
+                                await jobService.updateJobState(job.id, JSON.stringify(state));
+                                await jobService.updateJobStatus(job.id, 'paused');
+                            } else if (currentJob.status === 'stopping') {
+                                console.log(`Job ${job.id} stop requested.`);
+                                stopReason = 'stopped';
+                                await scanner.pause(); // Stop scanning cleanly
+                                await jobService.updateJobStatus(job.id, 'stopped');
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error checking job status:', err);
+                    }
+                    lastStatusCheck = now;
                 }
             },
             onError: (error) => {
                 console.error(`Scan error for job ${job.id}:`, error);
             }
-        });
+        }, initialState);
+
+        const results = await scanner.scan();
+
+        // If we stopped or paused, don't mark as completed
+        if (stopReason) {
+            console.log(`Job ${job.id} ${stopReason}. Exiting processing loop.`);
+            return;
+        }
 
         console.log(`Job ${job.id} completed. Found ${results.length} results.`);
-
-        // Save results (we might want to store them in a separate table or file, 
-        // but for now let's put them in the job record or handle them as the original app did)
-        // The original app saved to file or Supabase `scan_history`.
-        // Let's update the job with results for now, as our schema supports it.
 
         await jobService.updateJobStatus(job.id, 'completed', {
             results: results,
             urls_scanned: results.length,
-            total_urls: results.length // Total is what we found
+            total_urls: results.length
         });
 
     } catch (error: any) {
