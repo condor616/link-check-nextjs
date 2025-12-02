@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
-import { 
-  AlertCircle, 
-  History, 
-  Settings, 
+import {
+  AlertCircle,
+  History,
+  Settings,
   LogOut,
   Save,
   Home,
@@ -41,46 +41,46 @@ export default function RootLayout({
                 <h1 className="text-xl font-bold">Link Checker Pro</h1>
                 <p className="text-sm text-purple-300">Find broken links, fast.</p>
               </div>
-              
+
               <nav className="space-y-1">
-                <TransitionLink 
-                  href="/" 
+                <TransitionLink
+                  href="/"
                   className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
                   activeClassName="bg-purple-800"
                 >
                   <Home size={20} />
                   <span>Home</span>
                 </TransitionLink>
-                
-                <TransitionLink 
-                  href="/scan" 
+
+                <TransitionLink
+                  href="/scan"
                   className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
                   activeClassName="bg-purple-800"
                 >
                   <Search size={20} />
                   <span>New Scan</span>
                 </TransitionLink>
-                
-                <TransitionLink 
-                  href="/history" 
+
+                <TransitionLink
+                  href="/history"
                   className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
                   activeClassName="bg-purple-800"
                 >
                   <History size={20} />
                   <span>Scan History</span>
                 </TransitionLink>
-                
-                <TransitionLink 
-                  href="/saved-scans" 
+
+                <TransitionLink
+                  href="/saved-scans"
                   className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
                   activeClassName="bg-purple-800"
                 >
                   <Save size={20} />
                   <span>Saved Scans</span>
                 </TransitionLink>
-                
-                <TransitionLink 
-                  href="/settings" 
+
+                <TransitionLink
+                  href="/settings"
                   className="flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors"
                   activeClassName="bg-purple-800"
                 >
@@ -88,7 +88,7 @@ export default function RootLayout({
                   <span>Settings</span>
                 </TransitionLink>
               </nav>
-              
+
               <div className="mt-auto space-y-1 pt-4 border-t border-purple-800">
                 <button className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-purple-800 transition-colors">
                   <LogOut size={20} />
@@ -96,7 +96,7 @@ export default function RootLayout({
                 </button>
               </div>
             </div>
-            
+
             {/* Main content */}
             <div className="flex-1 overflow-auto p-6">
               <div className="bg-white rounded-xl shadow-lg p-6 min-h-full">
