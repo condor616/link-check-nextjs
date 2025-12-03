@@ -47,7 +47,7 @@ RUN adduser --system --uid 1001 nextjs
 
 # Install OpenSSL for Prisma and Prisma CLI
 RUN apk add --no-cache openssl
-RUN npm install -g prisma
+RUN npm install -g prisma@6.19.0
 
 COPY --from=builder /app/public ./public
 
