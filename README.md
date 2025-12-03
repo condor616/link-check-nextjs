@@ -27,7 +27,7 @@ A web application for scanning websites and identifying broken links. This tool 
 
 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/link-check.git
+git clone [https://github.com/your-username/link-check.git](https://github.com/condor616/link-check-nextjs.git)
 cd link-check
 ```
 
