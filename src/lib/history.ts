@@ -1,8 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import crypto from 'crypto';
 import { ScanConfig, ScanResult } from '@/lib/scanner';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
+import { prisma } from './prisma';
 
 // Define the expected structure for saving
 export interface SaveScanPayload {
@@ -16,18 +15,6 @@ export interface SaveScanPayload {
 // Define the structure of the saved file
 export interface SavedScan extends SaveScanPayload {
     id: string;
-}
-
-const historyDir = path.join(process.cwd(), '.scan_history');
-
-// Ensure history directory exists
-async function ensureHistoryDir() {
-    try {
-        await fs.access(historyDir);
-    } catch (_) {
-        // Directory doesn't exist, create it
-        await fs.mkdir(historyDir, { recursive: true });
-    }
 }
 
 export class HistoryService {
@@ -59,25 +46,29 @@ export class HistoryService {
         if (useSupabase) {
             await this.saveScanToSupabase(savedData);
         } else {
-            await this.saveScanToFile(savedData);
+            await this.saveScanToPrisma(savedData);
         }
 
         return scanId;
     }
 
-    // Save scan data to file
-    private async saveScanToFile(savedData: SavedScan) {
+    // Save scan data to Prisma (SQLite)
+    private async saveScanToPrisma(savedData: SavedScan) {
         try {
-            await ensureHistoryDir();
+            await prisma.scanHistory.create({
+                data: {
+                    id: savedData.id,
+                    scan_url: savedData.scanUrl,
+                    scan_date: new Date(savedData.scanDate),
+                    duration_seconds: savedData.durationSeconds,
+                    config: JSON.stringify(savedData.config),
+                    results: JSON.stringify(savedData.results)
+                }
+            });
 
-            const filePath = path.join(historyDir, `${savedData.id}.json`);
-
-            // Save the data as JSON
-            await fs.writeFile(filePath, JSON.stringify(savedData, null, 2));
-
-            console.log(`Scan saved successfully to file: ${savedData.id}`);
+            console.log(`Scan saved successfully to Prisma: ${savedData.id}`);
         } catch (error) {
-            console.error("Error saving scan to file:", error);
+            console.error("Error saving scan to Prisma:", error);
             throw error;
         }
     }
@@ -91,7 +82,6 @@ export class HistoryService {
                 throw new Error('Supabase client is not available');
             }
 
-            // Insert scan data into database
             // Insert scan data into database
             const { error } = await (supabase
                 .from('scan_history') as any)

@@ -1,0 +1,43 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Job {
+  id              String   @id
+  status          String
+  scan_url        String
+  created_at      DateTime @default(now())
+  started_at      DateTime?
+  completed_at    DateTime?
+  progress_percent Float    @default(0)
+  current_url     String?
+  urls_scanned    Int      @default(0)
+  total_urls      Int      @default(0)
+  scan_config     String   // JSON string
+  error           String?
+  results         String?  // JSON string (serialized ScanResult[])
+  state           String?  // Serialized state
+}
+
+model ScanHistory {
+  id              String   @id
+  scan_url        String
+  scan_date       DateTime
+  duration_seconds Float
+  config          String   // JSON string
+  results         String   // JSON string
+}
+
+model SavedConfig {
+  id        String   @id
+  name      String
+  url       String
+  config    String   // JSON string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

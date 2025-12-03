@@ -1,9 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
 import { ScanConfig, ScanResult } from './scanner';
 import { v4 as uuidv4 } from 'uuid';
 import { historyService, SaveScanPayload } from './history';
+import { prisma } from './prisma';
 
 // --- Types ---
 
@@ -26,10 +25,6 @@ export interface ScanJob {
     state?: string; // Serialized scan state for pause/resume
 }
 
-// --- Constants ---
-
-const JOBS_DIR = path.join(process.cwd(), '.scan_jobs');
-
 // --- Service ---
 
 export class JobService {
@@ -48,11 +43,6 @@ export class JobService {
                 }
             });
             this.useSupabase = true;
-        }
-
-        // Ensure local jobs directory exists if we might use it (or always as fallback)
-        if (!fs.existsSync(JOBS_DIR)) {
-            fs.mkdirSync(JOBS_DIR, { recursive: true });
         }
     }
 
@@ -78,12 +68,21 @@ export class JobService {
 
             if (error) {
                 console.error('Supabase createJob error:', error);
-                // Fallback to local file? Or throw? 
-                // For now, let's throw to be explicit about failure if Supabase is configured
                 throw new Error(`Failed to create job in Supabase: ${error.message}`);
             }
         } else {
-            this.saveJobLocal(newJob);
+            await prisma.job.create({
+                data: {
+                    id: newJob.id,
+                    status: newJob.status,
+                    scan_url: newJob.scan_url,
+                    created_at: new Date(newJob.created_at),
+                    progress_percent: newJob.progress_percent,
+                    urls_scanned: newJob.urls_scanned,
+                    total_urls: newJob.total_urls,
+                    scan_config: JSON.stringify(newJob.scan_config),
+                }
+            });
         }
 
         return newJob;
@@ -106,23 +105,12 @@ export class JobService {
             }
             return data as ScanJob[];
         } else {
-            // Read all files in .scan_jobs
-            const files = fs.readdirSync(JOBS_DIR);
-            const jobs: ScanJob[] = [];
+            const jobs = await prisma.job.findMany({
+                orderBy: { created_at: 'desc' },
+                take: 50
+            });
 
-            for (const file of files) {
-                if (!file.endsWith('.json')) continue;
-                try {
-                    const content = fs.readFileSync(path.join(JOBS_DIR, file), 'utf-8');
-                    const job = JSON.parse(content) as ScanJob;
-                    jobs.push(job);
-                } catch (e) {
-                    console.error(`Error reading job file ${file}:`, e);
-                }
-            }
-
-            // Sort by created_at desc
-            return jobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            return jobs.map(this.mapPrismaJobToScanJob);
         }
     }
 
@@ -143,7 +131,10 @@ export class JobService {
             }
             return data as ScanJob;
         } else {
-            return this.getJobLocal(id);
+            const job = await prisma.job.findUnique({
+                where: { id }
+            });
+            return job ? this.mapPrismaJobToScanJob(job) : null;
         }
     }
 
@@ -151,7 +142,7 @@ export class JobService {
      * Updates a job's status and optionally other fields.
      */
     async updateJobStatus(id: string, status: JobStatus, updates: Partial<ScanJob> = {}): Promise<void> {
-        const updateData = {
+        const updateData: any = {
             status,
             ...updates,
             ...(status === 'running' && !updates.started_at ? { started_at: new Date().toISOString() } : {}),
@@ -159,6 +150,30 @@ export class JobService {
             ...(status === 'failed' && !updates.completed_at ? { completed_at: new Date().toISOString() } : {}),
             ...(status === 'stopped' && !updates.completed_at ? { completed_at: new Date().toISOString() } : {}),
         };
+
+        // Prepare Prisma update data
+        const prismaUpdate: any = {
+            status: updateData.status,
+            progress_percent: updateData.progress_percent,
+            current_url: updateData.current_url,
+            urls_scanned: updateData.urls_scanned,
+            total_urls: updateData.total_urls,
+            error: updateData.error,
+            state: updateData.state,
+        };
+
+        if (updateData.started_at) prismaUpdate.started_at = new Date(updateData.started_at);
+        if (updateData.completed_at) prismaUpdate.completed_at = new Date(updateData.completed_at);
+        if (updateData.scan_config) prismaUpdate.scan_config = JSON.stringify(updateData.scan_config);
+
+        // Handle results serialization
+        if (updateData.results) {
+            prismaUpdate.results = JSON.stringify(updateData.results.map((r: any) => ({
+                ...r,
+                foundOn: Array.from(r.foundOn || []),
+                htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
+            })));
+        }
 
         if (this.useSupabase && this.supabase) {
             const { error } = await this.supabase
@@ -170,11 +185,10 @@ export class JobService {
                 throw new Error(`Failed to update job status in Supabase: ${error.message}`);
             }
         } else {
-            const job = this.getJobLocal(id);
-            if (job) {
-                const updatedJob = { ...job, ...updateData };
-                this.saveJobLocal(updatedJob);
-            }
+            await prisma.job.update({
+                where: { id },
+                data: prismaUpdate
+            });
         }
 
         // If the job is completed, save it to history
@@ -200,8 +214,6 @@ export class JobService {
                 }
             } catch (error) {
                 console.error(`Failed to save completed job ${id} to history:`, error);
-                // We don't throw here to avoid failing the job update itself, 
-                // but we log the error.
             }
         }
     }
@@ -227,11 +239,10 @@ export class JobService {
                 console.error('Failed to update progress in Supabase:', error);
             }
         } else {
-            const job = this.getJobLocal(id);
-            if (job) {
-                const updatedJob = { ...job, ...updateData };
-                this.saveJobLocal(updatedJob);
-            }
+            await prisma.job.update({
+                where: { id },
+                data: updateData
+            });
         }
     }
 
@@ -249,11 +260,10 @@ export class JobService {
                 console.error('Failed to update job state in Supabase:', error);
             }
         } else {
-            const job = this.getJobLocal(id);
-            if (job) {
-                const updatedJob = { ...job, state };
-                this.saveJobLocal(updatedJob);
-            }
+            await prisma.job.update({
+                where: { id },
+                data: { state }
+            });
         }
     }
 
@@ -312,110 +322,48 @@ export class JobService {
             }
             return data as ScanJob;
         } else {
-            // Read all files in .scan_jobs, find oldest queued
-            const files = fs.readdirSync(JOBS_DIR);
-            let oldestJob: ScanJob | null = null;
+            const job = await prisma.job.findFirst({
+                where: { status: 'queued' },
+                orderBy: { created_at: 'asc' }
+            });
 
-            for (const file of files) {
-                if (!file.endsWith('.json')) continue;
-                try {
-                    const content = fs.readFileSync(path.join(JOBS_DIR, file), 'utf-8');
-                    const job = JSON.parse(content) as ScanJob;
-
-                    if (job.status === 'queued') {
-                        if (!oldestJob || new Date(job.created_at) < new Date(oldestJob.created_at)) {
-                            oldestJob = job;
-                        }
-                    }
-                } catch (e) {
-                    console.error(`Error reading job file ${file}:`, e);
-                }
-            }
-            return oldestJob;
+            return job ? this.mapPrismaJobToScanJob(job) : null;
         }
     }
 
-    // --- Local File Helpers ---
+    // --- Helpers ---
 
-    private getJobLocal(id: string): ScanJob | null {
-        const filePath = path.join(JOBS_DIR, `${id}.json`);
-
-        // Retry logic for reading the file to handle race conditions with atomic writes
-        let attempts = 0;
-        const maxAttempts = 3;
-
-        while (attempts < maxAttempts) {
-            if (fs.existsSync(filePath)) {
-                try {
-                    const content = fs.readFileSync(filePath, 'utf-8');
-                    const job = JSON.parse(content) as any; // Parse as any first
-
-                    // Deserialize results if present
-                    if (job.results && Array.isArray(job.results)) {
-                        job.results = job.results.map((r: any) => ({
-                            ...r,
-                            foundOn: new Set(r.foundOn || []),
-                            htmlContexts: r.htmlContexts ? new Map(Object.entries(r.htmlContexts)) : undefined
-                        }));
-                    }
-
-                    return job as ScanJob;
-                } catch (e) {
-                    console.error(`Error reading local job ${id} (attempt ${attempts + 1}/${maxAttempts}):`, e);
-                    if (attempts === maxAttempts - 1) {
-                        try {
-                            console.error(`File content snippet: ${fs.readFileSync(filePath, 'utf-8').substring(0, 100)}...`);
-                        } catch (readErr) {
-                            console.error('Could not read file for snippet:', readErr);
-                        }
-                        return null;
-                    }
-                }
-            } else {
-                if (attempts === maxAttempts - 1) {
-                    console.log(`Job file not found: ${filePath}`);
-                    return null;
-                }
-            }
-
-            // Busy wait for a short period
-            const start = Date.now();
-            while (Date.now() - start < 10) {
-                // busy wait
-            }
-            attempts++;
-        }
-        return null;
-    }
-
-    private saveJobLocal(job: ScanJob): void {
-        const filePath = path.join(JOBS_DIR, `${job.id}.json`);
-        const tempPath = `${filePath}.tmp`;
-        try {
-            // Create a copy to serialize without mutating the original object
-            const jobToSave = { ...job };
-
-            if (jobToSave.results) {
-                jobToSave.results = jobToSave.results.map(r => ({
-                    ...r,
-                    foundOn: Array.from(r.foundOn || []) as any, // Cast to any to satisfy type checker while saving
-                    htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
-                })) as any;
-            }
-
-            fs.writeFileSync(tempPath, JSON.stringify(jobToSave, null, 2));
-            fs.renameSync(tempPath, filePath);
-        } catch (error) {
-            console.error(`Error saving job ${job.id} locally:`, error);
-            // Try to clean up temp file if it exists
+    private mapPrismaJobToScanJob(prismaJob: any): ScanJob {
+        let results: ScanResult[] | undefined;
+        if (prismaJob.results) {
             try {
-                if (fs.existsSync(tempPath)) {
-                    fs.unlinkSync(tempPath);
-                }
-            } catch (cleanupError) {
-                console.error('Error cleaning up temp file:', cleanupError);
+                const parsed = JSON.parse(prismaJob.results);
+                results = parsed.map((r: any) => ({
+                    ...r,
+                    foundOn: new Set(r.foundOn || []),
+                    htmlContexts: r.htmlContexts ? new Map(Object.entries(r.htmlContexts)) : undefined
+                }));
+            } catch (e) {
+                console.error('Error parsing results JSON:', e);
             }
         }
+
+        return {
+            id: prismaJob.id,
+            status: prismaJob.status as JobStatus,
+            scan_url: prismaJob.scan_url,
+            created_at: prismaJob.created_at.toISOString(),
+            started_at: prismaJob.started_at?.toISOString(),
+            completed_at: prismaJob.completed_at?.toISOString(),
+            progress_percent: prismaJob.progress_percent,
+            current_url: prismaJob.current_url || undefined,
+            urls_scanned: prismaJob.urls_scanned,
+            total_urls: prismaJob.total_urls,
+            scan_config: JSON.parse(prismaJob.scan_config),
+            error: prismaJob.error || undefined,
+            results,
+            state: prismaJob.state || undefined,
+        };
     }
 }
 

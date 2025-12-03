@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
-
-const SCAN_HISTORY_DIR = '.scan_history';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
@@ -28,11 +25,11 @@ export async function GET(
         return await getScanFromSupabase(scanId);
       } catch (supabaseError) {
         console.error('Error getting scan from Supabase:', supabaseError);
-        // Fall back to file-based storage on Supabase error
-        return await getScanFromFile(scanId);
+        // Fall back to Prisma on Supabase error
+        return await getScanFromPrisma(scanId);
       }
     } else {
-      return await getScanFromFile(scanId);
+      return await getScanFromPrisma(scanId);
     }
   } catch (err) {
     console.error('Error fetching scan:', err);
@@ -43,32 +40,50 @@ export async function GET(
   }
 }
 
-async function getScanFromFile(scanId: string) {
-  // Build file path
-  const scanFilePath = path.join(process.cwd(), SCAN_HISTORY_DIR, `${scanId}.json`);
-
+async function getScanFromPrisma(scanId: string) {
   try {
-    // Check if file exists
-    await fs.access(scanFilePath);
-  } catch (_) {
-    return NextResponse.json(
-      { error: 'Scan not found' },
-      { status: 404 }
-    );
-  }
+    const scan = await prisma.scanHistory.findUnique({
+      where: { id: scanId }
+    });
 
-  // Read and parse the scan file
-  const scanData = await fs.readFile(scanFilePath, 'utf-8');
+    if (!scan) {
+      return NextResponse.json(
+        { error: 'Scan not found' },
+        { status: 404 }
+      );
+    }
 
-  try {
-    const scan = JSON.parse(scanData);
+    // Parse JSON fields
+    let results = [];
+    try {
+      results = JSON.parse(scan.results);
+    } catch (e) {
+      console.error(`Error parsing results for scan ${scanId}:`, e);
+    }
 
-    // Return the scan data
-    return NextResponse.json(scan);
+    let config = {};
+    try {
+      config = JSON.parse(scan.config);
+    } catch (e) {
+      console.error(`Error parsing config for scan ${scanId}:`, e);
+    }
+
+    const formattedData = {
+      id: scan.id,
+      scanUrl: scan.scan_url,
+      scanDate: scan.scan_date.toISOString(),
+      durationSeconds: scan.duration_seconds,
+      results,
+      config,
+      // Add timestamp for compatibility if needed
+      timestamp: scan.scan_date.getTime()
+    };
+
+    return NextResponse.json(formattedData);
   } catch (err) {
-    console.error('Failed to parse scan data:', err);
+    console.error('Failed to get scan from Prisma:', err);
     return NextResponse.json(
-      { error: 'Failed to parse scan data' },
+      { error: 'Failed to get scan data' },
       { status: 500 }
     );
   }
@@ -152,11 +167,11 @@ export async function DELETE(
         return await deleteScanFromSupabase(scanId);
       } catch (supabaseError) {
         console.error('Error deleting scan from Supabase:', supabaseError);
-        // Fall back to file-based storage on Supabase error
-        return await deleteScanFromFile(scanId);
+        // Fall back to Prisma on Supabase error
+        return await deleteScanFromPrisma(scanId);
       }
     } else {
-      return await deleteScanFromFile(scanId);
+      return await deleteScanFromPrisma(scanId);
     }
   } catch (err) {
     console.error('Error deleting scan:', err);
@@ -167,27 +182,25 @@ export async function DELETE(
   }
 }
 
-async function deleteScanFromFile(scanId: string) {
-  // Build file path
-  const scanFilePath = path.join(process.cwd(), SCAN_HISTORY_DIR, `${scanId}.json`);
-
+async function deleteScanFromPrisma(scanId: string) {
   try {
-    // Check if file exists
-    await fs.access(scanFilePath);
-  } catch (_) {
+    await prisma.scanHistory.delete({
+      where: { id: scanId }
+    });
+
     return NextResponse.json(
-      { error: 'Scan not found' },
-      { status: 404 }
+      { success: true, message: 'Scan deleted successfully' }
     );
+  } catch (err: any) {
+    if (err.code === 'P2025') { // Record to delete does not exist
+      return NextResponse.json(
+        { error: 'Scan not found' },
+        { status: 404 }
+      );
+    }
+    console.error('Error deleting scan from Prisma:', err);
+    throw err;
   }
-
-  // Delete the scan file
-  await fs.unlink(scanFilePath);
-
-  // Return success
-  return NextResponse.json(
-    { success: true, message: 'Scan deleted successfully' }
-  );
 }
 
 async function deleteScanFromSupabase(scanId: string) {
@@ -209,4 +222,4 @@ async function deleteScanFromSupabase(scanId: string) {
   return NextResponse.json(
     { success: true, message: 'Scan deleted successfully' }
   );
-} 
+}

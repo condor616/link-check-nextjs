@@ -13,7 +13,8 @@ A web application for scanning websites and identifying broken links. This tool 
 - **Export Options**: Export results in JSON, CSV, or HTML formats
 - **History Tracking**: Save scans for later reference
 - **Responsive Design**: Works on desktop and mobile devices
-- **Multiple Storage Options**: Choose between file-based storage or Supabase database
+- **Robust Storage**: Uses SQLite (via Prisma) by default, with optional Supabase support
+- **Background Processing**: Dedicated worker for handling long-running scans
 
 ## Getting Started
 
@@ -21,7 +22,6 @@ A web application for scanning websites and identifying broken links. This tool 
 
 - Node.js 18.x or later
 - npm or yarn
-- (Optional) Supabase account for database storage
 
 ### Installation
 
@@ -38,39 +38,60 @@ npm install
 yarn install
 ```
 
-3. Set up application configuration
+3. Set up environment and database
    - Copy the template configuration file:
    ```bash
    cp .app_settings.template.json .app_settings.json
    ```
-   - By default, the application uses file-based storage. You can configure Supabase later in the application UI.
-
-4. (Optional) Configure Supabase connection
-   - Create a `.env.local` file with your Supabase credentials:
+   - Create a `.env` file (optional, but recommended for Supabase):
+   ```bash
+   cp .env.example .env
    ```
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   - Initialize the SQLite database:
+   ```bash
+   npx prisma generate
+   npx prisma migrate dev
    ```
-   - Alternatively, you can configure Supabase connection in the Settings page after starting the application
 
-5. Start the development server
+4. Start the application (Development)
+   This command starts both the Next.js web application and the background worker concurrently.
 ```bash
 npm run dev
 # or
 yarn dev
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-### Building for Production
+### Stopping the Application
 
+To stop the application, simply press `Ctrl+C` in the terminal where the application is running.
+
+### Managing the Worker
+
+The application uses a background worker to process scan jobs.
+
+- **Development**: When running `npm run dev`, the worker starts automatically alongside the web app.
+- **Production**: You must run the worker separately.
+
+#### Running in Production
+
+1. Build the application:
 ```bash
 npm run build
-npm start
-# or
-yarn build
-yarn start
 ```
+
+2. Start the web application:
+```bash
+npm start
+```
+
+3. In a separate terminal (or via a process manager like PM2), start the worker:
+```bash
+npm run worker
+```
+
+**Note**: The worker is essential for processing scans. If the worker is not running, scan jobs will remain in a "Queued" state indefinitely.
 
 ## Docker Deployment
 
@@ -85,32 +106,12 @@ docker build -t link-checker .
 ### Running the Container
 
 ```bash
-# Run with ephemeral storage (scan history will be lost when container is removed)
-docker run -p 3000:3000 link-checker
-
-# Run with persistent storage for scan history and application settings
+# Run with persistent storage for database and history
 docker run -p 3000:3000 \
-  -v $(pwd)/scan_history:/app/.scan_history \
-  -v $(pwd)/scan_configs:/app/.scan_configs \
-  -v $(pwd)/scan_params:/app/.scan_params \
-  -v $(pwd)/app_settings.json:/app/.app_settings.json \
+  -v $(pwd)/prisma:/app/prisma \
+  -v $(pwd)/.scan_history:/app/.scan_history \
+  -v $(pwd)/.app_settings.json:/app/.app_settings.json \
   link-checker
-
-# Run with Supabase environment variables
-docker run -p 3000:3000 \
-  -e NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co \
-  -e NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key \
-  link-checker
-```
-
-Before using the persistent storage option, create an app_settings.json file in your host directory:
-
-```bash
-# Create an app_settings.json file from the template
-cp .app_settings.template.json app_settings.json
-
-# Edit the file if you want to use Supabase
-# For file-based storage, you don't need to modify it
 ```
 
 Then access the application at [http://localhost:3000](http://localhost:3000)
@@ -119,12 +120,14 @@ Then access the application at [http://localhost:3000](http://localhost:3000)
 
 The application supports two storage methods:
 
-### File-based Storage (Default)
+### SQLite Storage (Default)
 
-By default, all scan configurations, results, and parameters are stored in JSON files in the following directories:
-- `.scan_configs` - Saved scan configurations
-- `.scan_history` - Scan history results
-- `.scan_params` - Scan parameters
+By default, the application uses a local SQLite database (via Prisma) to store:
+- Scan configurations
+- Scan history and results
+- Job status and progress
+
+The database file is located at `prisma/dev.db`.
 
 ### Supabase Storage
 
@@ -137,7 +140,7 @@ You can configure the application to use Supabase for data storage:
    - Via environment variables (`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 4. After configuring Supabase, initialize the schema by clicking "Initialize/Reset Supabase Schema" in the Settings page
 
-You can switch between storage methods at any time in the Settings page. Data in both storage methods is preserved when switching.
+You can switch between storage methods at any time in the Settings page.
 
 ## Usage
 
@@ -170,6 +173,7 @@ You can switch between storage methods at any time in the Settings page. Data in
 - React
 - TypeScript
 - TailwindCSS
+- Prisma (SQLite)
 - Cheerio (for HTML parsing)
 - Radix UI (for accessible components)
 - Supabase (optional, for database storage)
@@ -184,3 +188,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Radix UI for accessible components
 - Cheerio for HTML parsing
 - Supabase for database functionality
+- Prisma for database ORM

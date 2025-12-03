@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
 import crypto from 'crypto';
 import { ScanConfig } from '@/lib/scanner';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
 
 // Define the expected structure for saved configurations
 export interface SavedScanConfig {
@@ -13,18 +12,6 @@ export interface SavedScanConfig {
   config: ScanConfig;
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
-}
-
-const SCAN_CONFIGS_DIR = '.scan_configs';
-
-// Ensure configs directory exists
-async function ensureConfigsDir() {
-  try {
-    await fs.access(path.join(process.cwd(), SCAN_CONFIGS_DIR));
-  } catch (_) {
-    // Directory doesn't exist, create it
-    await fs.mkdir(path.join(process.cwd(), SCAN_CONFIGS_DIR), { recursive: true });
-  }
 }
 
 // GET all saved configurations
@@ -38,11 +25,11 @@ export async function GET() {
         return await getConfigsFromSupabase();
       } catch (supabaseError) {
         console.error('Error getting configurations from Supabase - falling back to empty array:', supabaseError);
-        // Return empty array instead of throwing an error
-        return NextResponse.json([]);
+        // Fall back to Prisma on Supabase error
+        return await getConfigsFromPrisma();
       }
     } else {
-      return await getConfigsFromFiles();
+      return await getConfigsFromPrisma();
     }
   } catch (error) {
     console.error('Error getting saved configurations:', error);
@@ -51,39 +38,35 @@ export async function GET() {
   }
 }
 
-// Get configs from file storage
-async function getConfigsFromFiles() {
+// Get configs from Prisma
+async function getConfigsFromPrisma() {
   try {
-    await ensureConfigsDir();
+    const configs = await prisma.savedConfig.findMany({
+      orderBy: { updatedAt: 'desc' }
+    });
 
-    // Read all files in the configs directory
-    const files = await fs.readdir(path.join(process.cwd(), SCAN_CONFIGS_DIR));
-    const configFiles = files.filter(file => file.endsWith('.json'));
-
-    // Read and parse each config file
-    const configs: SavedScanConfig[] = [];
-    for (const file of configFiles) {
+    // Format for response
+    const formattedConfigs: SavedScanConfig[] = configs.map((config: any) => {
+      let parsedConfig = {};
       try {
-        const fileContent = await fs.readFile(
-          path.join(process.cwd(), SCAN_CONFIGS_DIR, file),
-          'utf-8'
-        );
-        const config = JSON.parse(fileContent) as SavedScanConfig;
-        configs.push(config);
-      } catch (err) {
-        console.error(`Error reading config file ${file}:`, err);
-        // Skip invalid files
+        parsedConfig = JSON.parse(config.config);
+      } catch (e) {
+        console.error(`Error parsing config for ${config.id}:`, e);
       }
-    }
 
-    // Sort by most recently updated
-    configs.sort((a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+      return {
+        id: config.id,
+        name: config.name,
+        url: config.url,
+        config: parsedConfig as ScanConfig,
+        createdAt: config.createdAt.toISOString(),
+        updatedAt: config.updatedAt.toISOString()
+      };
+    });
 
-    return NextResponse.json(configs);
+    return NextResponse.json(formattedConfigs);
   } catch (error) {
-    console.error('Error getting configurations from files:', error);
+    console.error('Error getting configurations from Prisma:', error);
     throw error;
   }
 }
@@ -171,7 +154,7 @@ export async function POST(request: NextRequest) {
     if (useSupabase) {
       return await saveConfigToSupabase(savedConfig);
     } else {
-      return await saveConfigToFile(savedConfig);
+      return await saveConfigToPrisma(savedConfig);
     }
   } catch (error) {
     console.error('Error saving configuration:', error);
@@ -188,28 +171,37 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Save config to file storage
-async function saveConfigToFile(config: SavedScanConfig) {
+// Save config to Prisma
+async function saveConfigToPrisma(config: SavedScanConfig) {
   try {
-    await ensureConfigsDir();
-
-    // Save to file
-    const configFilePath = path.join(process.cwd(), SCAN_CONFIGS_DIR, `${config.id}.json`);
-    await fs.writeFile(
-      configFilePath,
-      JSON.stringify(config, null, 2)
-    );
+    await prisma.savedConfig.upsert({
+      where: { id: config.id },
+      update: {
+        name: config.name,
+        url: config.url,
+        config: JSON.stringify(config.config),
+        updatedAt: new Date()
+      },
+      create: {
+        id: config.id,
+        name: config.name,
+        url: config.url,
+        config: JSON.stringify(config.config),
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date()
+      }
+    });
 
     return NextResponse.json(
       {
-        message: 'Configuration saved successfully to file',
+        message: 'Configuration saved successfully to Prisma',
         id: config.id,
         config: config
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error saving configuration to file:', error);
+    console.error('Error saving configuration to Prisma:', error);
     throw error;
   }
 }
@@ -294,7 +286,7 @@ export async function DELETE(request: NextRequest) {
     if (useSupabase) {
       return await deleteConfigFromSupabase(id);
     } else {
-      return await deleteConfigFromFile(id);
+      return await deleteConfigFromPrisma(id);
     }
   } catch (error) {
     console.error('Error deleting configuration:', error);
@@ -311,30 +303,24 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// Delete config from file storage
-async function deleteConfigFromFile(id: string) {
+// Delete config from Prisma
+async function deleteConfigFromPrisma(id: string) {
   try {
-    await ensureConfigsDir();
+    await prisma.savedConfig.delete({
+      where: { id: id }
+    });
 
-    const configFilePath = path.join(process.cwd(), SCAN_CONFIGS_DIR, `${id}.json`);
-
-    try {
-      await fs.access(configFilePath);
-    } catch (_) {
+    return NextResponse.json(
+      { message: 'Configuration deleted successfully from Prisma' }
+    );
+  } catch (error: any) {
+    if (error.code === 'P2025') {
       return NextResponse.json(
         { error: 'Configuration not found' },
         { status: 404 }
       );
     }
-
-    // Delete the file
-    await fs.unlink(configFilePath);
-
-    return NextResponse.json(
-      { message: 'Configuration deleted successfully from file' }
-    );
-  } catch (error) {
-    console.error('Error deleting configuration from file:', error);
+    console.error('Error deleting configuration from Prisma:', error);
     throw error;
   }
 }
@@ -364,4 +350,4 @@ async function deleteConfigFromSupabase(id: string) {
     console.error('Error deleting configuration from Supabase:', error);
     throw error;
   }
-} 
+}

@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
 import { ScanConfig } from '@/lib/scanner';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
 
 // Define the expected structure for saving scan parameters
 interface SaveScanParamsPayload {
   id: string;
   url: string;
   config: ScanConfig;
-}
-
-const SCAN_PARAMS_DIR = '.scan_params';
-
-// Ensure parameters directory exists
-async function ensureParamsDir() {
-  try {
-    await fs.access(path.join(process.cwd(), SCAN_PARAMS_DIR));
-  } catch (_) {
-    // Directory doesn't exist, create it
-    await fs.mkdir(path.join(process.cwd(), SCAN_PARAMS_DIR), { recursive: true });
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -51,7 +38,7 @@ export async function POST(request: NextRequest) {
     if (useSupabase) {
       return await saveParamsToSupabaseHistory(sanitizedId, payload.url, payload.config);
     } else {
-      return await saveParamsToFile(sanitizedId, payload.url, payload.config);
+      return await saveParamsToPrisma(sanitizedId, payload.url, payload.config);
     }
 
   } catch (error) {
@@ -69,29 +56,35 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Save scan parameters to file
-async function saveParamsToFile(id: string, url: string, config: ScanConfig) {
-  await ensureParamsDir();
+// Save scan parameters to Prisma (SQLite)
+async function saveParamsToPrisma(id: string, url: string, config: ScanConfig) {
+  try {
+    await prisma.scanHistory.upsert({
+      where: { id: id },
+      update: {
+        config: JSON.stringify(config)
+      },
+      create: {
+        id: id,
+        scan_url: url,
+        scan_date: new Date(),
+        duration_seconds: 0,
+        config: JSON.stringify(config),
+        results: '[]'
+      }
+    });
 
-  // Create the file path
-  const paramsFilePath = path.join(process.cwd(), SCAN_PARAMS_DIR, `${id}.json`);
-
-  // Save the parameters to file
-  await fs.writeFile(
-    paramsFilePath,
-    JSON.stringify({
-      url: url,
-      config: config
-    }, null, 2)
-  );
-
-  return NextResponse.json(
-    {
-      message: 'Scan parameters saved successfully to file',
-      id: id
-    },
-    { status: 201 }
-  );
+    return NextResponse.json(
+      {
+        message: 'Scan parameters saved successfully to Prisma',
+        id: id
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error('Error saving scan parameters to Prisma:', error);
+    throw error;
+  }
 }
 
 // Save scan parameters to Supabase history table
@@ -150,4 +143,4 @@ async function saveParamsToSupabaseHistory(id: string, url: string, config: Scan
     },
     { status: 201 }
   );
-} 
+}

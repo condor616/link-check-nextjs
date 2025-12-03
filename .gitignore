@@ -49,3 +49,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /.scan_jobs/
+
+
+/src/generated/prisma
+
+# Database
+prisma/*.db
+prisma/*.db-journal
+
+# Scan Output
+scan_output.json

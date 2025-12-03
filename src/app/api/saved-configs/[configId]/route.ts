@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
 import { SavedScanConfig } from '../route';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 import { ScanConfig } from '@/lib/scanner';
-
-const SCAN_CONFIGS_DIR = '.scan_configs';
+import { prisma } from '@/lib/prisma';
 
 // Helper function to validate config ID
 function validateConfigId(configId: string): boolean {
@@ -36,11 +33,11 @@ export async function GET(
         return await getConfigFromSupabase(configId);
       } catch (error) {
         console.error('Error getting configuration from Supabase:', error);
-        // Fall back to file if Supabase fails
-        return await getConfigFromFile(configId);
+        // Fall back to Prisma if Supabase fails
+        return await getConfigFromPrisma(configId);
       }
     } else {
-      return await getConfigFromFile(configId);
+      return await getConfigFromPrisma(configId);
     }
   } catch (error) {
     console.error('Error getting saved configuration:', error);
@@ -51,24 +48,39 @@ export async function GET(
   }
 }
 
-// Helper function to get config from file
-async function getConfigFromFile(configId: string) {
+// Helper function to get config from Prisma
+async function getConfigFromPrisma(configId: string) {
   try {
-    const fileContent = await fs.readFile(
-      path.join(process.cwd(), SCAN_CONFIGS_DIR, `${configId}.json`),
-      'utf-8'
-    );
+    const config = await prisma.savedConfig.findUnique({
+      where: { id: configId }
+    });
 
-    const config = JSON.parse(fileContent) as SavedScanConfig;
-    return NextResponse.json(config);
-  } catch (err) {
-    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+    if (!config) {
       return NextResponse.json(
         { error: 'Configuration not found' },
         { status: 404 }
       );
     }
 
+    let parsedConfig = {};
+    try {
+      parsedConfig = JSON.parse(config.config);
+    } catch (e) {
+      console.error(`Error parsing config for ${config.id}:`, e);
+    }
+
+    const savedConfig: SavedScanConfig = {
+      id: config.id,
+      name: config.name,
+      url: config.url,
+      config: parsedConfig as ScanConfig,
+      createdAt: config.createdAt.toISOString(),
+      updatedAt: config.updatedAt.toISOString()
+    };
+
+    return NextResponse.json(savedConfig);
+  } catch (err) {
+    console.error('Error getting configuration from Prisma:', err);
     throw err;
   }
 }
@@ -161,7 +173,7 @@ export async function PUT(
     if (useSupabase) {
       return await updateConfigInSupabase(configId, payload);
     } else {
-      return await updateConfigInFile(configId, payload);
+      return await updateConfigInPrisma(configId, payload);
     }
   } catch (error) {
     console.error('Error updating saved configuration:', error);
@@ -172,44 +184,49 @@ export async function PUT(
   }
 }
 
-// Helper function to update config in file
-async function updateConfigInFile(configId: string, payload: any) {
-  // Check if configuration exists
-  const configPath = path.join(process.cwd(), SCAN_CONFIGS_DIR, `${configId}.json`);
+// Helper function to update config in Prisma
+async function updateConfigInPrisma(configId: string, payload: any) {
   try {
-    await fs.access(configPath);
-  } catch (err) {
-    return NextResponse.json(
-      { error: 'Configuration not found' },
-      { status: 404 }
-    );
+    // Check if configuration exists
+    const existingConfig = await prisma.savedConfig.findUnique({
+      where: { id: configId }
+    });
+
+    if (!existingConfig) {
+      return NextResponse.json(
+        { error: 'Configuration not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update the configuration
+    const updated = await prisma.savedConfig.update({
+      where: { id: configId },
+      data: {
+        name: payload.name,
+        url: payload.url,
+        config: JSON.stringify(payload.config),
+        updatedAt: new Date()
+      }
+    });
+
+    const updatedConfig: SavedScanConfig = {
+      id: updated.id,
+      name: updated.name,
+      url: updated.url,
+      config: payload.config,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString()
+    };
+
+    return NextResponse.json({
+      message: 'Configuration updated successfully',
+      config: updatedConfig
+    });
+  } catch (error) {
+    console.error('Error updating configuration in Prisma:', error);
+    throw error;
   }
-
-  // Parse existing config to preserve createdAt
-  const existingConfig = JSON.parse(
-    await fs.readFile(configPath, 'utf-8')
-  ) as SavedScanConfig;
-
-  // Update the configuration
-  const updatedConfig: SavedScanConfig = {
-    id: configId,
-    name: payload.name,
-    url: payload.url,
-    config: payload.config,
-    createdAt: existingConfig.createdAt,
-    updatedAt: new Date().toISOString()
-  };
-
-  // Save updated config
-  await fs.writeFile(
-    configPath,
-    JSON.stringify(updatedConfig, null, 2)
-  );
-
-  return NextResponse.json({
-    message: 'Configuration updated successfully',
-    config: updatedConfig
-  });
 }
 
 // Helper function to update config in Supabase
@@ -298,7 +315,7 @@ export async function DELETE(
     if (useSupabase) {
       return await deleteConfigFromSupabase(configId);
     } else {
-      return await deleteConfigFromFile(configId);
+      return await deleteConfigFromPrisma(configId);
     }
   } catch (error) {
     console.error('Error deleting saved configuration:', error);
@@ -309,29 +326,30 @@ export async function DELETE(
   }
 }
 
-// Helper function to delete config from file
-async function deleteConfigFromFile(configId: string) {
-  // Check if configuration exists
-  const configPath = path.join(process.cwd(), SCAN_CONFIGS_DIR, `${configId}.json`);
+// Delete config from Prisma
+async function deleteConfigFromPrisma(id: string) {
   try {
-    await fs.access(configPath);
-  } catch (err) {
+    await prisma.savedConfig.delete({
+      where: { id: id }
+    });
+
     return NextResponse.json(
-      { error: 'Configuration not found' },
-      { status: 404 }
+      { message: 'Configuration deleted successfully from Prisma' }
     );
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Configuration not found' },
+        { status: 404 }
+      );
+    }
+    console.error('Error deleting configuration from Prisma:', error);
+    throw error;
   }
-
-  // Delete the configuration file
-  await fs.unlink(configPath);
-
-  return NextResponse.json({
-    message: 'Configuration deleted successfully'
-  });
 }
 
-// Helper function to delete config from Supabase
-async function deleteConfigFromSupabase(configId: string) {
+// Delete config from Supabase
+async function deleteConfigFromSupabase(id: string) {
   try {
     const supabase = await getSupabaseClient();
 
@@ -339,39 +357,20 @@ async function deleteConfigFromSupabase(configId: string) {
       throw new Error('Supabase client is not available');
     }
 
-    // Check if config exists first
-    const { data: existingConfig, error: selectError } = await supabase
-      .from('scan_configs')
-      .select('id')
-      .eq('id', configId)
-      .maybeSingle();
-
-    if (selectError) {
-      throw new Error(`Supabase error: ${selectError.message}`);
-    }
-
-    if (!existingConfig) {
-      return NextResponse.json(
-        { error: 'Configuration not found' },
-        { status: 404 }
-      );
-    }
-
-    // Delete the config
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('scan_configs')
       .delete()
-      .eq('id', configId);
+      .eq('id', id);
 
-    if (deleteError) {
-      throw new Error(`Supabase error: ${deleteError.message}`);
+    if (error) {
+      throw new Error(`Supabase error: ${error.message}`);
     }
 
-    return NextResponse.json({
-      message: 'Configuration deleted successfully'
-    });
+    return NextResponse.json(
+      { message: 'Configuration deleted successfully from Supabase' }
+    );
   } catch (error) {
     console.error('Error deleting configuration from Supabase:', error);
     throw error;
   }
-} 
+}

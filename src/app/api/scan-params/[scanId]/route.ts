@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
-
-const SCAN_HISTORY_DIR = '.scan_history';
-const SCAN_PARAMS_DIR = '.scan_params';
+import { prisma } from '@/lib/prisma';
 
 // Get scan parameters for restarting a scan with the same settings
 export async function GET(
@@ -31,11 +27,11 @@ export async function GET(
         return await getScanParamsFromSupabaseHistory(scanId);
       } catch (supabaseError) {
         console.error('Error getting scan params from Supabase:', supabaseError);
-        // Fall back to file-based storage on Supabase error
-        return await getScanParamsFromFile(scanId);
+        // Fall back to Prisma on Supabase error
+        return await getScanParamsFromPrisma(scanId);
       }
     } else {
-      return await getScanParamsFromFile(scanId);
+      return await getScanParamsFromPrisma(scanId);
     }
   } catch (err) {
     console.error('Error fetching scan parameters:', err);
@@ -46,51 +42,35 @@ export async function GET(
   }
 }
 
-// Get scan parameters from file system
-async function getScanParamsFromFile(scanId: string) {
-  // Check both possible directories for the scan ID
-  // First try the scan_params directory (temporary scans)
-  const paramsFilePath = path.join(process.cwd(), SCAN_PARAMS_DIR, `${scanId}.json`);
-  const historyFilePath = path.join(process.cwd(), SCAN_HISTORY_DIR, `${scanId}.json`);
-
-  let scanData: string;
-  let isFromHistory = false;
-
+// Get scan parameters from Prisma
+async function getScanParamsFromPrisma(scanId: string) {
   try {
-    // First check params directory
-    await fs.access(paramsFilePath);
-    scanData = await fs.readFile(paramsFilePath, 'utf-8');
-  } catch (_) {
-    try {
-      // Then check history directory
-      await fs.access(historyFilePath);
-      scanData = await fs.readFile(historyFilePath, 'utf-8');
-      isFromHistory = true;
-    } catch (_) {
+    const scan = await prisma.scanHistory.findUnique({
+      where: { id: scanId }
+    });
+
+    if (!scan) {
       return NextResponse.json(
         { error: 'Scan parameters not found' },
         { status: 404 }
       );
     }
-  }
 
-  try {
-    const parsedData = JSON.parse(scanData);
-
-    // If from history, we need to extract the parameters
-    if (isFromHistory) {
-      return NextResponse.json({
-        url: parsedData.scanUrl,
-        config: parsedData.config
-      });
+    let config = {};
+    try {
+      config = JSON.parse(scan.config);
+    } catch (e) {
+      console.error(`Error parsing config for scan ${scanId}:`, e);
     }
 
-    // If from params directory, the structure is already correct
-    return NextResponse.json(parsedData);
+    return NextResponse.json({
+      url: scan.scan_url,
+      config: config
+    });
   } catch (err) {
-    console.error('Failed to parse scan data:', err);
+    console.error('Failed to get scan params from Prisma:', err);
     return NextResponse.json(
-      { error: 'Failed to parse scan parameters' },
+      { error: 'Failed to get scan parameters' },
       { status: 500 }
     );
   }
@@ -140,4 +120,4 @@ async function getScanParamsFromSupabaseHistory(scanId: string) {
     url: paramsData.scan_url,
     config: paramsData.config
   });
-} 
+}
