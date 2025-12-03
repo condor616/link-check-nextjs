@@ -1,0 +1,10 @@
+services:
+  link-check:
+    image: condor616/link-check:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=file:/app/data/db.sqlite
+    restart: unless-stopped
