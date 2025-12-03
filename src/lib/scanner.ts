@@ -57,6 +57,7 @@ export interface ScanState {
     visitedLinks: string[];
     results: any[]; // Use any[] to allow for serialized structure
     queue: { url: string; depth: number }[];
+    aborted?: { url: string; depth: number }[];
 }
 
 // Use classes for better state management during a scan
@@ -70,6 +71,8 @@ class Scanner {
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
     // Track pending URLs explicitly for state serialization
     protected readonly pendingUrls: Map<string, number> = new Map();
+    // Track aborted URLs explicitly to prioritize them on resume
+    protected readonly abortedUrls: Map<string, number> = new Map();
 
     protected isRunning: boolean = false;
     protected isPaused: boolean = false;
@@ -173,6 +176,13 @@ class Scanner {
             if (initialState.queue) {
                 initialState.queue.forEach(item => {
                     this.pendingUrls.set(item.url, item.depth);
+                });
+            }
+
+            // Pre-populate abortedUrls from the saved state
+            if (initialState.aborted) {
+                initialState.aborted.forEach(item => {
+                    this.abortedUrls.set(item.url, item.depth);
                 });
             }
         } else {
@@ -630,7 +640,8 @@ class Scanner {
         return {
             visitedLinks: Array.from(this.visitedLinks),
             results: serializedResults,
-            queue: Array.from(this.pendingUrls.entries()).map(([url, depth]) => ({ url, depth }))
+            queue: Array.from(this.pendingUrls.entries()).map(([url, depth]) => ({ url, depth })),
+            aborted: Array.from(this.abortedUrls.entries()).map(([url, depth]) => ({ url, depth }))
         };
     }
 }
@@ -680,8 +691,17 @@ export class WebsiteScanner extends Scanner {
         }
 
         // If resuming, queue the pending URLs from state
-        if (this.pendingUrls.size > 0) {
-            console.log(`Resuming scan with ${this.pendingUrls.size} pending URLs...`);
+        if (this.pendingUrls.size > 0 || this.abortedUrls.size > 0) {
+            console.log(`Resuming scan with ${this.abortedUrls.size} aborted and ${this.pendingUrls.size} pending URLs...`);
+
+            // First queue aborted URLs (prioritize them)
+            const aborted = Array.from(this.abortedUrls.entries());
+            this.abortedUrls.clear();
+            for (const [url, depth] of aborted) {
+                this.queueLinkForProcessing(url, depth);
+            }
+
+            // Then queue pending URLs
             // We need to queue them, but queueLinkForProcessing adds to pendingUrls again.
             // So we iterate a copy.
             const pending = Array.from(this.pendingUrls.entries());
@@ -693,11 +713,11 @@ export class WebsiteScanner extends Scanner {
             }
         } else {
             // Start scanning from the initial URL at depth 0
-            try {
-                await this.processUrl(this.startUrl, 0);
-            } catch (error) {
+            // We must use this.limit to ensure activeCount is incremented
+            // so that pause() waits for this task to complete/abort.
+            this.limit(() => this.processUrl(this.startUrl, 0).catch(error => {
                 console.error("Error processing start URL:", error);
-            }
+            }));
         }
 
         try {
@@ -761,12 +781,12 @@ export class WebsiteScanner extends Scanner {
      * Only process HTML content for links from the same domain
      */
     protected async processUrl(urlToProcess: string, depth: number): Promise<void> {
-        // Remove from pending map as we are starting to process it
-        this.pendingUrls.delete(urlToProcess);
-
         if (!this.limit) throw new Error("Scanner not running"); // Should not happen
 
         if (this.isPaused) return;
+
+        // Remove from pending map as we are starting to process it
+        this.pendingUrls.delete(urlToProcess);
 
         const currentResult = this.results.get(urlToProcess);
         // Should always exist as it's added before queuing, but check defensively
@@ -884,10 +904,13 @@ export class WebsiteScanner extends Scanner {
             }
         } catch (error: any) {
             // Check for abort due to pause
-            if (this.abortController?.signal.aborted) {
+            // We check isPaused because abortController might be nullified by scan() finally block
+            // before this catch block runs in a race condition
+            if (this.isPaused || this.abortController?.signal.aborted) {
                 console.log(`Aborted ${urlToProcess} due to pause`);
                 // Re-queue the URL so it gets processed when resumed
-                this.pendingUrls.set(urlToProcess, depth);
+                // Add to abortedUrls so it gets prioritized
+                this.abortedUrls.set(urlToProcess, depth);
                 // Remove from visited so it can be picked up again
                 this.visitedLinks.delete(urlToProcess);
                 return;

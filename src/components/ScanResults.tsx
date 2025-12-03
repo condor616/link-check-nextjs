@@ -28,18 +28,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  ExternalLink, 
-  ClipboardCopy, 
-  CheckCircle2, 
-  XCircle, 
-  AlertTriangle, 
-  ArrowUpRight, 
-  ChevronDown, 
-  Info, 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
+import {
+  ExternalLink,
+  ClipboardCopy,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ArrowUpRight,
+  ChevronDown,
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
   ChevronsRight,
   ListFilter,
   Clock,
@@ -86,10 +86,10 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const [recheckErrors, setRecheckErrors] = useState<Map<string, string>>(new Map());
   const [recheckSuccess, setRecheckSuccess] = useState<Map<string, string>>(new Map());
   const [localResults, setLocalResults] = useState<SerializedScanResult[]>(results);
-  
+
   // Use 'all' as the default tab 
   const [activeTab, setActiveTab] = useState<string>("all");
-  
+
   // Update local results when props change
   useEffect(() => {
     setLocalResults(results);
@@ -102,34 +102,34 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const skippedUrls = new Set(skippedLinks.map(r => r.url));
 
   // Then process broken links, excluding those already in skipped
-  const brokenLinks = localResults.filter(r => 
-    !skippedUrls.has(r.url) && 
+  const brokenLinks = localResults.filter(r =>
+    !skippedUrls.has(r.url) &&
     (r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400))
   );
 
   // Error links, excluding skipped
-  const errorLinks = localResults.filter(r => 
-    !skippedUrls.has(r.url) && 
+  const errorLinks = localResults.filter(r =>
+    !skippedUrls.has(r.url) &&
     r.status === 'error'
   );
 
   // External links, excluding skipped
-  const externalLinks = localResults.filter(r => 
-    !skippedUrls.has(r.url) && 
+  const externalLinks = localResults.filter(r =>
+    !skippedUrls.has(r.url) &&
     r.status === 'external'
   );
 
   // OK links, excluding skipped, broken and external
   const okLinks = localResults.filter(r => {
     return !skippedUrls.has(r.url) &&
-           r.status === 'ok' && 
-           (r.statusCode === undefined || r.statusCode < 400) &&
-           !brokenLinks.some(link => link.url === r.url) &&
-           !externalLinks.some(link => link.url === r.url);
+      r.status === 'ok' &&
+      (r.statusCode === undefined || r.statusCode < 400) &&
+      !brokenLinks.some(link => link.url === r.url) &&
+      !externalLinks.some(link => link.url === r.url);
   });
-  
+
   // Combined problematic links (broken + error)
-  const problematicLinks = [...brokenLinks, ...errorLinks.filter(link => 
+  const problematicLinks = [...brokenLinks, ...errorLinks.filter(link =>
     // Avoid duplicates from links that may be in both arrays
     !brokenLinks.some(broken => broken.url === link.url)
   )];
@@ -139,7 +139,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     const groupedLinks = new Map<string, SerializedScanResult>();
     links.forEach(link => {
       if (!groupedLinks.has(link.url)) {
-        groupedLinks.set(link.url, {...link});
+        groupedLinks.set(link.url, { ...link });
       } else {
         // Merge foundOn arrays instead of using add() on Sets
         const existingLink = groupedLinks.get(link.url)!;
@@ -149,13 +149,13 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
             existingLink.foundOn.push(page);
           }
         });
-        
+
         // Merge htmlContexts objects if they exist
         if (link.htmlContexts) {
           if (!existingLink.htmlContexts) {
             existingLink.htmlContexts = {};
           }
-          
+
           Object.entries(link.htmlContexts).forEach(([page, contexts]) => {
             if (!existingLink.htmlContexts![page]) {
               existingLink.htmlContexts![page] = [...contexts];
@@ -181,7 +181,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const uniqueAllCount = getUniqueCount(results);
 
   // Pagination state and handlers
-  
+
   // Get current list based on active tab
   const getCurrentList = () => {
     switch (activeTab) {
@@ -193,21 +193,21 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       default: return problematicLinks;
     }
   };
-  
+
   const currentList = getCurrentList();
 
   const uniqueCurrentList = getGroupedLinks(currentList);
   const totalPages = Math.ceil(uniqueCurrentList.length / currentItemsPerPage);
   const startIndex = (currentPage - 1) * currentItemsPerPage;
   const endIndex = Math.min(startIndex + currentItemsPerPage, uniqueCurrentList.length);
-  
+
   // Reset page when tab changes
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setCurrentPage(1);
     setExpandedItems(new Set());
   };
-  
+
   // Pagination controls
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
@@ -222,7 +222,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     const newPage = Math.floor(currentTopItem / newItemsPerPage) + 1;
     setCurrentPage(Math.max(1, Math.min(newPage, Math.ceil(uniqueCurrentList.length / newItemsPerPage))));
   };
-  
+
   // Toggle item expansion
   const toggleItemExpansion = (url: string) => {
     const newExpandedItems = new Set(expandedItems);
@@ -233,7 +233,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     }
     setExpandedItems(newExpandedItems);
   };
-  
+
   // Copy URL to clipboard
   const handleCopyUrl = async (url: string) => {
     try {
@@ -244,7 +244,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       console.error('Failed to copy URL:', err);
     }
   };
-  
+
   // Get host from URL for display
   const getHost = (url: string) => {
     try {
@@ -253,68 +253,70 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       return url;
     }
   };
-  
+
   // Format pages where a link was found
   const formatFoundOn = (foundOn: string[]) => {
     return foundOn; // Already an array, no need to convert
   };
-  
+
   // Count occurrences of each unique page in foundOn
   const countUniquePages = (foundOn: string[]) => {
     const pageMap = new Map<string, number>();
-    
-    foundOn.forEach(page => {
-      const count = pageMap.get(page) || 0;
-      pageMap.set(page, count + 1);
-    });
-    
+
+    if (Array.isArray(foundOn)) {
+      foundOn.forEach(page => {
+        const count = pageMap.get(page) || 0;
+        pageMap.set(page, count + 1);
+      });
+    }
+
     return pageMap;
   };
-  
+
   // Helper to extract and clean the relevant HTML context around the link
   const cleanHtmlContext = (html: string, url: string) => {
     try {
       // Load the HTML into cheerio
       const $ = cheerio.load(html);
-      
+
       // Remove all style tags, script tags, and other unnecessary elements
       $('style, script, link, meta').remove();
-      
+
       // Find the anchor tag with the broken link
       const anchorElement = $(`a[href="${url}"]`);
-      
+
       if (anchorElement.length) {
         // First, try to get just the anchor element
         const anchorHtml = $.html(anchorElement);
-        
+
         // Get up to 1 parent element for minimal context
         let parentElement = anchorElement.parent();
         if (parentElement.length) {
           // Check if parent provides useful context
           const parentTag = parentElement.prop('tagName')?.toLowerCase();
-          
+
           // Only use parent if it's a meaningful HTML element (not body, div, etc.)
           const usefulParents = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'td', 'figcaption', 'button', 'label'];
           if (parentTag && usefulParents.includes(parentTag)) {
             return `<!-- Link with immediate parent -->\n${$.html(parentElement)}`;
           }
         }
-        
+
         // Default to just showing the anchor element
         return `<!-- Just the link element -->\n${anchorHtml}`;
       }
-      
+
       // If we couldn't find the exact link, show a minimal version
       // Look for any a tag that might contain the URL
       const possibleAnchors = $('a').filter((_, el) => {
         const href = $(el).attr('href') || '';
         return href.includes(url) || url.includes(href);
       });
-      
+
       if (possibleAnchors.length) {
         return `<!-- Best matching link -->\n${$.html(possibleAnchors.first())}`;
       }
-      
+
       // Last resort: return a small, cleaned snippet of the HTML
       const bodyContent = $('body').html() || html;
       const cleanedHtml = bodyContent
@@ -323,7 +325,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
         .replace(/<link\b[^>]*>/gi, '') // Remove link tags
         .replace(/<meta\b[^>]*>/gi, '') // Remove meta tags
         .substring(0, 300); // Limit to 300 chars
-      
+
       return `<!-- Cleaned HTML snippet -->\n${cleanedHtml}${cleanedHtml.length > 300 ? '...' : ''}`;
     } catch (e) {
       // If parsing fails, return a minimal version of the original HTML
@@ -337,7 +339,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const generateHtmlContext = (url: string, page: string, occurrence: number) => {
     // Get the actual HTML context from the scan results
     const link = results.find(r => r.url === url);
-    
+
     if (link && link.htmlContexts && link.htmlContexts[page]) {
       const contexts = link.htmlContexts[page];
       if (contexts && contexts.length > 0) {
@@ -346,21 +348,21 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
         return cleanHtmlContext(htmlContext, url);
       }
     }
-    
+
     // Fallback if no HTML context is available
     return `<a href="${url}">Link not found in HTML context</a>`;
   };
-  
+
   // Status badge component
   const StatusBadge = ({ status, code, usedAuth }: { status: string, code?: number, usedAuth?: boolean }) => {
     let variant: 'default' | 'destructive' | 'secondary' | 'outline' = 'default';
     let icon = null;
     let className = "flex items-center";
-    
+
     // Always consider any status code >= 400 as "broken" regardless of status value
     const isBroken = code !== undefined && code >= 400;
     const displayStatus = isBroken ? 'broken' : status;
-    
+
     switch (displayStatus) {
       case 'broken':
         variant = 'destructive';
@@ -385,7 +387,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
         variant = 'outline';
         break;
     }
-    
+
     return (
       <div className="flex items-center gap-1">
         <Badge variant={variant} className={className}>
@@ -410,15 +412,15 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       </div>
     );
   };
-  
+
   // Render pagination controls
   const renderPagination = () => {
     return (
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-2">
           <div className="text-xs text-muted-foreground">
-            {uniqueCurrentList.length > 0 ? 
-              `Showing ${startIndex + 1}-${endIndex} of ${uniqueCurrentList.length} items` : 
+            {uniqueCurrentList.length > 0 ?
+              `Showing ${startIndex + 1}-${endIndex} of ${uniqueCurrentList.length} items` :
               "No items to display"}
           </div>
           <div className="flex items-center ml-4">
@@ -432,8 +434,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
               <PopoverContent className="w-48" align="start">
                 <div className="space-y-2">
                   <p className="text-xs font-medium">Items per page</p>
-                  <Select 
-                    value={currentItemsPerPage.toString()} 
+                  <Select
+                    value={currentItemsPerPage.toString()}
                     onValueChange={handleItemsPerPageChange}
                   >
                     <SelectTrigger className="w-full h-8 text-xs">
@@ -471,11 +473,11 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           <span className="text-xs px-2">
             Page {currentPage} of {Math.max(1, totalPages)}
           </span>
-          
+
           <Button
             variant="outline"
             size="icon"
@@ -498,7 +500,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       </div>
     );
   };
-  
+
   // Handle re-check for a URL
   const handleRecheck = async (url: string) => {
     if (recheckingUrls.has(url) || !scanId) return;
@@ -561,16 +563,14 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       });
 
       // Set success message
-      const statusMessage = data.result.status === 'ok' 
-        ? `Link is now working!${data.authMessage ? ` (${data.authMessage})` : ''}` 
-        : data.result.status === 'broken' 
-          ? `Link is broken (Status code: ${data.result.statusCode || 'unknown'})${
-              data.authMessage ? ` - ${data.authMessage}` : ''
-            }` 
-          : `Link check result: ${data.result.status}${
-              data.authMessage ? ` - ${data.authMessage}` : ''
-            }`;
-      
+      const statusMessage = data.result.status === 'ok'
+        ? `Link is now working!${data.authMessage ? ` (${data.authMessage})` : ''}`
+        : data.result.status === 'broken'
+          ? `Link is broken (Status code: ${data.result.statusCode || 'unknown'})${data.authMessage ? ` - ${data.authMessage}` : ''
+          }`
+          : `Link check result: ${data.result.status}${data.authMessage ? ` - ${data.authMessage}` : ''
+          }`;
+
       setRecheckSuccess(prev => new Map([...prev, [url, statusMessage]]));
 
     } catch (error) {
@@ -584,37 +584,37 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       });
     }
   };
-  
+
   // Render a list of links with collapsible items
   const renderLinksList = (links: SerializedScanResult[], isProblematic = false) => {
     if (links.length === 0) {
       return <p className="text-muted-foreground text-center py-8">No links in this category.</p>;
     }
-    
+
     // For problematic links, use the enhanced card-style display
     if (isProblematic) {
       return renderProblematicLinksList(links);
     }
-    
+
     // Group links by URL to avoid duplicates
     const uniqueLinks = getGroupedLinks(links);
     const paginatedItems = uniqueLinks.slice(startIndex, endIndex);
-    
+
     // Make sure to check each item's status code when filtering
-    const problematicItems = paginatedItems.filter(link => 
-      link.status === 'broken' || 
-      link.status === 'error' || 
+    const problematicItems = paginatedItems.filter(link =>
+      link.status === 'broken' ||
+      link.status === 'error' ||
       (link.statusCode !== undefined && link.statusCode >= 400)
     );
-    
-    const nonProblematicItems = paginatedItems.filter(link => 
-      (link.status !== 'broken' && link.status !== 'error') && 
+
+    const nonProblematicItems = paginatedItems.filter(link =>
+      (link.status !== 'broken' && link.status !== 'error') &&
       (link.statusCode === undefined || link.statusCode < 400)
     );
-    
+
     // If we're in the "All" tab, we need to handle both types
     const isAllTab = activeTab === 'all';
-    
+
     return (
       <div className="w-full">
         {renderPagination()}
@@ -641,11 +641,10 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                       <Button
                         variant="outline"
                         size="sm"
-                        className={`h-8 px-3 shrink-0 ${
-                          recheckingUrls.has(link.url) 
-                            ? 'bg-purple-100 text-purple-700' 
+                        className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
+                            ? 'bg-purple-100 text-purple-700'
                             : ''
-                        }`}
+                          }`}
                         onClick={() => handleRecheck(link.url)}
                         disabled={recheckingUrls.has(link.url)}
                       >
@@ -712,27 +711,27 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                       {(() => {
                         const message = recheckSuccess.get(link.url) || '';
                         // Check if there's an auth message in parentheses or after a dash
-                        const authStart = message.indexOf(' (HTTP Basic Auth') !== -1 
-                          ? message.indexOf(' (HTTP Basic Auth') 
+                        const authStart = message.indexOf(' (HTTP Basic Auth') !== -1
+                          ? message.indexOf(' (HTTP Basic Auth')
                           : message.indexOf(' - HTTP Basic Auth');
-                        
+
                         if (authStart !== -1) {
                           const mainMessage = message.substring(0, authStart);
                           const authMessage = message.substring(authStart);
-                          
+
                           return (
                             <>
                               {mainMessage}
                               <span className="block mt-1 text-blue-700 text-xs">
                                 <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
-                                {authMessage.startsWith(' - ') ? authMessage.substring(3) : 
-                                 authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) : 
-                                 authMessage}
+                                {authMessage.startsWith(' - ') ? authMessage.substring(3) :
+                                  authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) :
+                                    authMessage}
                               </span>
                             </>
                           );
                         }
-                        
+
                         return message;
                       })()}
                     </AlertDescription>
@@ -741,14 +740,14 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
               )}
             </div>
           ))}
-          
+
           {/* Problematic links in the All tab (expandable) */}
           {isAllTab && problematicItems.length > 0 && (
             problematicItems.map((link, index) => {
               // Get unique pages with counts
               const pagesWithCounts = countUniquePages(link.foundOn);
               const uniquePages = Array.from(pagesWithCounts.keys());
-              
+
               // Extract domain for display
               const urlDomain = (() => {
                 try {
@@ -757,12 +756,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                   return link.url;
                 }
               })();
-              
+
               const isExpanded = expandedItems.has(link.url);
-              
+
               return (
-                <div 
-                  key={link.url} 
+                <div
+                  key={link.url}
                   className={`text-sm ${index !== problematicItems.length - 1 ? 'border-b' : ''}`}
                 >
                   <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
@@ -773,11 +772,10 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                             {link.statusCode}
                           </span>
                         ) : (
-                          <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${
-                            link.errorMessage?.toLowerCase().includes('timeout') ? 
-                            'bg-amber-500' : 
-                            'bg-destructive'
-                          }`}>
+                          <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${link.errorMessage?.toLowerCase().includes('timeout') ?
+                              'bg-amber-500' :
+                              'bg-destructive'
+                            }`}>
                             {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
                           </span>
                         )}
@@ -801,11 +799,10 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           <Button
                             variant="outline"
                             size="sm"
-                            className={`h-8 px-3 shrink-0 ${
-                              recheckingUrls.has(link.url) 
-                                ? 'bg-purple-100 text-purple-700' 
+                            className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
+                                ? 'bg-purple-100 text-purple-700'
                                 : ''
-                            }`}
+                              }`}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRecheck(link.url);
@@ -825,7 +822,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                             )}
                           </Button>
                         )}
-                        <button 
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopyUrl(link.url);
@@ -849,19 +846,18 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
-                        <ChevronDown 
-                          className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                        <ChevronDown
+                          className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                         />
                       </div>
                     </div>
-                    
+
                     {link.errorMessage && (
                       <div className="text-muted-foreground mt-1.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
-                          link.errorMessage.toLowerCase().includes('timeout') ?
-                          'bg-amber-500/10 text-amber-700' :
-                          'bg-destructive/10 text-destructive'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${link.errorMessage.toLowerCase().includes('timeout') ?
+                            'bg-amber-500/10 text-amber-700' :
+                            'bg-destructive/10 text-destructive'
+                          }`}>
                           {link.errorMessage.toLowerCase().includes('timeout') ? (
                             <>
                               <Clock className="h-3 w-3 mr-1" />
@@ -875,12 +871,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                       </div>
                     )}
                   </div>
-                  
+
                   {isExpanded && uniquePages.length > 0 && (
                     <div className="px-3 pb-3 pt-0 bg-muted/30">
                       <div className="bg-muted/40 p-2 rounded-sm">
                         <p className="text-xs text-muted-foreground mb-1.5 flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
                           Found on: {uniquePages.length} page(s)
                         </p>
                         <ul className="space-y-1.5 pl-4 text-xs">
@@ -889,12 +885,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                             let displayText = page;
                             const occurrences = pagesWithCounts.get(page) || 0;
                             let isSelfReference = false;
-                            
+
                             try {
                               if (page !== 'initial') {
                                 const url = new URL(page);
                                 displayText = url.pathname || url.hostname;
-                                
+
                                 // Check if the page contains a broken link to itself
                                 if (page === link.url) {
                                   isSelfReference = true;
@@ -906,7 +902,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                             } catch {
                               // Keep original if parsing fails
                             }
-                            
+
                             return (
                               <li key={i} className="list-disc flex items-center gap-1">
                                 {page === 'initial' || isSelfReference ? (
@@ -923,9 +919,9 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                       title={page}
                                     >
                                       {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
                                     </a>
-                                    
+
                                     <TooltipProvider>
                                       <Popover>
                                         <PopoverTrigger asChild>
@@ -937,14 +933,14 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                           <div className="space-y-2">
                                             <h4 className="text-sm font-medium">Link HTML Context:</h4>
                                             <div className="max-h-[300px] overflow-y-auto space-y-3">
-                                              {Array.from({length: Math.min(3, occurrences)}, (_, idx) => {
+                                              {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
                                                 const html = generateHtmlContext(link.url, page, idx + 1);
                                                 return (
                                                   <div key={idx} className="relative">
                                                     <div className="absolute top-1 right-1 flex space-x-1">
-                                                      <Button 
-                                                        variant="outline" 
-                                                        size="sm" 
+                                                      <Button
+                                                        variant="outline"
+                                                        size="sm"
                                                         className="h-6 w-6 p-0 text-muted-foreground"
                                                         onClick={() => handleCopyUrl(html)}
                                                         title="Copy HTML"
@@ -952,8 +948,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                                         <ClipboardCopy className="h-3.5 w-3.5" />
                                                       </Button>
                                                     </div>
-                                                    <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20" 
-                                                      style={{maxHeight: "250px", fontSize: "12px"}}>
+                                                    <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
+                                                      style={{ maxHeight: "250px", fontSize: "12px" }}>
                                                       <code dangerouslySetInnerHTML={{
                                                         __html: html
                                                           // Use syntax highlighting for HTML
@@ -1007,13 +1003,13 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       </div>
     );
   };
-  
+
   // Enhanced display for problematic links (broken and errors)
   const renderProblematicLinksList = (links: SerializedScanResult[]) => {
     // Group links by URL to avoid duplicates
     const uniqueLinks = getGroupedLinks(links);
     const paginatedItems = uniqueLinks.slice(startIndex, endIndex);
-    
+
     return (
       <div className="w-full">
         {renderPagination()}
@@ -1022,7 +1018,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
             // Get unique pages with counts
             const pagesWithCounts = countUniquePages(link.foundOn);
             const uniquePages = Array.from(pagesWithCounts.keys());
-            
+
             // Extract domain for display
             const urlDomain = (() => {
               try {
@@ -1031,12 +1027,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                 return link.url;
               }
             })();
-            
+
             const isExpanded = expandedItems.has(link.url);
-            
+
             return (
-              <div 
-                key={link.url} 
+              <div
+                key={link.url}
                 className={`text-sm ${index !== paginatedItems.length - 1 ? 'border-b' : ''}`}
               >
                 <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
@@ -1047,11 +1043,10 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           {link.statusCode}
                         </span>
                       ) : (
-                        <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${
-                          link.errorMessage?.toLowerCase().includes('timeout') ? 
-                          'bg-amber-500' : 
-                          'bg-destructive'
-                        }`}>
+                        <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${link.errorMessage?.toLowerCase().includes('timeout') ?
+                            'bg-amber-500' :
+                            'bg-destructive'
+                          }`}>
                           {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
                         </span>
                       )}
@@ -1075,11 +1070,10 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                         <Button
                           variant="outline"
                           size="sm"
-                          className={`h-8 px-3 shrink-0 ${
-                            recheckingUrls.has(link.url) 
-                              ? 'bg-purple-100 text-purple-700' 
+                          className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
+                              ? 'bg-purple-100 text-purple-700'
                               : ''
-                          }`}
+                            }`}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRecheck(link.url);
@@ -1099,7 +1093,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           )}
                         </Button>
                       )}
-                      <button 
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCopyUrl(link.url);
@@ -1123,19 +1117,18 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
-                      <ChevronDown 
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                       />
                     </div>
                   </div>
-                  
+
                   {link.errorMessage && (
                     <div className="text-muted-foreground mt-1.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
-                        link.errorMessage.toLowerCase().includes('timeout') ?
-                        'bg-amber-500/10 text-amber-700' :
-                        'bg-destructive/10 text-destructive'
-                      }`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${link.errorMessage.toLowerCase().includes('timeout') ?
+                          'bg-amber-500/10 text-amber-700' :
+                          'bg-destructive/10 text-destructive'
+                        }`}>
                         {link.errorMessage.toLowerCase().includes('timeout') ? (
                           <>
                             <Clock className="h-3 w-3 mr-1" />
@@ -1167,27 +1160,27 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           {(() => {
                             const message = recheckSuccess.get(link.url) || '';
                             // Check if there's an auth message in parentheses or after a dash
-                            const authStart = message.indexOf(' (HTTP Basic Auth') !== -1 
-                              ? message.indexOf(' (HTTP Basic Auth') 
+                            const authStart = message.indexOf(' (HTTP Basic Auth') !== -1
+                              ? message.indexOf(' (HTTP Basic Auth')
                               : message.indexOf(' - HTTP Basic Auth');
-                            
+
                             if (authStart !== -1) {
                               const mainMessage = message.substring(0, authStart);
                               const authMessage = message.substring(authStart);
-                              
+
                               return (
                                 <>
                                   {mainMessage}
                                   <span className="block mt-1 text-blue-700 text-xs">
                                     <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
-                                    {authMessage.startsWith(' - ') ? authMessage.substring(3) : 
-                                     authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) : 
-                                     authMessage}
+                                    {authMessage.startsWith(' - ') ? authMessage.substring(3) :
+                                      authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) :
+                                        authMessage}
                                   </span>
                                 </>
                               );
                             }
-                            
+
                             return message;
                           })()}
                         </AlertDescription>
@@ -1195,12 +1188,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                     </div>
                   )}
                 </div>
-                
+
                 {isExpanded && uniquePages.length > 0 && (
                   <div className="px-3 pb-3 pt-0 bg-muted/30">
                     <div className="bg-muted/40 p-2 rounded-sm">
                       <p className="text-xs text-muted-foreground mb-1.5 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
                         Found on: {uniquePages.length} page(s)
                       </p>
                       <ul className="space-y-1.5 pl-4 text-xs">
@@ -1209,12 +1202,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           let displayText = page;
                           const occurrences = pagesWithCounts.get(page) || 0;
                           let isSelfReference = false;
-                          
+
                           try {
                             if (page !== 'initial') {
                               const url = new URL(page);
                               displayText = url.pathname || url.hostname;
-                              
+
                               // Check if the page contains a broken link to itself
                               if (page === link.url) {
                                 isSelfReference = true;
@@ -1226,7 +1219,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                           } catch {
                             // Keep original if parsing fails
                           }
-                          
+
                           return (
                             <li key={i} className="list-disc flex items-center gap-1">
                               {page === 'initial' || isSelfReference ? (
@@ -1243,9 +1236,9 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                     title={page}
                                   >
                                     {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
                                   </a>
-                                  
+
                                   <TooltipProvider>
                                     <Popover>
                                       <PopoverTrigger asChild>
@@ -1257,14 +1250,14 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                         <div className="space-y-2">
                                           <h4 className="text-sm font-medium">Link HTML Context:</h4>
                                           <div className="max-h-[300px] overflow-y-auto space-y-3">
-                                            {Array.from({length: Math.min(3, occurrences)}, (_, idx) => {
+                                            {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
                                               const html = generateHtmlContext(link.url, page, idx + 1);
                                               return (
                                                 <div key={idx} className="relative">
                                                   <div className="absolute top-1 right-1 flex space-x-1">
-                                                    <Button 
-                                                      variant="outline" 
-                                                      size="sm" 
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
                                                       className="h-6 w-6 p-0 text-muted-foreground"
                                                       onClick={() => handleCopyUrl(html)}
                                                       title="Copy HTML"
@@ -1272,8 +1265,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                                       <ClipboardCopy className="h-3.5 w-3.5" />
                                                     </Button>
                                                   </div>
-                                                  <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20" 
-                                                    style={{maxHeight: "250px", fontSize: "12px"}}>
+                                                  <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
+                                                    style={{ maxHeight: "250px", fontSize: "12px" }}>
                                                     <code dangerouslySetInnerHTML={{
                                                       __html: html
                                                         // Use syntax highlighting for HTML
@@ -1326,7 +1319,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       </div>
     );
   };
-  
+
   const handleCheckLink = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -1336,7 +1329,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     try {
       const urlDomain = new URL(url).hostname;
       const baseUrlDomain = new URL(baseUrl).hostname;
-      
+
       // Extract root domains to handle subdomains
       const getBaseDomain = (domain: string) => {
         // Extract the base domain (e.g., example.com from sub.example.com)
@@ -1348,10 +1341,10 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
         }
         return domain;
       };
-      
+
       const urlBaseDomain = getBaseDomain(urlDomain);
       const baseUrlBaseDomain = getBaseDomain(baseUrlDomain);
-      
+
       return urlBaseDomain !== baseUrlBaseDomain;
     } catch {
       return false;
@@ -1363,7 +1356,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       <div>
         {/* Filter cards that act as tabs */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div 
+          <div
             className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'problematic' ? 'ring-2 ring-purple-500' : ''}`}
             onClick={() => handleTabChange('problematic')}
           >
@@ -1373,8 +1366,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
               {uniqueProblematicCount}
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'ok' ? 'ring-2 ring-purple-500' : ''}`}
             onClick={() => handleTabChange('ok')}
           >
@@ -1384,8 +1377,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
               {uniqueOkCount}
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'external' ? 'ring-2 ring-purple-500' : ''}`}
             onClick={() => handleTabChange('external')}
           >
@@ -1395,8 +1388,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
               {uniqueExternalCount}
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'skipped' ? 'ring-2 ring-purple-500' : ''}`}
             onClick={() => handleTabChange('skipped')}
           >
@@ -1405,8 +1398,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
               {uniqueSkippedCount}
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'all' ? 'ring-2 ring-purple-500' : ''}`}
             onClick={() => handleTabChange('all')}
           >
@@ -1416,7 +1409,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
             </div>
           </div>
         </div>
-        
+
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium">
             {activeTab === 'problematic' && 'Problematic Links'}
@@ -1427,7 +1420,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
           </h3>
           <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} />
         </div>
-        
+
         {/* Render the appropriate list based on activeTab */}
         {activeTab === 'problematic' && renderLinksList(problematicLinks, true)}
         {activeTab === 'ok' && renderLinksList(okLinks)}

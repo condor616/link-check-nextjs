@@ -339,21 +339,78 @@ export class JobService {
 
     private getJobLocal(id: string): ScanJob | null {
         const filePath = path.join(JOBS_DIR, `${id}.json`);
-        if (fs.existsSync(filePath)) {
-            try {
-                const content = fs.readFileSync(filePath, 'utf-8');
-                return JSON.parse(content) as ScanJob;
-            } catch (e) {
-                console.error(`Error reading local job ${id}:`, e);
-                return null;
+
+        // Retry logic for reading the file to handle race conditions with atomic writes
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+            if (fs.existsSync(filePath)) {
+                try {
+                    const content = fs.readFileSync(filePath, 'utf-8');
+                    return JSON.parse(content) as ScanJob;
+                } catch (e) {
+                    console.error(`Error reading local job ${id} (attempt ${attempts + 1}/${maxAttempts}):`, e);
+                    if (attempts === maxAttempts - 1) {
+                        try {
+                            console.error(`File content snippet: ${fs.readFileSync(filePath, 'utf-8').substring(0, 100)}...`);
+                        } catch (readErr) {
+                            console.error('Could not read file for snippet:', readErr);
+                        }
+                        return null;
+                    }
+                }
+            } else {
+                if (attempts === maxAttempts - 1) {
+                    console.log(`Job file not found: ${filePath}`);
+                    return null;
+                }
             }
+
+            // Wait briefly before retrying
+            // Use synchronous sleep since this is a sync method (or make it async? getJobLocal is sync in implementation but called by async getJob)
+            // Wait, getJob is async. getJobLocal is sync.
+            // I should make getJobLocal async or use a busy wait. 
+            // Since getJobLocal is private and only called by getJob (async) or updateJobStatus (async), 
+            // I can't easily make it async without changing signature and all callers.
+            // But wait, getJobLocal IS called by sync methods?
+            // getJobLocal is called by: getJob (async), updateJobStatus (async), updateJobProgress (async), updateJobState (async).
+            // It is NOT called by any sync public methods.
+            // So I can make it async?
+            // No, updateJobStatus calls it and then calls saveJobLocal.
+            // Let's use a small busy wait or just retry immediately?
+            // Immediate retry might catch it if it's just a context switch away.
+            // But a small delay is better.
+            // Since I can't easily change it to async right now without refactoring, I will use a small busy wait (10ms)
+            // or just rely on immediate retry.
+            // Actually, fs.readFileSync is blocking.
+            // I'll use a busy wait loop for 10ms.
+            const start = Date.now();
+            while (Date.now() - start < 10) {
+                // busy wait
+            }
+            attempts++;
         }
         return null;
     }
 
     private saveJobLocal(job: ScanJob): void {
         const filePath = path.join(JOBS_DIR, `${job.id}.json`);
-        fs.writeFileSync(filePath, JSON.stringify(job, null, 2));
+        const tempPath = `${filePath}.tmp`;
+        try {
+            fs.writeFileSync(tempPath, JSON.stringify(job, null, 2));
+            fs.renameSync(tempPath, filePath);
+        } catch (error) {
+            console.error(`Error saving job ${job.id} locally:`, error);
+            // Try to clean up temp file if it exists
+            try {
+                if (fs.existsSync(tempPath)) {
+                    fs.unlinkSync(tempPath);
+                }
+            } catch (cleanupError) {
+                console.error('Error cleaning up temp file:', cleanupError);
+            }
+        }
     }
 }
 
