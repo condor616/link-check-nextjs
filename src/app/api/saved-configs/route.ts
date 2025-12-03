@@ -55,11 +55,11 @@ export async function GET() {
 async function getConfigsFromFiles() {
   try {
     await ensureConfigsDir();
-    
+
     // Read all files in the configs directory
     const files = await fs.readdir(path.join(process.cwd(), SCAN_CONFIGS_DIR));
     const configFiles = files.filter(file => file.endsWith('.json'));
-    
+
     // Read and parse each config file
     const configs: SavedScanConfig[] = [];
     for (const file of configFiles) {
@@ -75,12 +75,12 @@ async function getConfigsFromFiles() {
         // Skip invalid files
       }
     }
-    
+
     // Sort by most recently updated
-    configs.sort((a, b) => 
+    configs.sort((a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
-    
+
     return NextResponse.json(configs);
   } catch (error) {
     console.error('Error getting configurations from files:', error);
@@ -92,22 +92,34 @@ async function getConfigsFromFiles() {
 async function getConfigsFromSupabase() {
   try {
     const supabase = await getSupabaseClient();
-    
+
     if (!supabase) {
       throw new Error('Supabase client is not available');
     }
-    
+
     const { data, error } = await supabase
       .from('scan_configs')
       .select('*')
       .order('updated_at', { ascending: false });
-    
+
     if (error) {
       throw new Error(`Supabase error: ${error.message}`);
     }
-    
+
+    // Define interface for Supabase response
+    interface SavedConfigItem {
+      id: string;
+      name: string;
+      url: string;
+      config: any;
+      created_at: string;
+      updated_at: string;
+    }
+
+    const configItems = data as unknown as SavedConfigItem[];
+
     // Convert Supabase format to our app format
-    const configs = data.map(item => ({
+    const configs = configItems.map(item => ({
       id: item.id,
       name: item.name,
       url: item.url,
@@ -115,7 +127,7 @@ async function getConfigsFromSupabase() {
       createdAt: item.created_at,
       updatedAt: item.updated_at
     }));
-    
+
     return NextResponse.json(configs);
   } catch (error) {
     console.error('Error getting configurations from Supabase:', error);
@@ -127,7 +139,7 @@ async function getConfigsFromSupabase() {
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
-    
+
     // Validate payload
     if (!payload.name || !payload.url || !payload.config) {
       return NextResponse.json(
@@ -135,15 +147,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     // Generate unique ID if not provided (for new configs)
     const id = payload.id || `config_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    
+
     // Sanitize the ID
     const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, '');
-    
+
     const now = new Date().toISOString();
-    
+
     const savedConfig: SavedScanConfig = {
       id: sanitizedId,
       name: payload.name,
@@ -152,10 +164,10 @@ export async function POST(request: NextRequest) {
       createdAt: payload.createdAt || now,
       updatedAt: now
     };
-    
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     if (useSupabase) {
       return await saveConfigToSupabase(savedConfig);
     } else {
@@ -163,12 +175,12 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error saving configuration:', error);
-    
+
     let errorMessage = 'Failed to save configuration';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    
+
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
@@ -180,16 +192,16 @@ export async function POST(request: NextRequest) {
 async function saveConfigToFile(config: SavedScanConfig) {
   try {
     await ensureConfigsDir();
-    
+
     // Save to file
     const configFilePath = path.join(process.cwd(), SCAN_CONFIGS_DIR, `${config.id}.json`);
     await fs.writeFile(
       configFilePath,
       JSON.stringify(config, null, 2)
     );
-    
+
     return NextResponse.json(
-      { 
+      {
         message: 'Configuration saved successfully to file',
         id: config.id,
         config: config
@@ -206,24 +218,24 @@ async function saveConfigToFile(config: SavedScanConfig) {
 async function saveConfigToSupabase(config: SavedScanConfig) {
   try {
     const supabase = await getSupabaseClient();
-    
+
     if (!supabase) {
       throw new Error('Supabase client is not available');
     }
-    
+
     // Check if config with this ID already exists (update vs insert)
     const { data: existingConfig } = await supabase
       .from('scan_configs')
       .select('id')
       .eq('id', config.id)
       .maybeSingle();
-    
+
     let result;
-    
+
     if (existingConfig) {
       // Update existing config
-      result = await supabase
-        .from('scan_configs')
+      result = await (supabase
+        .from('scan_configs') as any)
         .update({
           name: config.name,
           url: config.url,
@@ -233,8 +245,8 @@ async function saveConfigToSupabase(config: SavedScanConfig) {
         .eq('id', config.id);
     } else {
       // Insert new config
-      result = await supabase
-        .from('scan_configs')
+      result = await (supabase
+        .from('scan_configs') as any)
         .insert({
           id: config.id,
           name: config.name,
@@ -244,13 +256,13 @@ async function saveConfigToSupabase(config: SavedScanConfig) {
           updated_at: config.updatedAt
         });
     }
-    
+
     if (result.error) {
       throw new Error(`Supabase error: ${result.error.message}`);
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         message: 'Configuration saved successfully to Supabase',
         id: config.id,
         config: config
@@ -268,17 +280,17 @@ export async function DELETE(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
-    
+
     if (!id) {
       return NextResponse.json(
         { error: 'Missing configuration ID' },
         { status: 400 }
       );
     }
-    
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     if (useSupabase) {
       return await deleteConfigFromSupabase(id);
     } else {
@@ -286,12 +298,12 @@ export async function DELETE(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error deleting configuration:', error);
-    
+
     let errorMessage = 'Failed to delete configuration';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    
+
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
@@ -303,9 +315,9 @@ export async function DELETE(request: NextRequest) {
 async function deleteConfigFromFile(id: string) {
   try {
     await ensureConfigsDir();
-    
+
     const configFilePath = path.join(process.cwd(), SCAN_CONFIGS_DIR, `${id}.json`);
-    
+
     try {
       await fs.access(configFilePath);
     } catch (_) {
@@ -314,10 +326,10 @@ async function deleteConfigFromFile(id: string) {
         { status: 404 }
       );
     }
-    
+
     // Delete the file
     await fs.unlink(configFilePath);
-    
+
     return NextResponse.json(
       { message: 'Configuration deleted successfully from file' }
     );
@@ -331,20 +343,20 @@ async function deleteConfigFromFile(id: string) {
 async function deleteConfigFromSupabase(id: string) {
   try {
     const supabase = await getSupabaseClient();
-    
+
     if (!supabase) {
       throw new Error('Supabase client is not available');
     }
-    
+
     const { error } = await supabase
       .from('scan_configs')
       .delete()
       .eq('id', id);
-    
+
     if (error) {
       throw new Error(`Supabase error: ${error.message}`);
     }
-    
+
     return NextResponse.json(
       { message: 'Configuration deleted successfully from Supabase' }
     );

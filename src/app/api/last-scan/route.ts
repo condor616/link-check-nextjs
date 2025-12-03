@@ -8,7 +8,7 @@ export async function GET() {
   try {
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     if (useSupabase) {
       try {
         return await getLastScanFromSupabase();
@@ -46,7 +46,7 @@ async function getLastScanFromFiles() {
   try {
     // Path to the scan history directory
     const historyDir = path.join(process.cwd(), '.scan_history');
-    
+
     // Ensure the directory exists
     if (!fs.existsSync(historyDir)) {
       return NextResponse.json({
@@ -58,7 +58,7 @@ async function getLastScanFromFiles() {
         error: 'No scan history found'
       });
     }
-    
+
     // Get all scan files
     const files = fs.readdirSync(historyDir)
       .filter(file => file.endsWith('.json'))
@@ -72,7 +72,7 @@ async function getLastScanFromFiles() {
         };
       })
       .sort((a, b) => b.mtime - a.mtime); // Sort by most recent first
-    
+
     // If no files found
     if (files.length === 0) {
       return NextResponse.json({
@@ -84,21 +84,21 @@ async function getLastScanFromFiles() {
         error: 'No scan history found'
       });
     }
-    
+
     // Get the most recent scan file
     const mostRecentFile = files[0];
     const filePath = path.join(historyDir, mostRecentFile.file);
     const scanData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    
+
     // Count broken links
-    const brokenLinks = Array.isArray(scanData.results) 
-      ? scanData.results.filter((result: ScanResult) => 
-          result.status === 'broken' || 
-          (result.statusCode !== undefined && result.statusCode >= 400) ||
-          result.status === 'error'
-        ).length
+    const brokenLinks = Array.isArray(scanData.results)
+      ? scanData.results.filter((result: ScanResult) =>
+        result.status === 'broken' ||
+        (result.statusCode !== undefined && result.statusCode >= 400) ||
+        result.status === 'error'
+      ).length
       : 0;
-    
+
     // Return simplified scan data for the homepage
     return NextResponse.json({
       id: mostRecentFile.id,
@@ -124,18 +124,18 @@ async function getLastScanFromFiles() {
 async function getLastScanFromSupabase() {
   try {
     const supabase = await getSupabaseClient();
-    
+
     if (!supabase) {
       throw new Error('Supabase client is not available');
     }
-    
+
     const { data, error } = await supabase
       .from('scan_history')
       .select('*')
       .order('scan_date', { ascending: false })
       .limit(1)
       .single();
-    
+
     if (error) {
       if (error.code === 'PGRST116') {
         // No rows returned
@@ -150,7 +150,7 @@ async function getLastScanFromSupabase() {
       }
       throw new Error(`Supabase error: ${error.message}`);
     }
-    
+
     if (!data) {
       return NextResponse.json({
         id: null,
@@ -161,26 +161,38 @@ async function getLastScanFromSupabase() {
         error: 'No scan history found'
       });
     }
-    
+
+    // Define interface for Supabase response since we don't have generated types
+    interface ScanHistoryItem {
+      id: string;
+      scan_url: string;
+      scan_date: string;
+      duration_seconds: number;
+      results: any[];
+      config: any;
+    }
+
+    const scanData = data as unknown as ScanHistoryItem;
+
     // Count broken links
     let resultsArr: any[] = [];
-    if (Array.isArray(data.results)) {
-      resultsArr = data.results;
-    } else if (data.results && typeof data.results === 'object') {
-      resultsArr = Object.values(data.results);
+    if (Array.isArray(scanData.results)) {
+      resultsArr = scanData.results;
+    } else if (scanData.results && typeof scanData.results === 'object') {
+      resultsArr = Object.values(scanData.results);
     }
-    
-    const brokenLinks = resultsArr.filter((result: ScanResult) => 
-      result.status === 'broken' || 
+
+    const brokenLinks = resultsArr.filter((result: ScanResult) =>
+      result.status === 'broken' ||
       (result.statusCode !== undefined && result.statusCode >= 400) ||
       result.status === 'error'
     ).length;
-    
+
     // Return simplified scan data for the homepage
     return NextResponse.json({
-      id: data.id,
-      url: data.scan_url,
-      date: data.scan_date,
+      id: scanData.id,
+      url: scanData.scan_url,
+      date: scanData.scan_date,
       brokenLinks,
       totalLinks: resultsArr.length,
     });

@@ -9,7 +9,7 @@ export async function GET(_request: NextRequest) {
   try {
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     if (useSupabase) {
       try {
         return await getHistoryFromSupabase();
@@ -117,34 +117,46 @@ async function getHistoryFromFiles() {
 async function getHistoryFromSupabase() {
   try {
     const supabase = await getSupabaseClient();
-    
+
     if (!supabase) {
       throw new Error('Supabase client is not available');
     }
-    
+
     const { data, error } = await supabase
       .from('scan_history')
       .select('*')
       .order('scan_date', { ascending: false });
-    
+
     if (error) {
       throw new Error(`Supabase error: ${error.message}`);
     }
-    
+
+    // Define interface for Supabase response since we don't have generated types
+    interface ScanHistoryItem {
+      id: string;
+      scan_url: string;
+      scan_date: string;
+      duration_seconds: number;
+      results: any[];
+      config: any;
+    }
+
+    const scans = data as unknown as ScanHistoryItem[];
+
     // Convert to the expected format
-    const summaries = data.map(scan => {
+    const summaries = scans.map(scan => {
       let resultsArr: any[] = [];
       if (Array.isArray(scan.results)) {
         resultsArr = scan.results;
       } else if (scan.results && typeof scan.results === 'object') {
         resultsArr = Object.values(scan.results);
       }
-      
+
       const resultsCount = resultsArr.length;
       const brokenLinksCount = resultsArr.filter((r: any) =>
         r && (r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400))
       ).length;
-      
+
       return {
         id: scan.id,
         scanUrl: scan.scan_url,
@@ -156,7 +168,7 @@ async function getHistoryFromSupabase() {
         config: scan.config
       };
     });
-    
+
     return NextResponse.json({ items: summaries });
   } catch (err) {
     console.error('Error retrieving scan history from Supabase:', err);

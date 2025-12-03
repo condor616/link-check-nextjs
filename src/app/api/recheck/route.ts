@@ -19,19 +19,19 @@ async function checkUrl(url: string, config?: ScanConfig & { originalScanUrl?: s
   try {
     // Prepare fetch options
     const timeoutDuration = config?.requestTimeout ?? 30000;
-    
+
     // Determine if auth should be used by comparing domains
     let shouldUseAuth = false;
     let authDecision = "";
-    
+
     if (config?.auth && config.originalScanUrl) {
       try {
         const urlDomain = new URL(url).hostname;
         const scanUrlDomain = new URL(config.originalScanUrl).hostname;
-        
+
         // Only use auth for the same domain as the original scan
         shouldUseAuth = urlDomain === scanUrlDomain;
-        
+
         if (shouldUseAuth) {
           console.log(`Using HTTP Basic Auth for ${url} (same domain as scan URL)`);
           authDecision = "auth_used_same_domain";
@@ -82,19 +82,19 @@ async function checkUrl(url: string, config?: ScanConfig & { originalScanUrl?: s
     };
   } catch (error: any) {
     console.error(`Error checking URL ${url}:`, error.name, error.message);
-    
+
     if (error.name === 'TimeoutError' || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
       return {
         url,
         status: 'broken',
-        errorMessage: `Request timed out after ${(config?.requestTimeout ?? 30000)/1000} seconds`,
+        errorMessage: `Request timed out after ${(config?.requestTimeout ?? 30000) / 1000} seconds`,
         foundOn: new Set<string>(),
         htmlContexts: new Map<string, string[]>(),
         usedAuth: false,
         authDecision: "request_timeout"
       };
     }
-    
+
     return {
       url,
       status: 'error',
@@ -118,7 +118,7 @@ function getAuthMessage(authDecision: string, originalScanUrl: string, checkedUr
   try {
     const originalDomain = new URL(originalScanUrl).hostname;
     const checkedDomain = new URL(checkedUrl).hostname;
-    
+
     switch (authDecision) {
       case "auth_used_same_domain":
         return `HTTP Basic Auth credentials were used (same domain: ${originalDomain})`;
@@ -160,36 +160,48 @@ async function getScanDataFromFile(scanId: string) {
 // Get scan data from Supabase
 async function getScanDataFromSupabase(scanId: string) {
   const supabase = await getSupabaseClient();
-  
+
   if (!supabase) {
     throw new Error('Supabase client is not available');
   }
-  
+
   const { data, error } = await supabase
     .from('scan_history')
     .select('*')
     .eq('id', scanId)
     .single();
-  
+
   if (error) {
     if (error.code === 'PGRST116') {
       return null;
     }
     throw new Error(`Supabase error: ${error.message}`);
   }
-  
+
   if (!data) {
     return null;
   }
-  
+
+  // Define interface for Supabase response since we don't have generated types
+  interface ScanHistoryItem {
+    id: string;
+    scan_url: string;
+    scan_date: string;
+    duration_seconds: number;
+    results: any[];
+    config: any;
+  }
+
+  const scanData = data as unknown as ScanHistoryItem;
+
   // Format data to match the file-based format
   return {
-    id: data.id,
-    scanUrl: data.scan_url,
-    scanDate: data.scan_date,
-    durationSeconds: data.duration_seconds,
-    results: data.results || [],
-    config: data.config || {}
+    id: scanData.id,
+    scanUrl: scanData.scan_url,
+    scanDate: scanData.scan_date,
+    durationSeconds: scanData.duration_seconds,
+    results: scanData.results || [],
+    config: scanData.config || {}
   };
 }
 
@@ -202,18 +214,18 @@ async function saveScanDataToFile(scanId: string, scanData: any) {
 // Save updated scan data to Supabase
 async function saveScanDataToSupabase(scanId: string, scanData: any) {
   const supabase = await getSupabaseClient();
-  
+
   if (!supabase) {
     throw new Error('Supabase client is not available');
   }
-  
-  const { error } = await supabase
-    .from('scan_history')
+
+  const { error } = await (supabase
+    .from('scan_history') as any)
     .update({
       results: scanData.results
     })
     .eq('id', scanId);
-  
+
   if (error) {
     throw new Error(`Supabase error updating scan: ${error.message}`);
   }
@@ -248,7 +260,7 @@ export async function POST(request: NextRequest) {
 
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     // Get scan data
     let scanData;
     if (useSupabase) {
@@ -260,7 +272,7 @@ export async function POST(request: NextRequest) {
     } else {
       scanData = await getScanDataFromFile(scanId);
     }
-    
+
     // Check if scan exists
     if (!scanData) {
       return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
@@ -298,7 +310,7 @@ export async function POST(request: NextRequest) {
         const originalResult = scanData.results[urlIndex];
         result.foundOn = new Set(originalResult.foundOn);
         result.htmlContexts = new Map(Object.entries(originalResult.htmlContexts || {}));
-        
+
         // Update the result in the scan data
         scanData.results[urlIndex] = {
           ...result,
@@ -329,29 +341,29 @@ export async function POST(request: NextRequest) {
 
     } catch (scanError) {
       console.error("Re-check error:", scanError);
-      
+
       if (scanError instanceof TypeError && scanError.message.includes('fetch')) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: `Failed to connect to the URL (${url}). Please check the URL and try again.`,
           status: 'error'
         }, { status: 502 });
-      } 
-      
+      }
+
       if (scanError instanceof Error && scanError.message.includes('timeout')) {
-        return NextResponse.json({ 
-          error: `Request timed out after ${(configWithAuth?.requestTimeout ?? 30000)/1000} seconds`,
+        return NextResponse.json({
+          error: `Request timed out after ${(configWithAuth?.requestTimeout ?? 30000) / 1000} seconds`,
           status: 'error'
         }, { status: 504 });
       }
-      
-      return NextResponse.json({ 
+
+      return NextResponse.json({
         error: scanError instanceof Error ? scanError.message : 'Unknown error occurred',
         status: 'error'
       }, { status: 500 });
     }
   } catch (error) {
     console.error("Re-check endpoint error:", error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: error instanceof Error ? error.message : 'Internal server error',
       status: 'error'
     }, { status: 500 });

@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { scanId } = await params;
-    
+
     // Validate scanId
     if (!scanId || typeof scanId !== 'string' || !scanId.match(/^[\w-]+$/)) {
       return NextResponse.json(
@@ -19,10 +19,10 @@ export async function GET(
         { status: 400 }
       );
     }
-    
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     if (useSupabase) {
       try {
         return await getScanFromSupabase(scanId);
@@ -46,7 +46,7 @@ export async function GET(
 async function getScanFromFile(scanId: string) {
   // Build file path
   const scanFilePath = path.join(process.cwd(), SCAN_HISTORY_DIR, `${scanId}.json`);
-  
+
   try {
     // Check if file exists
     await fs.access(scanFilePath);
@@ -56,13 +56,13 @@ async function getScanFromFile(scanId: string) {
       { status: 404 }
     );
   }
-  
+
   // Read and parse the scan file
   const scanData = await fs.readFile(scanFilePath, 'utf-8');
-  
+
   try {
     const scan = JSON.parse(scanData);
-    
+
     // Return the scan data
     return NextResponse.json(scan);
   } catch (err) {
@@ -76,17 +76,17 @@ async function getScanFromFile(scanId: string) {
 
 async function getScanFromSupabase(scanId: string) {
   const supabase = await getSupabaseClient();
-  
+
   if (!supabase) {
     throw new Error('Supabase client is not available');
   }
-  
+
   const { data, error } = await supabase
     .from('scan_history')
     .select('*')
     .eq('id', scanId)
     .single();
-  
+
   if (error) {
     if (error.code === 'PGRST116') {
       return NextResponse.json(
@@ -96,24 +96,36 @@ async function getScanFromSupabase(scanId: string) {
     }
     throw new Error(`Supabase error: ${error.message}`);
   }
-  
+
   if (!data) {
     return NextResponse.json(
       { error: 'Scan not found' },
       { status: 404 }
     );
   }
-  
+
+  // Define interface for Supabase response since we don't have generated types
+  interface ScanHistoryItem {
+    id: string;
+    scan_url: string;
+    scan_date: string;
+    duration_seconds: number;
+    results: any[];
+    config: any;
+  }
+
+  const scanData = data as unknown as ScanHistoryItem;
+
   // Format data to match the file-based format
   const formattedData = {
-    id: data.id,
-    scanUrl: data.scan_url,
-    scanDate: data.scan_date,
-    durationSeconds: data.duration_seconds,
-    results: data.results || [],
-    config: data.config || {}
+    id: scanData.id,
+    scanUrl: scanData.scan_url,
+    scanDate: scanData.scan_date,
+    durationSeconds: scanData.duration_seconds,
+    results: scanData.results || [],
+    config: scanData.config || {}
   };
-  
+
   return NextResponse.json(formattedData);
 }
 
@@ -123,7 +135,7 @@ export async function DELETE(
 ) {
   try {
     const { scanId } = await params;
-    
+
     // Validate scanId
     if (!scanId || typeof scanId !== 'string' || !scanId.match(/^[\w-]+$/)) {
       return NextResponse.json(
@@ -131,10 +143,10 @@ export async function DELETE(
         { status: 400 }
       );
     }
-    
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     if (useSupabase) {
       try {
         return await deleteScanFromSupabase(scanId);
@@ -158,7 +170,7 @@ export async function DELETE(
 async function deleteScanFromFile(scanId: string) {
   // Build file path
   const scanFilePath = path.join(process.cwd(), SCAN_HISTORY_DIR, `${scanId}.json`);
-  
+
   try {
     // Check if file exists
     await fs.access(scanFilePath);
@@ -168,10 +180,10 @@ async function deleteScanFromFile(scanId: string) {
       { status: 404 }
     );
   }
-  
+
   // Delete the scan file
   await fs.unlink(scanFilePath);
-  
+
   // Return success
   return NextResponse.json(
     { success: true, message: 'Scan deleted successfully' }
@@ -180,20 +192,20 @@ async function deleteScanFromFile(scanId: string) {
 
 async function deleteScanFromSupabase(scanId: string) {
   const supabase = await getSupabaseClient();
-  
+
   if (!supabase) {
     throw new Error('Supabase client is not available');
   }
-  
+
   const { error } = await supabase
     .from('scan_history')
     .delete()
     .eq('id', scanId);
-  
+
   if (error) {
     throw new Error(`Supabase error: ${error.message}`);
   }
-  
+
   return NextResponse.json(
     { success: true, message: 'Scan deleted successfully' }
   );

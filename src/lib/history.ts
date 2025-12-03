@@ -84,8 +84,9 @@ export class HistoryService {
             }
 
             // Insert scan data into database
-            const { error } = await supabase
-                .from('scan_history')
+            // Insert scan data into database
+            const { error } = await (supabase
+                .from('scan_history') as any)
                 .insert({
                     id: savedData.id,
                     scan_url: savedData.scanUrl,

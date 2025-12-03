@@ -13,7 +13,7 @@ export async function GET(
 ) {
   try {
     const { scanId } = await params;
-    
+
     // Validate scanId
     if (!scanId || typeof scanId !== 'string' || !scanId.match(/^[\w-]+$/)) {
       return NextResponse.json(
@@ -21,10 +21,10 @@ export async function GET(
         { status: 400 }
       );
     }
-    
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
-    
+
     if (useSupabase) {
       try {
         // Get directly from scan_history table
@@ -52,10 +52,10 @@ async function getScanParamsFromFile(scanId: string) {
   // First try the scan_params directory (temporary scans)
   const paramsFilePath = path.join(process.cwd(), SCAN_PARAMS_DIR, `${scanId}.json`);
   const historyFilePath = path.join(process.cwd(), SCAN_HISTORY_DIR, `${scanId}.json`);
-  
+
   let scanData: string;
   let isFromHistory = false;
-  
+
   try {
     // First check params directory
     await fs.access(paramsFilePath);
@@ -73,10 +73,10 @@ async function getScanParamsFromFile(scanId: string) {
       );
     }
   }
-  
+
   try {
     const parsedData = JSON.parse(scanData);
-    
+
     // If from history, we need to extract the parameters
     if (isFromHistory) {
       return NextResponse.json({
@@ -84,7 +84,7 @@ async function getScanParamsFromFile(scanId: string) {
         config: parsedData.config
       });
     }
-    
+
     // If from params directory, the structure is already correct
     return NextResponse.json(parsedData);
   } catch (err) {
@@ -99,17 +99,17 @@ async function getScanParamsFromFile(scanId: string) {
 // Get scan parameters from Supabase scan_history table
 async function getScanParamsFromSupabaseHistory(scanId: string) {
   const supabase = await getSupabaseClient();
-  
+
   if (!supabase) {
     throw new Error('Supabase client is not available');
   }
-  
+
   const { data, error } = await supabase
     .from('scan_history')
     .select('scan_url, config')
     .eq('id', scanId)
     .single();
-  
+
   if (error) {
     if (error.code === 'PGRST116') {
       return NextResponse.json(
@@ -119,17 +119,25 @@ async function getScanParamsFromSupabaseHistory(scanId: string) {
     }
     throw new Error(`Supabase error: ${error.message}`);
   }
-  
+
   if (!data) {
     return NextResponse.json(
       { error: 'Scan parameters not found' },
       { status: 404 }
     );
   }
-  
+
+  // Define interface for Supabase response
+  interface ScanParamsItem {
+    scan_url: string;
+    config: any;
+  }
+
+  const paramsData = data as unknown as ScanParamsItem;
+
   // Return the data in the expected format
   return NextResponse.json({
-    url: data.scan_url,
-    config: data.config
+    url: paramsData.scan_url,
+    config: paramsData.config
   });
 } 
