@@ -40,9 +40,17 @@ export class HistoryService {
             scanId = `scan_${timestamp}_${uniquePart}`;
         }
 
+        // Serialize results to ensure Sets and Maps are converted to JSON-compatible formats
+        const serializedResults = payload.results.map(r => ({
+            ...r,
+            foundOn: Array.from(r.foundOn || []),
+            htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
+        }));
+
         const savedData: SavedScan = {
             id: scanId,
             ...payload,
+            results: serializedResults as any // Cast to any to match ScanResult[] interface which expects Set/Map
         };
 
         // Check if using Supabase

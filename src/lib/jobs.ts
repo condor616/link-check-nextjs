@@ -348,7 +348,18 @@ export class JobService {
             if (fs.existsSync(filePath)) {
                 try {
                     const content = fs.readFileSync(filePath, 'utf-8');
-                    return JSON.parse(content) as ScanJob;
+                    const job = JSON.parse(content) as any; // Parse as any first
+
+                    // Deserialize results if present
+                    if (job.results && Array.isArray(job.results)) {
+                        job.results = job.results.map((r: any) => ({
+                            ...r,
+                            foundOn: new Set(r.foundOn || []),
+                            htmlContexts: r.htmlContexts ? new Map(Object.entries(r.htmlContexts)) : undefined
+                        }));
+                    }
+
+                    return job as ScanJob;
                 } catch (e) {
                     console.error(`Error reading local job ${id} (attempt ${attempts + 1}/${maxAttempts}):`, e);
                     if (attempts === maxAttempts - 1) {
@@ -367,24 +378,7 @@ export class JobService {
                 }
             }
 
-            // Wait briefly before retrying
-            // Use synchronous sleep since this is a sync method (or make it async? getJobLocal is sync in implementation but called by async getJob)
-            // Wait, getJob is async. getJobLocal is sync.
-            // I should make getJobLocal async or use a busy wait. 
-            // Since getJobLocal is private and only called by getJob (async) or updateJobStatus (async), 
-            // I can't easily make it async without changing signature and all callers.
-            // But wait, getJobLocal IS called by sync methods?
-            // getJobLocal is called by: getJob (async), updateJobStatus (async), updateJobProgress (async), updateJobState (async).
-            // It is NOT called by any sync public methods.
-            // So I can make it async?
-            // No, updateJobStatus calls it and then calls saveJobLocal.
-            // Let's use a small busy wait or just retry immediately?
-            // Immediate retry might catch it if it's just a context switch away.
-            // But a small delay is better.
-            // Since I can't easily change it to async right now without refactoring, I will use a small busy wait (10ms)
-            // or just rely on immediate retry.
-            // Actually, fs.readFileSync is blocking.
-            // I'll use a busy wait loop for 10ms.
+            // Busy wait for a short period
             const start = Date.now();
             while (Date.now() - start < 10) {
                 // busy wait
@@ -398,7 +392,18 @@ export class JobService {
         const filePath = path.join(JOBS_DIR, `${job.id}.json`);
         const tempPath = `${filePath}.tmp`;
         try {
-            fs.writeFileSync(tempPath, JSON.stringify(job, null, 2));
+            // Create a copy to serialize without mutating the original object
+            const jobToSave = { ...job };
+
+            if (jobToSave.results) {
+                jobToSave.results = jobToSave.results.map(r => ({
+                    ...r,
+                    foundOn: Array.from(r.foundOn || []) as any, // Cast to any to satisfy type checker while saving
+                    htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
+                })) as any;
+            }
+
+            fs.writeFileSync(tempPath, JSON.stringify(jobToSave, null, 2));
             fs.renameSync(tempPath, filePath);
         } catch (error) {
             console.error(`Error saving job ${job.id} locally:`, error);

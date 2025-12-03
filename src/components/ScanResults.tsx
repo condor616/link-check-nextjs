@@ -585,427 +585,300 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     }
   };
 
-  // Render a list of links with collapsible items
-  const renderLinksList = (links: SerializedScanResult[], isProblematic = false) => {
-    if (links.length === 0) {
-      return <p className="text-muted-foreground text-center py-8">No links in this category.</p>;
-    }
+  const renderLinkItem = (link: SerializedScanResult, index: number, total: number) => {
+    // Get unique pages with counts
+    const pagesWithCounts = countUniquePages(link.foundOn);
+    const uniquePages = Array.from(pagesWithCounts.keys());
 
-    // For problematic links, use the enhanced card-style display
-    if (isProblematic) {
-      return renderProblematicLinksList(links);
-    }
+    // Extract domain for display
+    const urlDomain = (() => {
+      try {
+        return new URL(link.url).hostname;
+      } catch {
+        return link.url;
+      }
+    })();
 
-    // Group links by URL to avoid duplicates
-    const uniqueLinks = getGroupedLinks(links);
-    const paginatedItems = uniqueLinks.slice(startIndex, endIndex);
-
-    // Make sure to check each item's status code when filtering
-    const problematicItems = paginatedItems.filter(link =>
-      link.status === 'broken' ||
-      link.status === 'error' ||
-      (link.statusCode !== undefined && link.statusCode >= 400)
-    );
-
-    const nonProblematicItems = paginatedItems.filter(link =>
-      (link.status !== 'broken' && link.status !== 'error') &&
-      (link.statusCode === undefined || link.statusCode < 400)
-    );
-
-    // If we're in the "All" tab, we need to handle both types
-    const isAllTab = activeTab === 'all';
+    const isExpanded = expandedItems.has(link.url);
 
     return (
-      <div className="w-full">
-        {renderPagination()}
-        <div className="border rounded-md">
-          {/* Non-problematic links (always non-expandable) */}
-          {nonProblematicItems.map((link, index) => (
-            <div
-              key={link.url}
-              className={`p-3 text-sm ${(index !== paginatedItems.length - 1 && (!isAllTab || index !== nonProblematicItems.length - 1)) ? 'border-b' : ''}`}
-            >
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2 truncate max-w-[80%]">
-                  <StatusBadge status={link.status} code={link.statusCode} usedAuth={link.usedAuth} />
-                  <span className="truncate font-medium">{link.url.replace(/^https?:\/\//, '')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {link.status === 'ok' && 'Working link'}
-                    {link.status === 'external' && 'External link'}
-                    {link.status === 'skipped' && 'Skipped link'}
-                  </span>
-                  <div className="flex">
-                    {scanId && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
-                            ? 'bg-purple-100 text-purple-700'
-                            : ''
-                          }`}
-                        onClick={() => handleRecheck(link.url)}
-                        disabled={recheckingUrls.has(link.url)}
-                      >
-                        {recheckingUrls.has(link.url) ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Checking...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Re-check
-                          </>
-                        )}
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 shrink-0"
-                      onClick={() => handleCopyUrl(link.url)}
-                      title="Copy URL"
-                    >
-                      {copiedUrl === link.url ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <ClipboardCopy className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 shrink-0"
-                      asChild
-                    >
-                      <a
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open URL"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              {recheckErrors.has(link.url) && (
-                <div className="mt-2">
-                  <Alert variant="destructive" className="py-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Re-check failed</AlertTitle>
-                    <AlertDescription>{recheckErrors.get(link.url)}</AlertDescription>
-                  </Alert>
-                </div>
-              )}
-              {recheckSuccess.has(link.url) && (
-                <div className="mt-2">
-                  <Alert variant="default" className="py-2 bg-green-50 text-green-800 border-green-200">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertTitle>Re-check completed</AlertTitle>
-                    <AlertDescription>
-                      {/* Split the message into main message and auth info */}
-                      {(() => {
-                        const message = recheckSuccess.get(link.url) || '';
-                        // Check if there's an auth message in parentheses or after a dash
-                        const authStart = message.indexOf(' (HTTP Basic Auth') !== -1
-                          ? message.indexOf(' (HTTP Basic Auth')
-                          : message.indexOf(' - HTTP Basic Auth');
-
-                        if (authStart !== -1) {
-                          const mainMessage = message.substring(0, authStart);
-                          const authMessage = message.substring(authStart);
-
-                          return (
-                            <>
-                              {mainMessage}
-                              <span className="block mt-1 text-blue-700 text-xs">
-                                <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
-                                {authMessage.startsWith(' - ') ? authMessage.substring(3) :
-                                  authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) :
-                                    authMessage}
-                              </span>
-                            </>
-                          );
-                        }
-
-                        return message;
-                      })()}
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
+      <div
+        key={link.url}
+        className={`text-sm ${index !== total - 1 ? 'border-b' : ''}`}
+      >
+        <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex items-center gap-2 truncate max-w-[70%]">
+              <StatusBadge status={link.status} code={link.statusCode} usedAuth={link.usedAuth} />
+              <span className="truncate font-medium" title={link.url}>{link.url.replace(/^https?:\/\//, '')}</span>
             </div>
-          ))}
-
-          {/* Problematic links in the All tab (expandable) */}
-          {isAllTab && problematicItems.length > 0 && (
-            problematicItems.map((link, index) => {
-              // Get unique pages with counts
-              const pagesWithCounts = countUniquePages(link.foundOn);
-              const uniquePages = Array.from(pagesWithCounts.keys());
-
-              // Extract domain for display
-              const urlDomain = (() => {
-                try {
-                  return new URL(link.url).hostname;
-                } catch {
-                  return link.url;
-                }
-              })();
-
-              const isExpanded = expandedItems.has(link.url);
-
-              return (
-                <div
-                  key={link.url}
-                  className={`text-sm ${index !== problematicItems.length - 1 ? 'border-b' : ''}`}
+            <div className="flex gap-1 items-center shrink-0">
+              <span className="text-xs text-muted-foreground mr-2">
+                {uniquePages.length} page{uniquePages.length !== 1 ? 's' : ''}
+              </span>
+              {scanId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
+                    ? 'bg-purple-100 text-purple-700'
+                    : ''
+                    }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRecheck(link.url);
+                  }}
+                  disabled={recheckingUrls.has(link.url)}
                 >
-                  <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex items-start gap-1.5">
-                        {link.statusCode ? (
-                          <span className="bg-destructive text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5">
-                            {link.statusCode}
-                          </span>
-                        ) : (
-                          <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${link.errorMessage?.toLowerCase().includes('timeout') ?
-                              'bg-amber-500' :
-                              'bg-destructive'
-                            }`}>
-                            {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
-                          </span>
-                        )}
-                        <div className="flex flex-col">
-                          <code className="text-destructive font-medium break-all">
-                            {urlDomain}{link.url.replace(/^https?:\/\/[^\/]+/, '')}
-                          </code>
-                          {link.usedAuth && (
-                            <span className="flex items-center gap-0.5 text-xs text-blue-600 mt-0.5">
-                              <LockIcon className="h-3 w-3" />
-                              HTTP Basic Auth
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-1 items-center">
-                        <span className="text-xs text-muted-foreground mr-2">
-                          {uniquePages.length} page{uniquePages.length !== 1 ? 's' : ''}
-                        </span>
-                        {scanId && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
-                                ? 'bg-purple-100 text-purple-700'
-                                : ''
-                              }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRecheck(link.url);
-                            }}
-                            disabled={recheckingUrls.has(link.url)}
-                          >
-                            {recheckingUrls.has(link.url) ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                Checking...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="h-4 w-4 mr-1" />
-                                Re-check
-                              </>
-                            )}
-                          </Button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyUrl(link.url);
-                          }}
-                          className="text-muted-foreground hover:text-foreground shrink-0"
-                          title="Copy URL"
-                        >
-                          {copiedUrl === link.url ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <ClipboardCopy className="h-4 w-4" />
-                          )}
-                        </button>
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground shrink-0"
-                          title="Open URL"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                        <ChevronDown
-                          className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                        />
-                      </div>
-                    </div>
-
-                    {link.errorMessage && (
-                      <div className="text-muted-foreground mt-1.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${link.errorMessage.toLowerCase().includes('timeout') ?
-                            'bg-amber-500/10 text-amber-700' :
-                            'bg-destructive/10 text-destructive'
-                          }`}>
-                          {link.errorMessage.toLowerCase().includes('timeout') ? (
-                            <>
-                              <Clock className="h-3 w-3 mr-1" />
-                              {link.errorMessage}
-                              <span className="ml-1 text-xs opacity-75">(Try increasing timeout in advanced settings)</span>
-                            </>
-                          ) : (
-                            link.errorMessage
-                          )}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {isExpanded && uniquePages.length > 0 && (
-                    <div className="px-3 pb-3 pt-0 bg-muted/30">
-                      <div className="bg-muted/40 p-2 rounded-sm">
-                        <p className="text-xs text-muted-foreground mb-1.5 flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
-                          Found on: {uniquePages.length} page(s)
-                        </p>
-                        <ul className="space-y-1.5 pl-4 text-xs">
-                          {uniquePages.map((page, i) => {
-                            // Format found-on page display
-                            let displayText = page;
-                            const occurrences = pagesWithCounts.get(page) || 0;
-                            let isSelfReference = false;
-
-                            try {
-                              if (page !== 'initial') {
-                                const url = new URL(page);
-                                displayText = url.pathname || url.hostname;
-
-                                // Check if the page contains a broken link to itself
-                                if (page === link.url) {
-                                  isSelfReference = true;
-                                  displayText = 'Self reference: ' + displayText;
-                                }
-                              } else {
-                                displayText = 'Initial scan page';
-                              }
-                            } catch {
-                              // Keep original if parsing fails
-                            }
-
-                            return (
-                              <li key={i} className="list-disc flex items-center gap-1">
-                                {page === 'initial' || isSelfReference ? (
-                                  <span className={`${isSelfReference ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                                    {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                                  </span>
-                                ) : (
-                                  <>
-                                    <a
-                                      href={page}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:underline inline-flex items-center"
-                                      title={page}
-                                    >
-                                      {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
-                                    </a>
-
-                                    <TooltipProvider>
-                                      <Popover>
-                                        <PopoverTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground">
-                                            <Info className="h-3.5 w-3.5" />
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[500px] p-3" align="start" side="left">
-                                          <div className="space-y-2">
-                                            <h4 className="text-sm font-medium">Link HTML Context:</h4>
-                                            <div className="max-h-[300px] overflow-y-auto space-y-3">
-                                              {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
-                                                const html = generateHtmlContext(link.url, page, idx + 1);
-                                                return (
-                                                  <div key={idx} className="relative">
-                                                    <div className="absolute top-1 right-1 flex space-x-1">
-                                                      <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-6 w-6 p-0 text-muted-foreground"
-                                                        onClick={() => handleCopyUrl(html)}
-                                                        title="Copy HTML"
-                                                      >
-                                                        <ClipboardCopy className="h-3.5 w-3.5" />
-                                                      </Button>
-                                                    </div>
-                                                    <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
-                                                      style={{ maxHeight: "250px", fontSize: "12px" }}>
-                                                      <code dangerouslySetInnerHTML={{
-                                                        __html: html
-                                                          // Use syntax highlighting for HTML
-                                                          .replace(/&/g, '&amp;')
-                                                          .replace(/</g, '&lt;')
-                                                          .replace(/>/g, '&gt;')
-                                                          .replace(/"/g, '&quot;')
-                                                          // Highlight comments
-                                                          .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6A9955;">$1</span>')
-                                                          // Highlight the attribute containing the broken link
-                                                          .replace(
-                                                            new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
-                                                            '<span style="background-color: rgba(255,0,0,0.2); color: #d20000; font-weight: bold; padding: 0 3px; border-radius: 2px;">$1' + link.url + '$2</span>'
-                                                          )
-                                                          // Highlight tags
-                                                          .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span style="color: #569cd6;">$1</span>$2')
-                                                          // Highlight attributes
-                                                          .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span style="color: #9cdcfe;">$2</span>$3')
-                                                          // Highlight quotes and their content
-                                                          .replace(/(&quot;)(.*?)(&quot;)/g, '<span style="color: #ce9178;">$1$2$3</span>')
-                                                      }} />
-                                                    </pre>
-                                                  </div>
-                                                );
-                                              })}
-                                              {occurrences > 3 && (
-                                                <p className="text-xs text-muted-foreground">
-                                                  {occurrences - 3} more occurrence(s) on this page...
-                                                </p>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </PopoverContent>
-                                      </Popover>
-                                    </TooltipProvider>
-                                  </>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    </div>
+                  {recheckingUrls.has(link.url) ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Re-check
+                    </>
                   )}
-                </div>
-              );
-            })
+                </Button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyUrl(link.url);
+                }}
+                className="text-muted-foreground hover:text-foreground shrink-0 p-2"
+                title="Copy URL"
+              >
+                {copiedUrl === link.url ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : (
+                  <ClipboardCopy className="h-4 w-4" />
+                )}
+              </button>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground shrink-0 p-2"
+                title="Open URL"
+                onClick={e => e.stopPropagation()}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              />
+            </div>
+          </div>
+
+          {link.errorMessage && (
+            <div className="text-muted-foreground mt-1.5 ml-1">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${link.errorMessage.toLowerCase().includes('timeout') ?
+                'bg-amber-500/10 text-amber-700' :
+                'bg-destructive/10 text-destructive'
+                }`}>
+                {link.errorMessage.toLowerCase().includes('timeout') ? (
+                  <>
+                    <Clock className="h-3 w-3 mr-1" />
+                    {link.errorMessage}
+                    <span className="ml-1 text-xs opacity-75">(Try increasing timeout in advanced settings)</span>
+                  </>
+                ) : (
+                  link.errorMessage
+                )}
+              </span>
+            </div>
+          )}
+          {recheckErrors.has(link.url) && (
+            <div className="mt-2">
+              <Alert variant="destructive" className="py-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Re-check failed</AlertTitle>
+                <AlertDescription>{recheckErrors.get(link.url)}</AlertDescription>
+              </Alert>
+            </div>
+          )}
+          {recheckSuccess.has(link.url) && (
+            <div className="mt-2">
+              <Alert variant="default" className="py-2 bg-green-50 text-green-800 border-green-200">
+                <CheckCircle className="h-4 w-4" />
+                <AlertTitle>Re-check completed</AlertTitle>
+                <AlertDescription>
+                  {/* Split the message into main message and auth info */}
+                  {(() => {
+                    const message = recheckSuccess.get(link.url) || '';
+                    // Check if there's an auth message in parentheses or after a dash
+                    const authStart = message.indexOf(' (HTTP Basic Auth') !== -1
+                      ? message.indexOf(' (HTTP Basic Auth')
+                      : message.indexOf(' - HTTP Basic Auth');
+
+                    if (authStart !== -1) {
+                      const mainMessage = message.substring(0, authStart);
+                      const authMessage = message.substring(authStart);
+
+                      return (
+                        <>
+                          {mainMessage}
+                          <span className="block mt-1 text-blue-700 text-xs">
+                            <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
+                            {authMessage.startsWith(' - ') ? authMessage.substring(3) :
+                              authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) :
+                                authMessage}
+                          </span>
+                        </>
+                      );
+                    }
+
+                    return message;
+                  })()}
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
         </div>
-        {renderPagination()}
+
+        {isExpanded && (
+          <div className="px-3 pb-3 pt-0 bg-muted/30">
+            <div className="bg-muted/40 p-2 rounded-sm">
+              {uniquePages.length > 0 ? (
+                <>
+                  <p className="text-xs text-muted-foreground mb-1.5 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
+                    Found on: {uniquePages.length} page(s)
+                  </p>
+                  <ul className="space-y-1.5 pl-4 text-xs">
+                    {uniquePages.map((page, i) => {
+                      // Format found-on page display
+                      let displayText = page;
+                      const occurrences = pagesWithCounts.get(page) || 0;
+                      let isSelfReference = false;
+
+                      try {
+                        if (page !== 'initial') {
+                          const url = new URL(page);
+                          displayText = url.pathname || url.hostname;
+
+                          // Check if the page contains a broken link to itself
+                          if (page === link.url) {
+                            isSelfReference = true;
+                            displayText = 'Self reference: ' + displayText;
+                          }
+                        } else {
+                          displayText = 'Initial scan page';
+                        }
+                      } catch {
+                        // Keep original if parsing fails
+                      }
+
+                      return (
+                        <li key={i} className="list-disc flex items-center gap-1">
+                          {page === 'initial' || isSelfReference ? (
+                            <span className={`${isSelfReference ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                              {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
+                            </span>
+                          ) : (
+                            <>
+                              <a
+                                href={page}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline inline-flex items-center"
+                                title={page}
+                              >
+                                {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
+                              </a>
+
+                              <TooltipProvider>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground">
+                                      <Info className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[500px] p-3" align="start" side="left">
+                                    <div className="space-y-2">
+                                      <h4 className="text-sm font-medium">Link HTML Context:</h4>
+                                      <div className="max-h-[300px] overflow-y-auto space-y-3">
+                                        {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
+                                          const html = generateHtmlContext(link.url, page, idx + 1);
+                                          return (
+                                            <div key={idx} className="relative">
+                                              <div className="absolute top-1 right-1 flex space-x-1">
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="h-6 w-6 p-0 text-muted-foreground"
+                                                  onClick={() => handleCopyUrl(html)}
+                                                  title="Copy HTML"
+                                                >
+                                                  <ClipboardCopy className="h-3.5 w-3.5" />
+                                                </Button>
+                                              </div>
+                                              <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
+                                                style={{ maxHeight: "250px", fontSize: "12px" }}>
+                                                <code dangerouslySetInnerHTML={{
+                                                  __html: html
+                                                    // Use syntax highlighting for HTML
+                                                    .replace(/&/g, '&amp;')
+                                                    .replace(/</g, '&lt;')
+                                                    .replace(/>/g, '&gt;')
+                                                    .replace(/"/g, '&quot;')
+                                                    // Highlight comments
+                                                    .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6A9955;">$1</span>')
+                                                    // Highlight the attribute containing the broken link
+                                                    .replace(
+                                                      new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
+                                                      '<span style="background-color: rgba(255,0,0,0.2); color: #d20000; font-weight: bold; padding: 0 3px; border-radius: 2px;">$1' + link.url + '$2</span>'
+                                                    )
+                                                    // Highlight tags
+                                                    .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span style="color: #569cd6;">$1</span>$2')
+                                                    // Highlight attributes
+                                                    .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span style="color: #9cdcfe;">$2</span>$3')
+                                                    // Highlight quotes and their content
+                                                    .replace(/(&quot;)(.*?)(&quot;)/g, '<span style="color: #ce9178;">$1$2$3</span>')
+                                                }} />
+                                              </pre>
+                                            </div>
+                                          );
+                                        })}
+                                        {occurrences > 3 && (
+                                          <p className="text-xs text-muted-foreground">
+                                            {occurrences - 3} more occurrence(s) on this page...
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </TooltipProvider>
+                            </>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground italic p-1">
+                  No source pages found. This is likely the starting URL of the scan.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
 
-  // Enhanced display for problematic links (broken and errors)
-  const renderProblematicLinksList = (links: SerializedScanResult[]) => {
+  // Render a list of links with collapsible items
+  const renderLinksList = (links: SerializedScanResult[]) => {
+    if (links.length === 0) {
+      return <p className="text-muted-foreground text-center py-8">No links in this category.</p>;
+    }
+
     // Group links by URL to avoid duplicates
     const uniqueLinks = getGroupedLinks(links);
     const paginatedItems = uniqueLinks.slice(startIndex, endIndex);
@@ -1014,306 +887,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       <div className="w-full">
         {renderPagination()}
         <div className="border rounded-md">
-          {paginatedItems.map((link, index) => {
-            // Get unique pages with counts
-            const pagesWithCounts = countUniquePages(link.foundOn);
-            const uniquePages = Array.from(pagesWithCounts.keys());
-
-            // Extract domain for display
-            const urlDomain = (() => {
-              try {
-                return new URL(link.url).hostname;
-              } catch {
-                return link.url;
-              }
-            })();
-
-            const isExpanded = expandedItems.has(link.url);
-
-            return (
-              <div
-                key={link.url}
-                className={`text-sm ${index !== paginatedItems.length - 1 ? 'border-b' : ''}`}
-              >
-                <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-start gap-1.5">
-                      {link.statusCode ? (
-                        <span className="bg-destructive text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5">
-                          {link.statusCode}
-                        </span>
-                      ) : (
-                        <span className={`text-white text-xs px-1.5 py-0.5 rounded font-mono mt-0.5 ${link.errorMessage?.toLowerCase().includes('timeout') ?
-                            'bg-amber-500' :
-                            'bg-destructive'
-                          }`}>
-                          {link.errorMessage?.toLowerCase().includes('timeout') ? 'TIMEOUT' : 'ERR'}
-                        </span>
-                      )}
-                      <div className="flex flex-col">
-                        <code className="text-destructive font-medium break-all">
-                          {urlDomain}{link.url.replace(/^https?:\/\/[^\/]+/, '')}
-                        </code>
-                        {link.usedAuth && (
-                          <span className="flex items-center gap-0.5 text-xs text-blue-600 mt-0.5">
-                            <LockIcon className="h-3 w-3" />
-                            HTTP Basic Auth
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-1 items-center">
-                      <span className="text-xs text-muted-foreground mr-2">
-                        {uniquePages.length} page{uniquePages.length !== 1 ? 's' : ''}
-                      </span>
-                      {scanId && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
-                              ? 'bg-purple-100 text-purple-700'
-                              : ''
-                            }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRecheck(link.url);
-                          }}
-                          disabled={recheckingUrls.has(link.url)}
-                        >
-                          {recheckingUrls.has(link.url) ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              Checking...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-1" />
-                              Re-check
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyUrl(link.url);
-                        }}
-                        className="text-muted-foreground hover:text-foreground shrink-0"
-                        title="Copy URL"
-                      >
-                        {copiedUrl === link.url ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <ClipboardCopy className="h-4 w-4" />
-                        )}
-                      </button>
-                      <a
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground shrink-0"
-                        title="Open URL"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      />
-                    </div>
-                  </div>
-
-                  {link.errorMessage && (
-                    <div className="text-muted-foreground mt-1.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${link.errorMessage.toLowerCase().includes('timeout') ?
-                          'bg-amber-500/10 text-amber-700' :
-                          'bg-destructive/10 text-destructive'
-                        }`}>
-                        {link.errorMessage.toLowerCase().includes('timeout') ? (
-                          <>
-                            <Clock className="h-3 w-3 mr-1" />
-                            {link.errorMessage}
-                            <span className="ml-1 text-xs opacity-75">(Try increasing timeout in advanced settings)</span>
-                          </>
-                        ) : (
-                          link.errorMessage
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  {recheckErrors.has(link.url) && (
-                    <div className="mt-2">
-                      <Alert variant="destructive" className="py-2">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Re-check failed</AlertTitle>
-                        <AlertDescription>{recheckErrors.get(link.url)}</AlertDescription>
-                      </Alert>
-                    </div>
-                  )}
-                  {recheckSuccess.has(link.url) && (
-                    <div className="mt-2">
-                      <Alert variant="default" className="py-2 bg-green-50 text-green-800 border-green-200">
-                        <CheckCircle className="h-4 w-4" />
-                        <AlertTitle>Re-check completed</AlertTitle>
-                        <AlertDescription>
-                          {/* Split the message into main message and auth info */}
-                          {(() => {
-                            const message = recheckSuccess.get(link.url) || '';
-                            // Check if there's an auth message in parentheses or after a dash
-                            const authStart = message.indexOf(' (HTTP Basic Auth') !== -1
-                              ? message.indexOf(' (HTTP Basic Auth')
-                              : message.indexOf(' - HTTP Basic Auth');
-
-                            if (authStart !== -1) {
-                              const mainMessage = message.substring(0, authStart);
-                              const authMessage = message.substring(authStart);
-
-                              return (
-                                <>
-                                  {mainMessage}
-                                  <span className="block mt-1 text-blue-700 text-xs">
-                                    <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
-                                    {authMessage.startsWith(' - ') ? authMessage.substring(3) :
-                                      authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) :
-                                        authMessage}
-                                  </span>
-                                </>
-                              );
-                            }
-
-                            return message;
-                          })()}
-                        </AlertDescription>
-                      </Alert>
-                    </div>
-                  )}
-                </div>
-
-                {isExpanded && uniquePages.length > 0 && (
-                  <div className="px-3 pb-3 pt-0 bg-muted/30">
-                    <div className="bg-muted/40 p-2 rounded-sm">
-                      <p className="text-xs text-muted-foreground mb-1.5 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
-                        Found on: {uniquePages.length} page(s)
-                      </p>
-                      <ul className="space-y-1.5 pl-4 text-xs">
-                        {uniquePages.map((page, i) => {
-                          // Format found-on page display
-                          let displayText = page;
-                          const occurrences = pagesWithCounts.get(page) || 0;
-                          let isSelfReference = false;
-
-                          try {
-                            if (page !== 'initial') {
-                              const url = new URL(page);
-                              displayText = url.pathname || url.hostname;
-
-                              // Check if the page contains a broken link to itself
-                              if (page === link.url) {
-                                isSelfReference = true;
-                                displayText = 'Self reference: ' + displayText;
-                              }
-                            } else {
-                              displayText = 'Initial scan page';
-                            }
-                          } catch {
-                            // Keep original if parsing fails
-                          }
-
-                          return (
-                            <li key={i} className="list-disc flex items-center gap-1">
-                              {page === 'initial' || isSelfReference ? (
-                                <span className={`${isSelfReference ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                                  {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                                </span>
-                              ) : (
-                                <>
-                                  <a
-                                    href={page}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline inline-flex items-center"
-                                    title={page}
-                                  >
-                                    {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
-                                  </a>
-
-                                  <TooltipProvider>
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground">
-                                          <Info className="h-3.5 w-3.5" />
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-[500px] p-3" align="start" side="left">
-                                        <div className="space-y-2">
-                                          <h4 className="text-sm font-medium">Link HTML Context:</h4>
-                                          <div className="max-h-[300px] overflow-y-auto space-y-3">
-                                            {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
-                                              const html = generateHtmlContext(link.url, page, idx + 1);
-                                              return (
-                                                <div key={idx} className="relative">
-                                                  <div className="absolute top-1 right-1 flex space-x-1">
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      className="h-6 w-6 p-0 text-muted-foreground"
-                                                      onClick={() => handleCopyUrl(html)}
-                                                      title="Copy HTML"
-                                                    >
-                                                      <ClipboardCopy className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                  </div>
-                                                  <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
-                                                    style={{ maxHeight: "250px", fontSize: "12px" }}>
-                                                    <code dangerouslySetInnerHTML={{
-                                                      __html: html
-                                                        // Use syntax highlighting for HTML
-                                                        .replace(/&/g, '&amp;')
-                                                        .replace(/</g, '&lt;')
-                                                        .replace(/>/g, '&gt;')
-                                                        .replace(/"/g, '&quot;')
-                                                        // Highlight comments
-                                                        .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6A9955;">$1</span>')
-                                                        // Highlight the attribute containing the broken link
-                                                        .replace(
-                                                          new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
-                                                          '<span style="background-color: rgba(255,0,0,0.2); color: #d20000; font-weight: bold; padding: 0 3px; border-radius: 2px;">$1' + link.url + '$2</span>'
-                                                        )
-                                                        // Highlight tags
-                                                        .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span style="color: #569cd6;">$1</span>$2')
-                                                        // Highlight attributes
-                                                        .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span style="color: #9cdcfe;">$2</span>$3')
-                                                        // Highlight quotes and their content
-                                                        .replace(/(&quot;)(.*?)(&quot;)/g, '<span style="color: #ce9178;">$1$2$3</span>')
-                                                    }} />
-                                                  </pre>
-                                                </div>
-                                              );
-                                            })}
-                                            {occurrences > 3 && (
-                                              <p className="text-xs text-muted-foreground">
-                                                {occurrences - 3} more occurrence(s) on this page...
-                                              </p>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
-                                  </TooltipProvider>
-                                </>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {paginatedItems.map((link, index) => renderLinkItem(link, index, paginatedItems.length))}
         </div>
         {renderPagination()}
       </div>
@@ -1422,7 +996,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
         </div>
 
         {/* Render the appropriate list based on activeTab */}
-        {activeTab === 'problematic' && renderLinksList(problematicLinks, true)}
+        {activeTab === 'problematic' && renderLinksList(problematicLinks)}
         {activeTab === 'ok' && renderLinksList(okLinks)}
         {activeTab === 'external' && renderLinksList(externalLinks)}
         {activeTab === 'skipped' && renderLinksList(skippedLinks)}
@@ -1430,4 +1004,4 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       </div>
     </div>
   );
-} 
+}

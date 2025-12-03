@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jobService } from '@/lib/jobs';
 
+// Helper function to serialize results for JSON (same as in scan/route.ts)
+function serializeResults(results: any[]): any[] {
+    if (!results) return [];
+    return results.map(r => ({
+        ...r,
+        foundOn: r.foundOn instanceof Set ? Array.from(r.foundOn) : r.foundOn,
+        htmlContexts: r.htmlContexts instanceof Map ? Object.fromEntries(r.htmlContexts) : r.htmlContexts
+    }));
+}
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -11,6 +21,11 @@ export async function GET(
 
         if (!job) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+        }
+
+        // Serialize results if present to ensure Sets/Maps are converted for JSON
+        if (job.results) {
+            job.results = serializeResults(job.results);
         }
 
         return NextResponse.json(job);

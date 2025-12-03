@@ -308,7 +308,8 @@ export async function POST(request: NextRequest) {
       if (urlIndex !== -1) {
         // Preserve the foundOn and htmlContexts from the original scan
         const originalResult = scanData.results[urlIndex];
-        result.foundOn = new Set(originalResult.foundOn);
+        // Ensure foundOn is iterable before creating a Set
+        result.foundOn = new Set(Array.isArray(originalResult.foundOn) ? originalResult.foundOn : []);
         result.htmlContexts = new Map(Object.entries(originalResult.htmlContexts || {}));
 
         // Update the result in the scan data
