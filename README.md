@@ -27,7 +27,7 @@ A web application for scanning websites and identifying broken links. This tool 
 
 1. Clone the repository
 ```bash
-git clone [https://github.com/your-username/link-check.git](https://github.com/condor616/link-check-nextjs.git)
+git clone https://github.com/condor616/link-check-nextjs.git
 cd link-check
 ```
 
@@ -43,7 +43,7 @@ yarn install
    ```bash
    cp .app_settings.template.json .app_settings.json
    ```
-   - Create a `.env` file (optional, but recommended for Supabase):
+   - Create a `.env` file (required for database connection):
    ```bash
    cp .env.example .env
    ```
