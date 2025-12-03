@@ -50,4 +50,10 @@ Add a bit more color (keep it dark, but at the moment it’s boring to have only
 Add smooth and particular effects to various aspect of the apps. For example, when i start a scan, i have to scroll down to check the results. Maybe you can make the scan form disappear, when user starts the scan, and replace it with the actual scan progress amd results. 
 Add navigation buttons with cool hover effects, which make the app easy and smooth to navigate. 
 
-Add possibility to stop a running scan. Some times i forget to specify an option and want to stop the scan and start it again. 
+
+---------
+
+- Cache bypass - Append a timestamp to the URL to bypass the cache (i.e. ?t=1234567890)
+- Add live log in the scan details page, so user knows what's happening
+- fix progress bar (currently says 0%)
+- in scan result page (the one with all filters) add a text based filter, so I can check for a specific URL/Link

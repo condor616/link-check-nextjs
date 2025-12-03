@@ -33,7 +33,7 @@ RUN npm run build
 # Bundle worker script
 # We use esbuild to bundle the worker and its local dependencies (like src/lib) into a single file
 # while keeping node_modules external.
-RUN npm install -g esbuild && esbuild scripts/worker.ts --bundle --platform=node --packages=external --outfile=.next/standalone/worker.js
+RUN npm install -g esbuild && esbuild scripts/worker.ts --bundle --platform=node --external:@prisma/client --outfile=.next/standalone/worker.js
 
 # Production image, copy all the files and run next
 FROM base AS runner
