@@ -86,7 +86,7 @@ function ScannerLoading() {
         transition={{ duration: 0.3, ease: "easeOut" }}
         className="w-full"
       >
-        <Card className="bg-white shadow">
+        <Card className="border-border bg-card">
           <CardHeader>
             <CardTitle className="text-2xl">Loading Scan...</CardTitle>
           </CardHeader>
@@ -652,7 +652,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="w-full"
         >
-          <Card className="bg-white shadow">
+          <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-2xl">Loading Scan Parameters...</CardTitle>
             </CardHeader>
@@ -677,7 +677,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="w-full"
         >
-          <Card className="bg-white shadow">
+          <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-2xl">Error Loading Scan</CardTitle>
             </CardHeader>
@@ -708,7 +708,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="w-full"
         >
-          <Card className="bg-white shadow">
+          <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-2xl">Confirm Scan</CardTitle>
               <CardDescription>You're about to scan the following URL. You can modify scan parameters below.</CardDescription>
@@ -833,7 +833,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                                   {showUrlExclusionHelp && (
                                     <div
                                       ref={urlExclusionHelpRef}
-                                      className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                                      className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
                                     >
                                       <div className="flex justify-between items-center mb-2">
                                         <h3 className="font-medium">URL Exclusion Patterns Help</h3>
@@ -935,7 +935,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                                   {showRegexExclusionHelp && (
                                     <div
                                       ref={regexExclusionHelpRef}
-                                      className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                                      className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
                                     >
                                       <div className="flex justify-between items-center mb-2">
                                         <h3 className="font-medium">Regex Exclusion Patterns Help</h3>
@@ -1035,7 +1035,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                                   {showCssSelectorsHelp && (
                                     <div
                                       ref={cssSelectorsHelpRef}
-                                      className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
+                                      className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
                                     >
                                       <div className="flex justify-between items-center mb-2">
                                         <h3 className="font-medium">CSS Selector Exclusions Help</h3>
@@ -1181,7 +1181,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
 
   return (
     <main className="container mx-auto p-4 max-w-none">
-      <Card className="w-full bg-white shadow">
+      <Card className="w-full border-border bg-card">
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <Button variant="ghost" className="p-0" asChild>
@@ -2088,7 +2088,7 @@ function ScanForm() {
       <h1 className="text-2xl font-bold">New Scan</h1>
 
       {/* Main scan card */}
-      <Card className="bg-white shadow">
+      <Card className="border-border bg-card">
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -2346,7 +2346,7 @@ function ScanForm() {
                           {showUrlExclusionHelp && (
                             <div
                               ref={urlExclusionHelpRef}
-                              className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                              className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
                             >
                               <div className="flex justify-between items-center mb-2">
                                 <h3 className="font-medium">URL Exclusion Patterns Help</h3>
@@ -2448,7 +2448,7 @@ function ScanForm() {
                           {showRegexExclusionHelp && (
                             <div
                               ref={regexExclusionHelpRef}
-                              className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
+                              className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
                             >
                               <div className="flex justify-between items-center mb-2">
                                 <h3 className="font-medium">Regex Exclusion Patterns Help</h3>
@@ -2548,7 +2548,7 @@ function ScanForm() {
                           {showCssSelectorsHelp && (
                             <div
                               ref={cssSelectorsHelpRef}
-                              className="absolute z-50 w-[550px] p-4 bg-white rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
+                              className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
                             >
                               <div className="flex justify-between items-center mb-2">
                                 <h3 className="font-medium">CSS Selector Exclusions Help</h3>

@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Check, Database, FileJson, HelpCircle, Trash, X, RefreshCw, Eraser } from "lucide-react";
+import { AlertCircle, Check, Database, FileJson, HelpCircle, Trash, X, RefreshCw, Eraser, Palette } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNotification } from "@/components/NotificationContext";
+import { useTheme } from "next-themes";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ export default function SettingsPage() {
 
   // Get notification context to show global notifications
   const { addNotification } = useNotification();
+  const { theme, setTheme } = useTheme();
 
   // Load settings on page load
   useEffect(() => {
@@ -521,6 +523,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="data-storage" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="data-storage">Data Storage</TabsTrigger>
+          <TabsTrigger value="themes">Themes</TabsTrigger>
           {/* Add other settings tabs here in the future */}
         </TabsList>
 
@@ -689,6 +692,52 @@ export default function SettingsPage() {
                   >
                     {isSaving ? "Saving..." : "Save Settings"}
                   </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="themes">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Theme Settings
+              </CardTitle>
+              <CardDescription>
+                Customize the look and feel of the application
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="theme-select">Color Theme</Label>
+                  <Select
+                    value={theme}
+                    onValueChange={setTheme}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dark" className="flex items-center gap-2">
+                        <span className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full bg-slate-900 border border-slate-700"></div>
+                          Dark Blue (Default)
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="matrix" className="flex items-center gap-2">
+                        <span className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full bg-black border border-green-500"></div>
+                          Matrix
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Choose a color theme for the application interface.
+                  </p>
                 </div>
               </div>
             </CardContent>

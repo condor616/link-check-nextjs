@@ -178,6 +178,37 @@ You can switch between storage methods at any time in the Settings page.
 - Radix UI (for accessible components)
 - Supabase (optional, for database storage)
 
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Missing `DATABASE_URL` Environment Variable
+
+**Error:** `PrismaConfigEnvError: Missing required environment variable: DATABASE_URL`
+
+**Solution:**
+Ensure you have a `.env` file in the root directory. You can create one from the example:
+
+```bash
+cp .env.example .env
+```
+
+For local development with SQLite, the file should contain:
+```
+DATABASE_URL="file:./dev.db"
+```
+
+#### 2. Database Tables Missing
+
+**Error:** `PrismaClientKnownRequestError: The table main.Job does not exist in the current database.`
+
+**Solution:**
+The database schema hasn't been pushed to your local database. Run the following command to create the tables:
+
+```bash
+npx prisma db push
+```
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

@@ -8,16 +8,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScanConfig, ScanResult } from '@/lib/scanner';
-import { 
-  AlertCircle, 
-  CheckCircle2, 
-  Loader2, 
-  Save, 
-  Check, 
-  Plus, 
-  X, 
-  Clock, 
-  Key, 
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Save,
+  Check,
+  Plus,
+  X,
+  Clock,
+  Key,
   Link as LinkIcon,
   History,
   Settings,
@@ -30,10 +30,10 @@ import { TransitionLink } from '@/components/TransitionLink';
 
 // Define the structure for results returned by the API (matching API response)
 interface ApiScanResponse {
-    message: string;
-    durationSeconds: number;
-    resultsCount: number;
-    results: ScanResult[]; // Assuming results are serialized as array
+  message: string;
+  durationSeconds: number;
+  resultsCount: number;
+  results: ScanResult[]; // Assuming results are serialized as array
 }
 
 export default function HomePage() {
@@ -42,14 +42,14 @@ export default function HomePage() {
   const [concurrency, setConcurrency] = useState<number>(10);
   const [requestTimeout, setRequestTimeout] = useState<number>(30);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
-  
+
   // Auth states
   const [showAuthDialog, setShowAuthDialog] = useState<boolean>(false);
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [authEnabled, setAuthEnabled] = useState<boolean>(false);
   const [useAuthForAllDomains, setUseAuthForAllDomains] = useState<boolean>(true);
-  
+
   // Exclusion states
   const [regexExclusions, setRegexExclusions] = useState<string[]>([""]);
   const [cssSelectors, setCssSelectors] = useState<string[]>([""]);
@@ -57,7 +57,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [scanResponse, setScanResponse] = useState<ApiScanResponse | null>(null);
-  
+
   // Save states
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
@@ -115,7 +115,7 @@ export default function HomePage() {
       // Add timeout to the main API fetch request as well
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minute timeout for the API call itself
-      
+
       const response = await fetch('/api/scan', {
         method: 'POST',
         headers: {
@@ -124,7 +124,7 @@ export default function HomePage() {
         body: JSON.stringify(requestBody),
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
 
       // Check for response status first
@@ -147,7 +147,7 @@ export default function HomePage() {
 
     } catch (err: unknown) {
       console.error("Scan API call failed:", err);
-      
+
       // Handle different types of errors
       if (err instanceof TypeError && err.message === 'Failed to fetch') {
         setError(
@@ -159,8 +159,8 @@ export default function HomePage() {
         );
       } else {
         setError(
-          err instanceof Error 
-            ? err.message 
+          err instanceof Error
+            ? err.message
             : "An unexpected error occurred."
         );
       }
@@ -168,20 +168,20 @@ export default function HomePage() {
       setIsLoading(false);
     }
   };
-  
+
   // Handler to save scan to history
   const handleSaveScan = async () => {
     if (!scanResponse) return;
-    
+
     setIsSaving(true);
     setSaveSuccess(false);
     setSaveError(null);
-    
+
     try {
       // Filter out empty entries
       const filteredRegexExclusions = regexExclusions.filter(regex => regex.trim() !== "");
       const filteredCssSelectors = cssSelectors.filter(selector => selector.trim() !== "");
-      
+
       // Prepare the payload for saving
       const savePayload = {
         scanUrl: url,
@@ -198,11 +198,11 @@ export default function HomePage() {
         },
         results: scanResponse.results,
       };
-      
+
       // Add timeout to the save fetch request
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
+
       const response = await fetch('/api/save-scan', {
         method: 'POST',
         headers: {
@@ -211,9 +211,9 @@ export default function HomePage() {
         body: JSON.stringify(savePayload),
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       // Check for response status first
       if (!response.ok) {
         const errorText = await response.text();
@@ -228,15 +228,15 @@ export default function HomePage() {
         }
         throw new Error(errorMessage);
       }
-      
+
       const data = await response.json();
-      
+
       setSaveSuccess(true);
       console.log('Scan saved successfully:', data.scanId);
-      
+
     } catch (err: unknown) {
       console.error('Failed to save scan:', err);
-      
+
       // Handle different types of errors
       if (err instanceof TypeError && err.message === 'Failed to fetch') {
         setSaveError(
@@ -248,8 +248,8 @@ export default function HomePage() {
         );
       } else {
         setSaveError(
-          err instanceof Error 
-            ? err.message 
+          err instanceof Error
+            ? err.message
             : 'Failed to save scan to history'
         );
       }
@@ -267,19 +267,19 @@ export default function HomePage() {
     if (regexExclusions.length <= 1) return; // Always keep at least one input
     setRegexExclusions(regexExclusions.filter((_, i) => i !== index));
   };
-  
+
   const updateRegexExclusion = (index: number, value: string) => {
     const updated = [...regexExclusions];
     updated[index] = value;
     setRegexExclusions(updated);
   };
-  
+
   const addCssSelector = () => setCssSelectors([...cssSelectors, ""]);
   const removeCssSelector = (index: number) => {
     if (cssSelectors.length <= 1) return; // Always keep at least one input
     setCssSelectors(cssSelectors.filter((_, i) => i !== index));
   };
-  
+
   const updateCssSelector = (index: number, value: string) => {
     const updated = [...cssSelectors];
     updated[index] = value;
@@ -290,7 +290,7 @@ export default function HomePage() {
   const toggleAuthDialog = () => {
     setShowAuthDialog(!showAuthDialog);
   };
-  
+
   const saveAuthCredentials = () => {
     if (username.trim() || password.trim()) {
       setAuthEnabled(true);
@@ -299,7 +299,7 @@ export default function HomePage() {
     }
     setShowAuthDialog(false);
   };
-  
+
   const clearAuthCredentials = () => {
     setUsername("");
     setPassword("");
@@ -334,12 +334,12 @@ export default function HomePage() {
   return (
     <main className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-8 text-center">Link Checker Pro</h1>
-      
+
       <div className="grid md:grid-cols-2 gap-6 mb-8">
-        <Card className="hover:shadow-lg transition-shadow">
+        <AnimatedCard delay={0.1}>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <AlertCircle className="mr-2 h-6 w-6 text-purple-600" />
+            <CardTitle className="flex items-center text-primary">
+              <AlertCircle className="mr-2 h-6 w-6" />
               New Scan
             </CardTitle>
             <CardDescription>
@@ -347,24 +347,24 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="mb-6">
+            <p className="mb-6 text-muted-foreground">
               Start a new scan to identify broken links, analyze performance, and get detailed insights.
             </p>
           </CardContent>
           <CardFooter>
             <TransitionLink href="/scan" className="w-full">
-              <Button className="w-full">
+              <AnimatedButton className="w-full" variant="primary">
                 Start New Scan
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              </AnimatedButton>
             </TransitionLink>
           </CardFooter>
-        </Card>
+        </AnimatedCard>
 
-        <Card className="hover:shadow-lg transition-shadow">
+        <AnimatedCard delay={0.2}>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <History className="mr-2 h-6 w-6 text-purple-600" />
+            <CardTitle className="flex items-center text-primary">
+              <History className="mr-2 h-6 w-6" />
               View History
             </CardTitle>
             <CardDescription>
@@ -372,32 +372,35 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="mb-6">
+            <p className="mb-6 text-muted-foreground">
               View all your previous scans, review results, compare scans, and export reports.
             </p>
           </CardContent>
           <CardFooter>
             <TransitionLink href="/history" className="w-full">
-              <Button className="w-full">
+              <AnimatedButton className="w-full" variant="secondary">
                 View History
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              </AnimatedButton>
             </TransitionLink>
           </CardFooter>
-        </Card>
+        </AnimatedCard>
       </div>
 
       <section className="mb-6">
         <h2 className="text-2xl font-bold mb-4">Last Scan</h2>
         {isLoading ? (
-          <Card className="p-6 text-center">
-            <p>Loading last scan data...</p>
-          </Card>
+          <AnimatedCard delay={0.3} className="p-6 text-center border-dashed border-muted">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Loading last scan data...</p>
+            </div>
+          </AnimatedCard>
         ) : lastScan ? (
-          <Card className="hover:shadow-lg transition-shadow">
+          <AnimatedCard delay={0.3}>
             <CardHeader>
-              <CardTitle className="text-xl">
-                <LinkIcon className="inline-block mr-2 h-5 w-5 text-purple-600" />
+              <CardTitle className="text-xl flex items-center gap-2 text-primary">
+                <LinkIcon className="h-5 w-5" />
                 {lastScan.url}
               </CardTitle>
               <CardDescription className="flex items-center">
@@ -407,23 +410,23 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-lg font-semibold text-red-500">{lastScan.brokenLinks}</p>
-                  <p className="text-sm text-gray-500">Broken Links</p>
+                <div className="p-4 bg-background/50 rounded-lg border border-border">
+                  <p className="text-lg font-semibold text-destructive">{lastScan.brokenLinks}</p>
+                  <p className="text-sm text-muted-foreground">Broken Links</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-lg font-semibold">{lastScan.totalLinks}</p>
-                  <p className="text-sm text-gray-500">Total Links</p>
+                <div className="p-4 bg-background/50 rounded-lg border border-border">
+                  <p className="text-lg font-semibold text-foreground">{lastScan.totalLinks}</p>
+                  <p className="text-sm text-muted-foreground">Total Links</p>
                 </div>
               </div>
             </CardContent>
             <CardFooter>
               {lastScan.id ? (
                 <TransitionLink href={`/history/${lastScan.id}`} className="w-full">
-                  <Button variant="outline" className="w-full">
+                  <AnimatedButton variant="outline" className="w-full">
                     View Details
                     <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  </AnimatedButton>
                 </TransitionLink>
               ) : (
                 <Button variant="outline" className="w-full" disabled>
@@ -431,19 +434,19 @@ export default function HomePage() {
                 </Button>
               )}
             </CardFooter>
-          </Card>
+          </AnimatedCard>
         ) : (
-          <Card className="p-6 text-center">
-            <p>No previous scans found. Start your first scan now!</p>
+          <AnimatedCard delay={0.3} className="p-6 text-center border-dashed border-muted">
+            <p className="text-muted-foreground mb-4">No previous scans found. Start your first scan now!</p>
             <div className="mt-4">
               <TransitionLink href="/scan">
-                <Button>
+                <AnimatedButton variant="primary">
                   Start New Scan
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                </AnimatedButton>
               </TransitionLink>
             </div>
-          </Card>
+          </AnimatedCard>
         )}
       </section>
     </main>

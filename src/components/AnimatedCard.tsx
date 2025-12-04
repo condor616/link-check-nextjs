@@ -9,11 +9,11 @@ interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "transition" | 
   children: React.ReactNode;
 }
 
-export function AnimatedCard({ 
-  children, 
-  className, 
+export function AnimatedCard({
+  children,
+  className,
   delay = 0,
-  ...props 
+  ...props
 }: AnimatedCardProps) {
   return (
     <motion.div
@@ -24,12 +24,12 @@ export function AnimatedCard({
         delay: delay,
         ease: "easeOut"
       }}
-      whileHover={{ 
+      whileHover={{
         y: -5,
         transition: { duration: 0.2 }
       }}
       className={cn(
-        "bg-white rounded-xl border border-gray-100 shadow-sm p-6",
+        "bg-card text-card-foreground rounded-xl border border-border shadow-sm p-6 transition-all duration-300 hover:border-primary/50 hover:shadow-[0_0_30px_-5px_var(--primary)] hover:bg-card/80",
         className
       )}
       {...props}

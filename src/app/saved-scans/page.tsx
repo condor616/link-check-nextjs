@@ -2,29 +2,29 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardContent, 
-  CardFooter 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SavedScanConfig } from '@/app/api/saved-configs/route';
-import { 
-  Loader2, 
-  AlertCircle, 
-  Download, 
-  Edit, 
-  Trash2, 
-  Play, 
-  Check, 
-  X, 
-  Save, 
+import {
+  Loader2,
+  AlertCircle,
+  Download,
+  Edit,
+  Trash2,
+  Play,
+  Check,
+  X,
+  Save,
   ArrowLeft,
   Plus,
   Copy,
@@ -52,7 +52,7 @@ export default function SavedScansPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSupabaseError, setIsSupabaseError] = useState<boolean>(false);
   const [settingsType, setSettingsType] = useState<'file' | 'supabase' | null>(null);
-  
+
   // Editing state
   const [editingConfig, setEditingConfig] = useState<SavedScanConfig | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -62,18 +62,18 @@ export default function SavedScansPage() {
   const [editPassword, setEditPassword] = useState('');
   const [editUseAuth, setEditUseAuth] = useState(false);
   const [editUseAuthForAllDomains, setEditUseAuthForAllDomains] = useState(false);
-  
+
   // Save/delete state
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  
+
   // Confirm dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  
+
   // Add additional state variables for scan options
   const [editDepth, setEditDepth] = useState<number>(0);
   const [editConcurrency, setEditConcurrency] = useState<number>(10);
@@ -86,19 +86,19 @@ export default function SavedScansPage() {
   const [editWildcardExclusions, setEditWildcardExclusions] = useState<string[]>([""]);
   const [editSkipExternalDomains, setEditSkipExternalDomains] = useState<boolean>(true);
   const [editExcludeSubdomains, setEditExcludeSubdomains] = useState<boolean>(true);
-  
+
   const router = useRouter();
   const { addNotification } = useNotification();
-  
+
   useEffect(() => {
     fetchConfigs();
   }, []);
-  
+
   const fetchConfigs = async () => {
     setLoading(true);
     setError(null);
     setIsSupabaseError(false);
-    
+
     try {
       // First get current settings to know if we're using Supabase
       const settingsResponse = await fetch('/api/settings');
@@ -106,22 +106,22 @@ export default function SavedScansPage() {
         const settingsData = await settingsResponse.json();
         setSettingsType(settingsData.storageType || 'file');
       }
-      
+
       const response = await fetch('/api/saved-configs');
       const data = await response.json();
-      
+
       if (!response.ok) {
         // Check if this is a Supabase connection error
-        if (data.error && typeof data.error === 'string' && 
-            (data.error.includes('Supabase') || 
-             data.error.includes('database') || 
-             data.error.includes('connection'))) {
+        if (data.error && typeof data.error === 'string' &&
+          (data.error.includes('Supabase') ||
+            data.error.includes('database') ||
+            data.error.includes('connection'))) {
           setIsSupabaseError(true);
           throw new Error(`Database connection error: ${data.error}`);
         }
         throw new Error(data.error || 'Failed to fetch saved configurations');
       }
-      
+
       setConfigs(data);
     } catch (error) {
       console.error('Error fetching saved configurations:', error);
@@ -130,7 +130,7 @@ export default function SavedScansPage() {
       setLoading(false);
     }
   };
-  
+
   // Function to switch to file-based storage
   const switchToFileStorage = async () => {
     try {
@@ -163,54 +163,54 @@ export default function SavedScansPage() {
   const goToSettings = () => {
     router.push('/settings');
   };
-  
+
   const handleStartScan = (config: SavedScanConfig) => {
     // Navigate to scan page with config parameters
     const configString = encodeURIComponent(JSON.stringify(config.config));
     router.push(`/scan?url=${encodeURIComponent(config.url)}&config=${configString}`);
   };
-  
+
   const handleEdit = (config: SavedScanConfig) => {
     setEditingConfig(config);
     setEditName(config.name);
     setEditUrl(config.url);
-    
+
     // Initialize depth
     setEditDepth(config.config.depth ?? 0);
-    
+
     // Initialize concurrency
     setEditConcurrency(config.config.concurrency ?? 10);
-    
+
     // Initialize request timeout (convert from ms to seconds)
     setEditRequestTimeout((config.config.requestTimeout ?? 30000) / 1000);
-    
+
     // Initialize scan same link once option
     setEditScanSameLinkOnce(config.config.scanSameLinkOnce !== false);
-    
+
     // Initialize skip external domains option
     setEditSkipExternalDomains(config.config.skipExternalDomains !== false);
-    
+
     // Initialize exclude subdomains option
     setEditExcludeSubdomains(config.config.excludeSubdomains !== false);
-    
+
     // Initialize exclusion patterns
     setEditRegexExclusions(
-      config.config.regexExclusions?.length ? 
-      config.config.regexExclusions : [""]
+      config.config.regexExclusions?.length ?
+        config.config.regexExclusions : [""]
     );
-    
+
     setEditCssSelectors(
-      config.config.cssSelectors?.length ? 
-      config.config.cssSelectors : [""]
+      config.config.cssSelectors?.length ?
+        config.config.cssSelectors : [""]
     );
-    
+
     setEditCssSelectorsForceExclude(!!config.config.cssSelectorsForceExclude);
-    
+
     setEditWildcardExclusions(
-      config.config.wildcardExclusions?.length ? 
-      config.config.wildcardExclusions : [""]
+      config.config.wildcardExclusions?.length ?
+        config.config.wildcardExclusions : [""]
     );
-    
+
     // Set auth if available
     if (config.config.auth) {
       setEditUsername(config.config.auth.username || '');
@@ -223,40 +223,40 @@ export default function SavedScansPage() {
       setEditUseAuth(false);
       setEditUseAuthForAllDomains(false);
     }
-    
+
     setShowEditDialog(true);
     setSaveError(null);
     setSaveSuccess(false);
   };
-  
+
   const handleSaveEdit = async () => {
     if (!editingConfig) return;
-    
+
     if (!editName.trim()) {
       setSaveError('Please provide a name for this configuration');
       return;
     }
-    
+
     if (!editUrl.trim()) {
       setSaveError('Please provide a URL');
       return;
     }
-    
+
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
-    
+
     try {
       // Filter out empty entries
       const filteredRegexExclusions = editRegexExclusions.filter(regex => regex.trim() !== "");
       const filteredCssSelectors = editCssSelectors.filter(selector => selector.trim() !== "");
       const filteredWildcardExclusions = editWildcardExclusions.filter(pattern => pattern.trim() !== "");
-      
+
       // Create a copy of the config to update
       const updatedConfig = { ...editingConfig };
       updatedConfig.name = editName;
       updatedConfig.url = editUrl;
-      
+
       // Update scan configuration options
       updatedConfig.config = {
         ...updatedConfig.config,
@@ -271,7 +271,7 @@ export default function SavedScansPage() {
         skipExternalDomains: editSkipExternalDomains,
         excludeSubdomains: editExcludeSubdomains,
       };
-      
+
       // Update auth settings
       if (editUseAuth && editUsername && editPassword) {
         updatedConfig.config.auth = {
@@ -284,7 +284,7 @@ export default function SavedScansPage() {
         const { auth, useAuthForAllDomains, ...configWithoutAuth } = updatedConfig.config;
         updatedConfig.config = configWithoutAuth;
       }
-      
+
       // Send to API
       const response = await fetch(`/api/saved-configs/${editingConfig.id}`, {
         method: 'PUT',
@@ -297,20 +297,20 @@ export default function SavedScansPage() {
           config: updatedConfig.config
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to update configuration');
       }
-      
+
       setSaveSuccess(true);
-      
+
       // Update the configs list
-      setConfigs(configs.map(config => 
+      setConfigs(configs.map(config =>
         config.id === editingConfig.id ? { ...updatedConfig, updatedAt: new Date().toISOString() } : config
       ));
-      
+
       // Close dialog after a short delay
       setTimeout(() => {
         setShowEditDialog(false);
@@ -324,33 +324,33 @@ export default function SavedScansPage() {
       setIsSaving(false);
     }
   };
-  
+
   const confirmDelete = (configId: string) => {
     setConfigToDelete(configId);
     setShowDeleteDialog(true);
     setDeleteError(null);
   };
-  
+
   const handleDelete = async () => {
     if (!configToDelete) return;
-    
+
     setIsDeleting(true);
     setDeleteError(null);
-    
+
     try {
       const response = await fetch(`/api/saved-configs/${configToDelete}`, {
         method: 'DELETE'
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to delete configuration');
       }
-      
+
       // Remove from the configs list
       setConfigs(configs.filter(config => config.id !== configToDelete));
-      
+
       // Close dialog
       setShowDeleteDialog(false);
       setConfigToDelete(null);
@@ -361,12 +361,12 @@ export default function SavedScansPage() {
       setIsDeleting(false);
     }
   };
-  
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
   };
-  
+
   // Helper functions for managing exclusion patterns
   const addEditRegexExclusion = () => setEditRegexExclusions([...editRegexExclusions, ""]);
 
@@ -409,17 +409,17 @@ export default function SavedScansPage() {
     newExclusions[index] = value;
     setEditWildcardExclusions(newExclusions);
   };
-  
+
   // Add copy to clipboard function
   const copyJsonToClipboard = (json: any) => {
     const stringified = JSON.stringify(json, null, 2);
     navigator.clipboard.writeText(stringified);
   };
-  
+
   return (
     <div className="container mx-auto p-4 max-w-none">
       <h1 className="text-2xl font-bold mb-6">Saved Scan Configurations</h1>
-      
+
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -442,7 +442,7 @@ export default function SavedScansPage() {
                 <div className="space-y-3">
                   <h4 className="font-medium text-amber-800">You have two options:</h4>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={switchToFileStorage} variant="outline" className="bg-white">
+                    <Button onClick={switchToFileStorage} variant="outline" className="bg-transparent border-input hover:bg-accent hover:text-accent-foreground">
                       <FileJson className="mr-2 h-4 w-4" />
                       Switch to File Storage
                     </Button>
@@ -456,13 +456,13 @@ export default function SavedScansPage() {
             </div>
           </div>
         ) : (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )
       ) : configs.length === 0 ? (
-        <Card className="bg-white shadow">
+        <Card className="bg-card border-border shadow-sm">
           <CardContent className="pt-6 pb-6">
             <div className="text-center py-12">
               <p className="mb-4 text-muted-foreground">No saved configurations found.</p>
@@ -475,7 +475,7 @@ export default function SavedScansPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {configs.map(config => (
-            <Card key={config.id} className="bg-white shadow">
+            <Card key={config.id} className="bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300">
               <CardHeader className="pb-2">
                 <CardTitle className="text-xl">{config.name}</CardTitle>
                 <CardDescription>
@@ -485,7 +485,7 @@ export default function SavedScansPage() {
                   <span className="font-medium">Updated:</span> {formatDate(config.updatedAt)}
                 </CardDescription>
               </CardHeader>
-              
+
               <CardContent className="pb-3">
                 <div className="text-sm space-y-2">
                   <div>
@@ -502,27 +502,27 @@ export default function SavedScansPage() {
                   </div>
                 </div>
               </CardContent>
-              
+
               <CardFooter className="flex justify-between pt-2">
                 <div className="space-x-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => handleEdit(config)}
                   >
                     <Edit className="h-4 w-4 mr-1" /> Edit
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => confirmDelete(config.id)}
                     className="text-red-500 hover:text-red-600 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4 mr-1" /> Delete
                   </Button>
                 </div>
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   onClick={() => handleStartScan(config)}
                   className="bg-primary hover:bg-primary/90 text-white"
                 >
@@ -533,7 +533,7 @@ export default function SavedScansPage() {
           ))}
         </div>
       )}
-      
+
       {/* Edit Dialog */}
       <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <AlertDialogContent className="!max-w-full sm:!max-w-[95%] md:!max-w-[95%] lg:!max-w-[95%] xl:!max-w-[1400px] w-full h-auto max-h-[95vh] overflow-y-auto p-6 m-4">
@@ -543,7 +543,7 @@ export default function SavedScansPage() {
               Update your saved scan configuration details.
             </div>
           </AlertDialogHeader>
-          
+
           <div className="space-y-6 py-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -556,7 +556,7 @@ export default function SavedScansPage() {
                   className="text-base p-3 h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="editUrl" className="text-base">URL</Label>
                 <Input
@@ -568,7 +568,7 @@ export default function SavedScansPage() {
                 />
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
               <div className="space-y-2">
                 <Label htmlFor="editDepth" className="text-base">Scan Depth (0 for current page only)</Label>
@@ -582,7 +582,7 @@ export default function SavedScansPage() {
                   className="text-base p-3 h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="editConcurrency" className="text-base">Concurrency (1-50)</Label>
                 <Input
@@ -595,7 +595,7 @@ export default function SavedScansPage() {
                   className="text-base p-3 h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="editRequestTimeout" className="text-base">Request Timeout (seconds)</Label>
                 <Input
@@ -610,7 +610,7 @@ export default function SavedScansPage() {
                 <p className="text-xs text-muted-foreground mt-1">Time before giving up on a single URL (5-180 seconds)</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2 mt-4 py-2">
               <Checkbox
                 id="editScanSameLinkOnce"
@@ -622,7 +622,7 @@ export default function SavedScansPage() {
                 Check each link only once (recommended)
               </Label>
             </div>
-            
+
             <div className="flex items-center space-x-2 mb-4">
               <Checkbox
                 id="editSkipExternalDomains"
@@ -633,7 +633,7 @@ export default function SavedScansPage() {
                 Skip external domains
               </Label>
             </div>
-            
+
             <div className="flex items-center space-x-2 mb-4">
               <Checkbox
                 id="editExcludeSubdomains"
@@ -644,12 +644,12 @@ export default function SavedScansPage() {
                 Do not check subdomains
               </Label>
             </div>
-            
+
             <div className="space-y-4 border-t pt-4 mt-2">
               <div className="flex items-center space-x-2 py-2">
-                <Checkbox 
-                  id="editUseAuth" 
-                  checked={editUseAuth} 
+                <Checkbox
+                  id="editUseAuth"
+                  checked={editUseAuth}
                   onCheckedChange={(checked) => setEditUseAuth(!!checked)}
                   className="h-5 w-5"
                 />
@@ -657,7 +657,7 @@ export default function SavedScansPage() {
                   Use HTTP Basic Authentication
                 </Label>
               </div>
-              
+
               {editUseAuth && (
                 <div className="pl-8 space-y-4 bg-gray-50 p-4 rounded-md">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -671,7 +671,7 @@ export default function SavedScansPage() {
                         className="text-base p-3 h-11"
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="editPassword" className="text-base">Password</Label>
                       <Input
@@ -683,11 +683,11 @@ export default function SavedScansPage() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center mt-2">
-                    <Checkbox 
-                      id="editUseAuthForAllDomains" 
-                      checked={editUseAuthForAllDomains} 
+                    <Checkbox
+                      id="editUseAuthForAllDomains"
+                      checked={editUseAuthForAllDomains}
                       onCheckedChange={(checked) => setEditUseAuthForAllDomains(!!checked)}
                       className="h-5 w-5"
                     />
@@ -698,16 +698,16 @@ export default function SavedScansPage() {
                 </div>
               )}
             </div>
-            
+
             {/* Advanced Options */}
-            <Button 
-              variant="link" 
-              className="p-0 h-auto text-purple-600 text-base" 
+            <Button
+              variant="link"
+              className="p-0 h-auto text-purple-600 text-base"
               onClick={() => setEditShowAdvanced(!editShowAdvanced)}
             >
               {editShowAdvanced ? 'Hide' : 'Show'} Advanced Options
             </Button>
-            
+
             {editShowAdvanced && (
               <div className="border border-border rounded-lg p-6 space-y-6 mt-2 bg-gray-50">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -719,7 +719,7 @@ export default function SavedScansPage() {
                       <p className="text-sm text-muted-foreground mb-3">
                         Simple URL patterns to exclude (e.g., "example.com/about/*")
                       </p>
-                      
+
                       {editWildcardExclusions.map((pattern, index) => (
                         <div key={`wildcard-${index}`} className="flex gap-3 items-center mb-3">
                           <div className="w-1.5 h-11 bg-yellow-400 rounded-sm mr-1"></div>
@@ -729,7 +729,7 @@ export default function SavedScansPage() {
                             placeholder="e.g. example.com/about/*"
                             className="flex-1 text-base p-3 h-11"
                           />
-                          
+
                           {index === editWildcardExclusions.length - 1 ? (
                             <>
                               <Button
@@ -742,7 +742,7 @@ export default function SavedScansPage() {
                               >
                                 <X className="h-5 w-5" />
                               </Button>
-                              
+
                               <Button
                                 type="button"
                                 variant="outline"
@@ -767,14 +767,14 @@ export default function SavedScansPage() {
                         </div>
                       ))}
                     </div>
-                    
+
                     {/* Regex Exclusion Rules */}
                     <div className="space-y-3">
                       <Label htmlFor="editRegexExclusions" className="text-base font-medium">Regex Exclusion Patterns</Label>
                       <p className="text-sm text-muted-foreground mb-3">
                         Links matching these patterns will be skipped
                       </p>
-                      
+
                       {editRegexExclusions.map((regex, index) => (
                         <div key={`regex-${index}`} className="flex gap-3 items-center mb-3">
                           <div className="w-1.5 h-11 bg-blue-400 rounded-sm mr-1"></div>
@@ -784,7 +784,7 @@ export default function SavedScansPage() {
                             placeholder="e.g. \/assets\/.*\.pdf$"
                             className="flex-1 text-base p-3 h-11"
                           />
-                          
+
                           {index === editRegexExclusions.length - 1 ? (
                             <>
                               <Button
@@ -797,7 +797,7 @@ export default function SavedScansPage() {
                               >
                                 <X className="h-5 w-5" />
                               </Button>
-                              
+
                               <Button
                                 type="button"
                                 variant="outline"
@@ -823,7 +823,7 @@ export default function SavedScansPage() {
                       ))}
                     </div>
                   </div>
-                  
+
                   {/* Right column */}
                   <div className="space-y-6">
                     {/* CSS Selector Exclusions */}
@@ -832,7 +832,7 @@ export default function SavedScansPage() {
                       <p className="text-sm text-muted-foreground mb-3">
                         Links within these CSS selectors will be skipped
                       </p>
-                      
+
                       {editCssSelectors.map((selector, index) => (
                         <div key={`selector-${index}`} className="flex gap-3 items-center mb-3">
                           <div className="w-1.5 h-11 bg-green-400 rounded-sm mr-1"></div>
@@ -842,7 +842,7 @@ export default function SavedScansPage() {
                             placeholder="e.g. .footer, #navigation, [data-skip]"
                             className="flex-1 text-base p-3 h-11"
                           />
-                          
+
                           {index === editCssSelectors.length - 1 ? (
                             <>
                               <Button
@@ -855,7 +855,7 @@ export default function SavedScansPage() {
                               >
                                 <X className="h-5 w-5" />
                               </Button>
-                              
+
                               <Button
                                 type="button"
                                 variant="outline"
@@ -879,7 +879,7 @@ export default function SavedScansPage() {
                           )}
                         </div>
                       ))}
-                      
+
                       <div className="flex items-center space-x-2 pt-4">
                         <Checkbox
                           id="editCssSelectorsForceExclude"
@@ -894,10 +894,10 @@ export default function SavedScansPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Use the new JSONPreview component */}
                 <div className="border-t border-border pt-6 mt-4">
-                  <JSONPreview 
+                  <JSONPreview
                     data={{
                       name: editName,
                       url: editUrl,
@@ -925,14 +925,14 @@ export default function SavedScansPage() {
                 </div>
               </div>
             )}
-            
+
             {saveError && (
               <Alert variant="destructive">
                 <AlertCircle className="h-5 w-5" />
                 <AlertDescription className="text-base">{saveError}</AlertDescription>
               </Alert>
             )}
-            
+
             {saveSuccess && (
               <Alert className="bg-green-50 text-green-800 border-green-200">
                 <Check className="h-5 w-5" />
@@ -940,12 +940,12 @@ export default function SavedScansPage() {
               </Alert>
             )}
           </div>
-          
+
           <AlertDialogFooter className="pt-4">
             <AlertDialogCancel disabled={isSaving} className="text-base h-11">
               Cancel
             </AlertDialogCancel>
-            <Button 
+            <Button
               onClick={handleSaveEdit}
               disabled={isSaving || !editName.trim() || !editUrl.trim()}
               className="text-base h-11 px-6"
@@ -965,7 +965,7 @@ export default function SavedScansPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-md">
@@ -975,19 +975,19 @@ export default function SavedScansPage() {
               Are you sure you want to delete this scan configuration? This action cannot be undone.
             </div>
           </AlertDialogHeader>
-          
+
           {deleteError && (
             <Alert variant="destructive" className="mt-2">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{deleteError}</AlertDescription>
             </Alert>
           )}
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>
               Cancel
             </AlertDialogCancel>
-            <Button 
+            <Button
               variant="destructive"
               onClick={handleDelete}
               disabled={isDeleting}

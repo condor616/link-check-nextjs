@@ -378,7 +378,7 @@ export default function HistoryPage() {
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Total Scans Card */}
-          <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl">
             <CardContent className="p-6">
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 <div className="rounded-full bg-purple-50 p-3 group-hover:bg-purple-100 transition-colors">
@@ -393,7 +393,7 @@ export default function HistoryPage() {
           </Card>
 
           {/* Active Jobs Card */}
-          <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl">
             <CardContent className="p-6">
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 <div className="rounded-full bg-blue-50 p-3 group-hover:bg-blue-100 transition-colors">
@@ -408,7 +408,7 @@ export default function HistoryPage() {
           </Card>
 
           {/* Last Scan Card */}
-          <Card className="group bg-white shadow hover:shadow-lg transition-shadow rounded-xl">
+          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl">
             <CardContent className="p-6">
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 <div className="rounded-full bg-green-50 p-3 group-hover:bg-green-100 transition-colors">
@@ -425,7 +425,7 @@ export default function HistoryPage() {
 
         {/* Active Jobs Section */}
         {activeJobs.length > 0 && (
-          <Card className="bg-white shadow mb-8">
+          <Card className="bg-card border-border shadow-sm mb-8">
             <CardHeader>
               <CardTitle>Active Scans</CardTitle>
               <CardDescription>Currently running or queued scans</CardDescription>
@@ -468,7 +468,7 @@ export default function HistoryPage() {
         )}
 
         {/* History Section */}
-        <Card className="bg-white shadow">
+        <Card className="bg-card border-border shadow-sm">
           <CardHeader>
             <CardTitle>Recent Scans</CardTitle>
           </CardHeader>
@@ -494,7 +494,7 @@ export default function HistoryPage() {
                       <div className="space-y-3">
                         <h4 className="font-medium text-amber-800">You have two options:</h4>
                         <div className="flex flex-col sm:flex-row gap-2">
-                          <Button onClick={switchToFileStorage} variant="outline" className="bg-white">
+                          <Button onClick={switchToFileStorage} variant="outline" className="bg-transparent border-input hover:bg-accent hover:text-accent-foreground">
                             <FileJson className="mr-2 h-4 w-4" />
                             Switch to File Storage
                           </Button>
