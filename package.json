@@ -7,7 +7,7 @@
     "dev": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"npm run dev:next\" \"npm run worker\"",
     "build": "npx prisma generate && next build",
     "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --external:@prisma/client --outfile=.next/standalone/worker.js",
-    "build:prod": "npm run build && npm run build:worker",
+    "build:prod": "npm run build && npm run build:worker && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static",
     "db:deploy": "prisma migrate deploy",
     "prod": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"DATABASE_URL=file:$(pwd)/prisma/dev.db node .next/standalone/server.js\" \"DATABASE_URL=file:$(pwd)/prisma/dev.db node .next/standalone/worker.js\"",
     "start": "next start",
