@@ -82,7 +82,13 @@ npm run build:prod
 ```
 This command generates a standalone build in `.next/standalone`, including the bundled worker script.
 
-2. Start the application (Server + Worker):
+2. Initialize the production database (required for the first run or after updates):
+```bash
+npm run db:deploy
+```
+This applies any pending database migrations to your production database.
+
+3. Start the application (Server + Worker):
 ```bash
 npm run prod
 ```
