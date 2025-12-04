@@ -6,6 +6,8 @@
     "dev:next": "next dev --turbopack",
     "dev": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"npm run dev:next\" \"npm run worker\"",
     "build": "npx prisma generate && next build",
+    "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --external:@prisma/client --outfile=.next/standalone/worker.js",
+    "build:prod": "npm run build && npm run build:worker",
     "start": "next start",
     "lint": "next lint",
     "worker": "tsx scripts/worker.ts"
@@ -50,6 +52,7 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "concurrently": "^9.2.1",
+    "esbuild": "^0.27.1",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.6",
     "prisma": "^6.19.0",

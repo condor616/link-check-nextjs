@@ -76,19 +76,20 @@ The application uses a background worker to process scan jobs.
 
 #### Running in Production
 
-1. Build the application:
+1. Build the application for production:
 ```bash
-npm run build
+npm run build:prod
 ```
+This command generates a standalone build in `.next/standalone`, including the bundled worker script.
 
 2. Start the web application:
 ```bash
-npm start
+node .next/standalone/server.js
 ```
 
 3. In a separate terminal (or via a process manager like PM2), start the worker:
 ```bash
-npm run worker
+node .next/standalone/worker.js
 ```
 
 **Note**: The worker is essential for processing scans. If the worker is not running, scan jobs will remain in a "Queued" state indefinitely.
