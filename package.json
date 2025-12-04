@@ -9,7 +9,7 @@
     "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --external:@prisma/client --outfile=.next/standalone/worker.js",
     "build:prod": "npm run build && npm run build:worker",
     "db:deploy": "prisma migrate deploy",
-    "prod": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"node .next/standalone/server.js\" \"node .next/standalone/worker.js\"",
+    "prod": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"DATABASE_URL=file:$(pwd)/prisma/dev.db node .next/standalone/server.js\" \"DATABASE_URL=file:$(pwd)/prisma/dev.db node .next/standalone/worker.js\"",
     "start": "next start",
     "lint": "next lint",
     "worker": "tsx scripts/worker.ts"
