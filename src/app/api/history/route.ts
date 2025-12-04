@@ -29,6 +29,13 @@ export async function GET(_request: NextRequest) {
 async function getHistoryFromPrisma() {
   try {
     const scans = await prisma.scanHistory.findMany({
+      where: {
+        NOT: {
+          id: {
+            startsWith: 'temp_'
+          }
+        }
+      },
       orderBy: { scan_date: 'desc' }
     });
 
@@ -88,6 +95,7 @@ async function getHistoryFromSupabase() {
     const { data, error } = await supabase
       .from('scan_history')
       .select('*')
+      .not('id', 'like', 'temp_%')
       .order('scan_date', { ascending: false });
 
     if (error) {
