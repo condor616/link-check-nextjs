@@ -82,15 +82,11 @@ npm run build:prod
 ```
 This command generates a standalone build in `.next/standalone`, including the bundled worker script.
 
-2. Start the web application:
+2. Start the application (Server + Worker):
 ```bash
-node .next/standalone/server.js
+npm run prod
 ```
-
-3. In a separate terminal (or via a process manager like PM2), start the worker:
-```bash
-node .next/standalone/worker.js
-```
+This command concurrently starts the Next.js server and the background worker from the standalone build.
 
 **Note**: The worker is essential for processing scans. If the worker is not running, scan jobs will remain in a "Queued" state indefinitely.
 

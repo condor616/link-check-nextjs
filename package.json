@@ -8,6 +8,7 @@
     "build": "npx prisma generate && next build",
     "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --external:@prisma/client --outfile=.next/standalone/worker.js",
     "build:prod": "npm run build && npm run build:worker",
+    "prod": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"node .next/standalone/server.js\" \"node .next/standalone/worker.js\"",
     "start": "next start",
     "lint": "next lint",
     "worker": "tsx scripts/worker.ts"
