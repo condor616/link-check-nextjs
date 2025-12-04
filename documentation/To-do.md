@@ -19,3 +19,4 @@ Make the header navigation responsive, with hamburger menu and cool transitions.
 - in scan result page (the one with all filters) add a text based filter, so I can check for a specific URL/Link
 - Possibility to switch themes
 - Add dark mode function
+- Backup and restore data feature
