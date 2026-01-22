@@ -7,7 +7,8 @@ import {
     Save,
     Home,
     Search,
-    Terminal
+    Terminal,
+    Activity
 } from 'lucide-react';
 import { TransitionLink } from "@/components/TransitionLink";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,15 @@ export function TopNav() {
                 >
                     <Search size={18} className="group-hover:text-primary transition-colors" />
                     <span className="font-medium">New Scan</span>
+                </TransitionLink>
+
+                <TransitionLink
+                    href="/jobs"
+                    className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 group border border-transparent text-sm"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground border-primary/20 shadow-[0_0_10px_-5px_var(--primary)]"
+                >
+                    <Activity size={18} className="group-hover:text-primary transition-colors" />
+                    <span className="font-medium">Active Jobs</span>
                 </TransitionLink>
 
                 <TransitionLink

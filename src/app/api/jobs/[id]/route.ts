@@ -78,3 +78,29 @@ export async function PATCH(
         );
     }
 }
+
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const id = (await params).id;
+
+        // Signal worker to stop first if it's running
+        const job = await jobService.getJob(id);
+        if (job && (job.status === 'running' || job.status === 'pausing' || job.status === 'paused')) {
+            await jobService.stopJob(id);
+            // Give it a tiny bit of time to signal? 
+            // Actually, deleting it will make the worker stop as soon as it checks.
+        }
+
+        await jobService.deleteJob(id);
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error('Error deleting job:', error);
+        return NextResponse.json(
+            { error: error.message || 'Failed to delete job' },
+            { status: 500 }
+        );
+    }
+}

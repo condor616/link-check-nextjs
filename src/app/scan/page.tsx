@@ -337,8 +337,8 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
           throw new Error(data.error || 'Failed to submit scan job');
         }
 
-        // Redirect to history page for the new job
-        router.push(`/history/${data.id}`);
+        // Use router.replace to prevent back-nav into an already-submitted state
+        router.replace(`/history/${data.id}`);
 
       } catch (error) {
         console.error('Error submitting scan:', error);
@@ -1161,7 +1161,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
             <CardFooter className="flex justify-between">
               <Button
                 variant="outline"
-                onClick={() => router.back()}
+                onClick={() => router.push('/')}
                 className="gap-2"
               >
                 <ArrowLeft className="h-4 w-4" /> Cancel
@@ -1169,8 +1169,18 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
               <Button
                 onClick={handleConfirmScan}
                 className="gap-2"
+                disabled={isScanning}
               >
-                <CheckCircle2 className="h-4 w-4" /> Confirm Scan
+                {isScanning ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" /> Confirm Scan
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>

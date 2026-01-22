@@ -299,6 +299,40 @@ export class JobService {
     }
 
     /**
+     * Stops all active jobs.
+     */
+    async stopAllJobs(): Promise<void> {
+        const activeStatuses: JobStatus[] = ['running', 'queued', 'paused', 'pausing'];
+
+        if (this.useSupabase && this.supabase) {
+            const { error } = await this.supabase
+                .from('scan_jobs')
+                .update({ status: 'stopping' })
+                .in('status', activeStatuses);
+
+            if (error) {
+                console.error('Supabase stopAllJobs error:', error);
+                throw new Error(`Failed to stop all jobs in Supabase: ${error.message}`);
+            }
+        } else {
+            // Find all active jobs
+            const activeJobs = await prisma.job.findMany({
+                where: {
+                    status: {
+                        in: activeStatuses
+                    }
+                }
+            });
+
+            // Update them individually to trigger proper status logic if needed
+            // OR do a bulk update. For simplicity and consistency with individual stop:
+            for (const job of activeJobs) {
+                await this.stopJob(job.id);
+            }
+        }
+    }
+
+    /**
      * Gets the next pending job (queued).
      * Used by the worker.
      */
@@ -328,6 +362,27 @@ export class JobService {
             });
 
             return job ? this.mapPrismaJobToScanJob(job) : null;
+        }
+    }
+
+    /**
+     * Deletes a job.
+     */
+    async deleteJob(id: string): Promise<void> {
+        if (this.useSupabase && this.supabase) {
+            const { error } = await this.supabase
+                .from('scan_jobs')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error('Supabase deleteJob error:', error);
+                throw new Error(`Failed to delete job from Supabase: ${error.message}`);
+            }
+        } else {
+            await prisma.job.delete({
+                where: { id }
+            });
         }
     }
 

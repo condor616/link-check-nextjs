@@ -626,6 +626,20 @@ class Scanner {
         return this.getScanState();
     }
 
+    /**
+     * Aggressively stops the scan, clearing all queues and returning current state.
+     */
+    public async stop(): Promise<ScanState> {
+        this.isPaused = true;
+        this.isRunning = false;
+
+        if (this.limit) {
+            this.limit.clearQueue();
+        }
+
+        return this.getScanState();
+    }
+
     // Get current state for serialization
     public getScanState(): ScanState {
         // Convert complex objects to serializable format
@@ -774,6 +788,16 @@ export class WebsiteScanner extends Scanner {
             this.abortController.abort();
         }
         return super.pause();
+    }
+
+    /**
+     * Override stop to abort all active and pending work immediately
+     */
+    public async stop(): Promise<ScanState> {
+        if (this.abortController) {
+            this.abortController.abort();
+        }
+        return super.stop();
     }
 
     /**

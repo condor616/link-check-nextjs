@@ -51,24 +51,28 @@ async function processJob(job: any) {
                 }
 
                 // Check for status changes (pause/stop signals)
-                if (now - lastStatusCheck > 1000) {
+                // Reduced throttle to 100ms for near-instant responsiveness
+                if (now - lastStatusCheck > 100) {
                     try {
                         const currentJob = await jobService.getJob(job.id);
-                        if (currentJob) {
-                            if (currentJob.status === 'pausing') {
-                                console.log(`Job ${job.id} pause requested.`);
-                                stopReason = 'paused';
-                                // Pause the scanner and get state
-                                const state = await scanner.pause();
-                                // Save state and update status
-                                await jobService.updateJobState(job.id, JSON.stringify(state));
-                                await jobService.updateJobStatus(job.id, 'paused');
-                            } else if (currentJob.status === 'stopping') {
-                                console.log(`Job ${job.id} stop requested.`);
-                                stopReason = 'stopped';
-                                await scanner.pause(); // Stop scanning cleanly
-                                await jobService.updateJobStatus(job.id, 'stopped');
-                            }
+                        if (!currentJob) {
+                            console.log(`Job ${job.id} no longer exists. Aborting scanner.`);
+                            stopReason = 'stopped';
+                            await scanner.stop(); // Stop immediately
+                            return;
+                        }
+
+                        if (currentJob.status === 'pausing') {
+                            console.log(`Job ${job.id} pause requested.`);
+                            stopReason = 'paused';
+                            const state = await scanner.pause();
+                            await jobService.updateJobState(job.id, JSON.stringify(state));
+                            await jobService.updateJobStatus(job.id, 'paused');
+                        } else if (currentJob.status === 'stopping') {
+                            console.log(`Job ${job.id} stop requested.`);
+                            stopReason = 'stopped';
+                            await scanner.stop(); // Stop immediately
+                            await jobService.updateJobStatus(job.id, 'stopped');
                         }
                     } catch (err) {
                         console.error('Error checking job status:', err);

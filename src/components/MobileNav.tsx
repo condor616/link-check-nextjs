@@ -9,6 +9,7 @@ import {
     Home,
     Search,
     Terminal,
+    Activity,
     Menu,
     X
 } from 'lucide-react';
@@ -70,6 +71,7 @@ export function MobileNav() {
                                 <MobileLink href="/" icon={Home} label="Dashboard" onClick={closeMenu} />
                                 <MobileLink href="/scan" icon={Search} label="New Scan" onClick={closeMenu} />
                                 <MobileLink href="/history" icon={History} label="Scan History" onClick={closeMenu} />
+                                <MobileLink href="/jobs" icon={Activity} label="Active Jobs" onClick={closeMenu} />
                                 <MobileLink href="/saved-scans" icon={Save} label="Saved Scans" onClick={closeMenu} />
                                 <MobileLink href="/settings" icon={Settings} label="Settings" onClick={closeMenu} />
                             </nav>
