@@ -4,7 +4,7 @@ import "./globals.css";
 import { PageTransition } from "@/components/PageTransition";
 import { NotificationProvider } from "@/components/NotificationContext";
 import { Toaster } from "@/components/ui/sonner";
-import { Sidebar } from "@/components/Sidebar";
+import { TopNav } from "@/components/TopNav";
 import { MobileNav } from "@/components/MobileNav";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
@@ -50,9 +50,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <NotificationProvider>
-            <div className="flex h-screen overflow-hidden">
-              {/* Desktop Sidebar */}
-              <Sidebar />
+            <div className="flex flex-col h-screen overflow-hidden">
+              {/* Desktop Top Navigation */}
+              <TopNav />
 
               {/* Main Content Area */}
               <div className="flex-1 flex flex-col overflow-hidden relative">
