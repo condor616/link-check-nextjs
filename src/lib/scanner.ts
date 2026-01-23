@@ -83,6 +83,7 @@ class Scanner {
     protected authHeadersCache: Record<string, string> | null = null;
     // Domain cache to optimize hostname lookups
     protected domainCache: Map<string, string> = new Map();
+    protected abortController: AbortController = new AbortController();
 
     protected callbacks: ScanCallbacks;
 
@@ -355,7 +356,10 @@ class Scanner {
                     'Connection': 'keep-alive'
                 },
                 redirect: 'follow',
-                signal: AbortSignal.timeout(timeoutDuration),
+                signal: AbortSignal.any([
+                    this.abortController.signal,
+                    AbortSignal.timeout(timeoutDuration)
+                ]),
                 cache: 'no-store',
                 keepalive: true
             };
@@ -632,6 +636,7 @@ class Scanner {
     public async stop(): Promise<ScanState> {
         this.isPaused = true;
         this.isRunning = false;
+        this.abortController.abort();
 
         if (this.limit) {
             this.limit.clearQueue();
@@ -685,7 +690,6 @@ export async function scanWebsite(startUrl: string, config: ScanConfig = {}, cal
  * and improved domain filtering
  */
 export class WebsiteScanner extends Scanner {
-    protected abortController: AbortController | null = null;
 
     /**
      * Runs the scan and returns the results
@@ -696,6 +700,7 @@ export class WebsiteScanner extends Scanner {
         this.limit = pLimit(this.config.concurrency);
         this.isRunning = true;
         this.isPaused = false;
+        // Re-initialize abort controller for new run
         this.abortController = new AbortController();
 
         console.log(`Starting scan of ${this.startUrl} with domain filtering ${this.config.skipExternalDomains ? 'enabled' : 'disabled'}`);
@@ -775,7 +780,6 @@ export class WebsiteScanner extends Scanner {
             throw error;
         } finally {
             this.isRunning = false;
-            this.abortController = null;
         }
     }
 
@@ -794,9 +798,6 @@ export class WebsiteScanner extends Scanner {
      * Override stop to abort all active and pending work immediately
      */
     public async stop(): Promise<ScanState> {
-        if (this.abortController) {
-            this.abortController.abort();
-        }
         return super.stop();
     }
 

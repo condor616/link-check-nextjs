@@ -197,24 +197,23 @@ function ScanDetailsContent() {
     setIsDeleting(true);
     try {
       // Try deleting as job first
-      if (job) {
-        // We might need a delete endpoint for jobs, or just use the history one if we unify
-        // For now, let's assume we can't delete running jobs easily without a specific endpoint
-        // But if it's completed, it might be in history?
-        // Actually, let's just try the history delete endpoint, or we need a job delete endpoint.
-        // I'll assume for now we can't delete running jobs from UI yet.
-        alert("Deletion of jobs is not yet implemented.");
-        setIsDeleting(false);
-        return;
-      }
-
-      const response = await fetch(`/api/history/${scanId}`, {
+      const jobResponse = await fetch(`/api/jobs/${scanId}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || `Failed to delete scan (${response.status})`);
+      if (jobResponse.ok) {
+        router.push('/history');
+        return;
+      }
+
+      // If not found in jobs, it might be in history (already completed)
+      const historyResponse = await fetch(`/api/history/${scanId}`, {
+        method: 'DELETE',
+      });
+
+      if (!historyResponse.ok) {
+        const data = await historyResponse.json();
+        throw new Error(data.error || `Failed to delete scan (${historyResponse.status})`);
       }
 
       router.push('/history');
@@ -305,46 +304,63 @@ function ScanDetailsContent() {
                 </Link>
               </Button>
 
-              <div className="flex gap-2">
-                {/* Control Buttons */}
-                {job.status !== 'stopped' && job.status !== 'stopping' && (
-                  <>
-                    {!isTransient && (
-                      isActive ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleControl('pause')}
-                          disabled={isControlling}
-                        >
-                          <Pause className="h-4 w-4 mr-2" />
-                          Pause
-                        </Button>
-                      ) : isPaused ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleControl('resume')}
-                          disabled={isControlling}
-                        >
-                          <Play className="h-4 w-4 mr-2" />
-                          Resume
-                        </Button>
-                      ) : null
-                    )}
+              {/* Control Buttons */}
+              {!isTransient && (
+                isActive ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleControl('pause')}
+                    disabled={isControlling}
+                  >
+                    <Pause className="h-4 w-4 mr-2" />
+                    Pause
+                  </Button>
+                ) : isPaused ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleControl('resume')}
+                    disabled={isControlling}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Resume
+                  </Button>
+                ) : null
+              )}
 
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleControl('stop')}
-                      disabled={isControlling}
-                    >
-                      <Square className="h-4 w-4 mr-2" />
-                      Stop
-                    </Button>
-                  </>
-                )}
-              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={isDeleting || isControlling}
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Scan?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {isActive || isPaused
+                        ? 'This scan is still active. Deleting it will stop the worker and abort the scan immediately. Proceed?'
+                        : 'Are you sure you want to permanently delete this scan record? This action cannot be undone.'}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={deleteScan} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
             <CardTitle className="text-2xl flex items-center gap-2">
               Scan {isActive ? 'in Progress' : isPaused ? 'Paused' : job.status === 'stopped' ? 'Stopped' : 'Status'}
@@ -365,14 +381,14 @@ function ScanDetailsContent() {
               <Progress value={job.progress_percent} className={isPaused ? "opacity-50" : ""} />
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="p-4 bg-muted/50 rounded-lg border border-border/50">
                 <p className="text-muted-foreground">Scanned URLs</p>
                 <p className="text-xl font-semibold">{job.urls_scanned}</p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-muted/50 rounded-lg border border-border/50 min-w-0">
                 <p className="text-muted-foreground">Current URL</p>
-                <p className="font-medium truncate" title={job.current_url}>{job.current_url || 'Waiting...'}</p>
+                <p className="font-medium truncate block" title={job.current_url}>{job.current_url || 'Waiting...'}</p>
               </div>
             </div>
 

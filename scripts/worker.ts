@@ -110,10 +110,29 @@ async function processJob(job: any) {
 }
 
 async function startWorker() {
-    console.log('Worker started. Polling for jobs...');
+    console.log('Worker starting up...');
+
+    // Clean up orphaned jobs (jobs that were left in an active state but have no worker)
+    try {
+        const jobs = await jobService.getJobs();
+        const orphanedJobs = jobs.filter(j => ['running', 'pausing', 'stopping'].includes(j.status));
+
+        if (orphanedJobs.length > 0) {
+            console.log(`Found ${orphanedJobs.length} orphaned jobs. Resetting to 'queued'.`);
+            for (const job of orphanedJobs) {
+                await jobService.updateJobStatus(job.id, 'queued');
+            }
+        }
+    } catch (err) {
+        console.error('Failed to cleanup orphaned jobs:', err);
+    }
+
+    console.log('Worker ready. Polling for jobs...');
 
     while (true) {
         try {
+            // Heartbeat log every few iterations if no jobs? Or just log before poll
+            // console.log('Polling for next job...');
             const job = await jobService.getNextPendingJob();
 
             if (job) {

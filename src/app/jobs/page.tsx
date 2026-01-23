@@ -52,9 +52,8 @@ export default function ActiveJobsPage() {
             if (!response.ok) throw new Error('Failed to fetch jobs');
             const data = await response.json();
 
-            // Show jobs that are active OR terminal but still in the list
-            // We want to allow removing jobs that are terminal
-            const activeStatuses = ['queued', 'running', 'pausing', 'paused', 'stopping', 'stopped', 'failed', 'completed'];
+            // Show jobs that are active ONLY
+            const activeStatuses = ['queued', 'running', 'pausing', 'paused', 'stopping'];
             const activeJobs = data.filter((job: ScanJob) => activeStatuses.includes(job.status));
 
             setJobs(activeJobs);
@@ -78,7 +77,7 @@ export default function ActiveJobsPage() {
             const response = await fetch(`/api/jobs/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action })
+                body: JSON.stringify({ action: action === 'stop' ? 'stop' : action })
             });
 
             if (!response.ok) throw new Error(`Failed to ${action} job`);
@@ -169,7 +168,7 @@ export default function ActiveJobsPage() {
                             ) : (
                                 <XOctagon size={18} className="mr-2" />
                             )}
-                            Stop All Workers
+                            Stop All
                         </AnimatedButton>
                     </div>
                 </div>
@@ -208,7 +207,7 @@ export default function ActiveJobsPage() {
                             <AnimatedCard key={job.id} className="group overflow-hidden">
                                 <div className="p-5 flex flex-col md:flex-row gap-6">
                                     {/* Info Section */}
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
                                                 <span className={`text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-sidebar-accent ${getStatusColor(job.status)}`}>
@@ -228,7 +227,7 @@ export default function ActiveJobsPage() {
                                             </a>
                                         </h3>
 
-                                        <div className="mt-4 flex items-center gap-4 text-sm">
+                                        <div className="mt-4 flex items-center gap-4 text-sm w-full min-w-0">
                                             <div className="flex flex-col">
                                                 <span className="text-muted-foreground text-xs uppercase font-semibold">Progress</span>
                                                 <span className="text-foreground font-medium">{Math.round(job.progress_percent)}%</span>
@@ -238,9 +237,9 @@ export default function ActiveJobsPage() {
                                                 <span className="text-muted-foreground text-xs uppercase font-semibold">Links Scanned</span>
                                                 <span className="text-foreground font-medium">{job.urls_scanned} / {job.total_urls || '?'}</span>
                                             </div>
-                                            <div className="hidden md:flex flex-col flex-1 truncate">
+                                            <div className="hidden md:flex flex-col flex-1 min-w-0">
                                                 <span className="text-muted-foreground text-xs uppercase font-semibold">Current URL</span>
-                                                <span className="text-foreground font-medium truncate italic" title={job.current_url}>
+                                                <span className="text-foreground font-medium truncate italic block" title={job.current_url}>
                                                     {job.current_url || 'Initializing...'}
                                                 </span>
                                             </div>
@@ -277,24 +276,15 @@ export default function ActiveJobsPage() {
                                         )}
 
                                         <button
-                                            onClick={() => handleJobAction(job.id, 'stop')}
-                                            disabled={job.status === 'stopping' || ['completed', 'failed', 'stopped'].includes(job.status)}
-                                            className="p-3 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all disabled:opacity-50"
-                                            title="Stop Scan"
-                                        >
-                                            <Square size={20} fill="currentColor" />
-                                        </button>
-
-                                        <button
                                             onClick={() => setJobToRemove({ id: job.id, status: job.status })}
                                             className="p-3 bg-sidebar-accent text-muted-foreground hover:bg-destructive hover:text-white rounded-lg transition-all"
-                                            title="Remove Job"
+                                            title="Delete Scan"
                                         >
                                             <Trash2 size={20} />
                                         </button>
 
                                         <AnimatedButton
-                                            href={`/scan?id=${job.id}`}
+                                            href={`/history/${job.id}`}
                                             variant="secondary"
                                             className="ml-2"
                                         >
@@ -311,15 +301,15 @@ export default function ActiveJobsPage() {
                 <AlertDialog open={showStopAllConfirm} onOpenChange={setShowStopAllConfirm}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Stop All Workers?</AlertDialogTitle>
+                            <AlertDialogTitle>Stop All Scans?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Are you sure you want to stop all active jobs? This cannot be undone and will abort all ongoing scans.
+                                Are you sure you want to stop all active jobs? This will immediately abort all workers and you will lose any unsaved progress for ongoing scans.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction onClick={handleStopAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Stop All
+                                Abort All
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -329,17 +319,17 @@ export default function ActiveJobsPage() {
                 <AlertDialog open={!!jobToRemove} onOpenChange={(open) => !open && setJobToRemove(null)}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Remove Job?</AlertDialogTitle>
+                            <AlertDialogTitle>Delete Scan?</AlertDialogTitle>
                             <AlertDialogDescription>
                                 {jobToRemove && ['queued', 'running', 'pausing', 'paused', 'stopping'].includes(jobToRemove.status)
-                                    ? 'This job is currently active. Removing it will kill the worker and you will lose any unsaved progress. Continue?'
-                                    : 'Are you sure you want to remove this job from the list?'}
+                                    ? 'This scan is currently active. Deleting it will stop the worker and abort the scan immediately. Proceed?'
+                                    : 'Are you sure you want to delete this scan? This action cannot be undone.'}
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction onClick={handleRemoveJob} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Remove
+                                Delete
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
