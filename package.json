@@ -12,7 +12,7 @@
     "prod": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"DATABASE_URL=file:$(pwd)/prisma/dev.db node .next/standalone/server.js\" \"DATABASE_URL=file:$(pwd)/prisma/dev.db node .next/standalone/worker.js\"",
     "start": "next start",
     "lint": "next lint",
-    "worker": "tsx scripts/worker.ts"
+    "worker": "tsx --watch scripts/worker.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

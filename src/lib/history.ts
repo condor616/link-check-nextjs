@@ -56,6 +56,10 @@ export class HistoryService {
         const useSupabase = await isUsingSupabase();
 
         if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                throw new Error('Supabase client is not available or not configured');
+            }
             await this.saveScanToSupabase(savedData);
         } else {
             await this.saveScanToPrisma(savedData);
@@ -111,6 +115,9 @@ export class HistoryService {
                 });
 
             if (error) {
+                if (error.message.includes('broken_links') || error.message.includes('total_links') || error.message.includes('column')) {
+                    throw new Error(`Supabase schema mismatch: Missing columns in 'scan_history' table. Please go to Settings and run 'Fix Supabase Tables' or run: ALTER TABLE scan_history ADD COLUMN broken_links INTEGER DEFAULT 0, ADD COLUMN total_links INTEGER DEFAULT 0;`);
+                }
                 throw new Error(`Supabase error: ${error.message}`);
             }
 

@@ -265,10 +265,6 @@ export async function POST(request: NextRequest) {
     let scanData;
     if (useSupabase) {
       scanData = await getScanDataFromSupabase(scanId);
-      if (!scanData) {
-        // Try file as fallback
-        scanData = await getScanDataFromFile(scanId);
-      }
     } else {
       scanData = await getScanDataFromFile(scanId);
     }

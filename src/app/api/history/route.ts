@@ -8,13 +8,7 @@ export async function GET(_request: NextRequest) {
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      try {
-        return await getHistoryFromSupabase();
-      } catch (supabaseError) {
-        console.error('Error getting history from Supabase - falling back to Prisma:', supabaseError);
-        // Fall back to Prisma on Supabase error
-        return await getHistoryFromPrisma();
-      }
+      return await getHistoryFromSupabase();
     } else {
       return await getHistoryFromPrisma();
     }

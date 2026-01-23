@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseClient, isUsingSupabase } from './supabase';
 import { ScanConfig, ScanResult } from './scanner';
 import { v4 as uuidv4 } from 'uuid';
 import { historyService, SaveScanPayload } from './history';
@@ -30,22 +30,7 @@ export interface ScanJob {
 // --- Service ---
 
 export class JobService {
-    private supabase: SupabaseClient | null = null;
-    private useSupabase: boolean = false;
-
     constructor() {
-        // Initialize Supabase if env vars are present
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-        if (supabaseUrl && supabaseKey) {
-            this.supabase = createClient(supabaseUrl, supabaseKey, {
-                auth: {
-                    persistSession: false
-                }
-            });
-            this.useSupabase = true;
-        }
     }
 
     /**
@@ -65,9 +50,16 @@ export class JobService {
             scan_config: config,
         };
 
-        if (this.useSupabase && this.supabase) {
-            const { error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                throw new Error('Supabase client is not available or not configured');
+            }
+            const { error } = await (supabase
+                .from('scan_jobs') as any)
                 .insert([newJob]);
 
             if (error) {
@@ -98,9 +90,17 @@ export class JobService {
      * Retrieves all jobs (minimal metadata for list views).
      */
     async getJobsMinimal(): Promise<Partial<ScanJob>[]> {
-        if (this.useSupabase && this.supabase) {
-            const { data, error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                console.error('Supabase client is not available or not configured');
+                return [];
+            }
+            const { data, error } = await (supabase
+                .from('scan_jobs') as any)
                 .select('id, status, scan_url, created_at, started_at, completed_at, progress_percent, urls_scanned, total_urls, broken_links, total_links')
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -109,7 +109,7 @@ export class JobService {
                 console.error('Supabase getJobsMinimal error:', error);
                 return [];
             }
-            return data as Partial<ScanJob>[];
+            return (data as any[]).map(this.mapDatabaseRowToScanJob);
         } else {
             const jobs = await prisma.job.findMany({
                 select: {
@@ -142,9 +142,17 @@ export class JobService {
      * Retrieves all jobs.
      */
     async getJobs(): Promise<ScanJob[]> {
-        if (this.useSupabase && this.supabase) {
-            const { data, error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                console.error('Supabase client is not available or not configured');
+                return [];
+            }
+            const { data, error } = await (supabase
+                .from('scan_jobs') as any)
                 .select('*')
                 .order('created_at', { ascending: false })
                 .limit(50); // Limit to 50 most recent
@@ -153,14 +161,14 @@ export class JobService {
                 console.error('Supabase getJobs error:', error);
                 return [];
             }
-            return data as ScanJob[];
+            return (data as any[]).map(this.mapDatabaseRowToScanJob);
         } else {
             const jobs = await prisma.job.findMany({
                 orderBy: { created_at: 'desc' },
                 take: 50
             });
 
-            return jobs.map(this.mapPrismaJobToScanJob);
+            return jobs.map(this.mapDatabaseRowToScanJob);
         }
     }
 
@@ -168,23 +176,63 @@ export class JobService {
      * Retrieves a job by ID.
      */
     async getJob(id: string): Promise<ScanJob | null> {
-        if (this.useSupabase && this.supabase) {
-            const { data, error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                console.error('Supabase client is not available or not configured');
+                return null;
+            }
+            const { data, error } = await (supabase
+                .from('scan_jobs') as any)
                 .select('*')
                 .eq('id', id)
                 .single();
 
             if (error) {
+                if (error.code === 'PGRST116') { // No rows found
+                    return null;
+                }
                 console.error('Supabase getJob error:', error);
-                return null;
+                throw new Error(`Supabase getJob error: ${error.message}`);
             }
-            return data as ScanJob;
+            return this.mapDatabaseRowToScanJob(data);
         } else {
             const job = await prisma.job.findUnique({
                 where: { id }
             });
-            return job ? this.mapPrismaJobToScanJob(job) : null;
+            return job ? this.mapDatabaseRowToScanJob(job) : null;
+        }
+    }
+
+    /**
+     * Retrieves only the status of a job. Optimized for frequent polling.
+     */
+    async getJobStatus(id: string): Promise<JobStatus | null> {
+        const useSupabase = await isUsingSupabase();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) return null;
+
+            const { data, error } = await (supabase
+                .from('scan_jobs') as any)
+                .select('status')
+                .eq('id', id)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') return null;
+                throw new Error(`Supabase getJobStatus error: ${error.message}`);
+            }
+            return data.status as JobStatus;
+        } else {
+            const job = await prisma.job.findUnique({
+                where: { id },
+                select: { status: true }
+            });
+            return job ? job.status as JobStatus : null;
         }
     }
 
@@ -224,19 +272,31 @@ export class JobService {
                 r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400)
             ).length;
 
+            updateData.broken_links = brokenCount;
+            updateData.total_links = updateData.results.length;
+
+            // Serialize results for database storage
+            const serializedResults = this.serializeScanResults(updateData.results);
+
+            // For Supabase, we send the serialized object/array directly (PostgREST handles JSONB)
+            updateData.results = serializedResults;
+
+            // For Prisma, we also update the fields and stringify
             prismaUpdate.broken_links = brokenCount;
             prismaUpdate.total_links = updateData.results.length;
-
-            prismaUpdate.results = JSON.stringify(updateData.results.map((r: any) => ({
-                ...r,
-                foundOn: Array.from(r.foundOn || []),
-                htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
-            })));
+            prismaUpdate.results = JSON.stringify(serializedResults);
         }
 
-        if (this.useSupabase && this.supabase) {
-            const { error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                throw new Error('Supabase client is not available or not configured');
+            }
+            const { error } = await (supabase
+                .from('scan_jobs') as any)
                 .update(updateData)
                 .eq('id', id);
 
@@ -293,9 +353,17 @@ export class JobService {
         if (progress.brokenLinks !== undefined) updateData.broken_links = progress.brokenLinks;
         if (progress.totalLinks !== undefined) updateData.total_links = progress.totalLinks;
 
-        if (this.useSupabase && this.supabase) {
-            const { error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                console.error('Failed to update progress: Supabase client is not available');
+                return;
+            }
+            const { error } = await (supabase
+                .from('scan_jobs') as any)
                 .update(updateData)
                 .eq('id', id);
 
@@ -314,9 +382,17 @@ export class JobService {
      * Saves the scan state for a job.
      */
     async updateJobState(id: string, state: string): Promise<void> {
-        if (this.useSupabase && this.supabase) {
-            const { error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                console.error('Failed to update job state: Supabase client is not available');
+                return;
+            }
+            const { error } = await (supabase
+                .from('scan_jobs') as any)
                 .update({ state })
                 .eq('id', id);
 
@@ -368,9 +444,16 @@ export class JobService {
     async stopAllJobs(): Promise<void> {
         const activeStatuses: JobStatus[] = ['running', 'queued', 'paused', 'pausing'];
 
-        if (this.useSupabase && this.supabase) {
-            const { error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                throw new Error('Supabase client is not available or not configured');
+            }
+            const { error } = await (supabase
+                .from('scan_jobs') as any)
                 .update({ status: 'stopping' })
                 .in('status', activeStatuses);
 
@@ -401,10 +484,17 @@ export class JobService {
      * Used by the worker.
      */
     async getNextPendingJob(): Promise<ScanJob | null> {
-        if (this.useSupabase && this.supabase) {
+        const useSupabase = await isUsingSupabase();
+        const supabase = await getSupabaseClient();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                return null;
+            }
             // Get the oldest queued job
-            const { data, error } = await this.supabase
-                .from('scan_jobs')
+            const { data, error } = await (supabase
+                .from('scan_jobs') as any)
                 .select('*')
                 .eq('status', 'queued')
                 .order('created_at', { ascending: true })
@@ -425,7 +515,7 @@ export class JobService {
                 orderBy: { created_at: 'asc' }
             });
 
-            return job ? this.mapPrismaJobToScanJob(job) : null;
+            return job ? this.mapDatabaseRowToScanJob(job) : null;
         }
     }
 
@@ -433,9 +523,15 @@ export class JobService {
      * Deletes a job.
      */
     async deleteJob(id: string): Promise<void> {
-        if (this.useSupabase && this.supabase) {
-            const { error } = await this.supabase
-                .from('scan_jobs')
+        const useSupabase = await isUsingSupabase();
+
+        if (useSupabase) {
+            const supabase = await getSupabaseClient();
+            if (!supabase) {
+                throw new Error('Supabase client is not available or not configured');
+            }
+            const { error } = await (supabase
+                .from('scan_jobs') as any)
                 .delete()
                 .eq('id', id);
 
@@ -452,11 +548,20 @@ export class JobService {
 
     // --- Helpers ---
 
-    private mapPrismaJobToScanJob(prismaJob: any): ScanJob {
+    private serializeScanResults(results: ScanResult[]): any[] {
+        return results.map(r => ({
+            ...r,
+            foundOn: Array.from(r.foundOn || []),
+            htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
+        }));
+    }
+
+    private mapDatabaseRowToScanJob = (row: any): ScanJob => {
         let results: ScanResult[] | undefined;
-        if (prismaJob.results) {
+        if (row.results) {
             try {
-                const parsed = JSON.parse(prismaJob.results);
+                // Supabase might return data as object/array already, Prisma returns string
+                const parsed = typeof row.results === 'string' ? JSON.parse(row.results) : row.results;
                 results = parsed.map((r: any) => ({
                     ...r,
                     foundOn: new Set(r.foundOn || []),
@@ -468,22 +573,22 @@ export class JobService {
         }
 
         return {
-            id: prismaJob.id,
-            status: prismaJob.status as JobStatus,
-            scan_url: prismaJob.scan_url,
-            created_at: prismaJob.created_at.toISOString(),
-            started_at: prismaJob.started_at?.toISOString(),
-            completed_at: prismaJob.completed_at?.toISOString(),
-            progress_percent: prismaJob.progress_percent,
-            current_url: prismaJob.current_url || undefined,
-            urls_scanned: prismaJob.urls_scanned,
-            total_urls: prismaJob.total_urls,
-            broken_links: prismaJob.broken_links || 0,
-            total_links: prismaJob.total_links || 0,
-            scan_config: JSON.parse(prismaJob.scan_config),
-            error: prismaJob.error || undefined,
+            id: row.id,
+            status: row.status as JobStatus,
+            scan_url: row.scan_url,
+            created_at: typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString(),
+            started_at: row.started_at ? (typeof row.started_at === 'string' ? row.started_at : row.started_at.toISOString()) : undefined,
+            completed_at: row.completed_at ? (typeof row.completed_at === 'string' ? row.completed_at : row.completed_at.toISOString()) : undefined,
+            progress_percent: row.progress_percent,
+            current_url: row.current_url || undefined,
+            urls_scanned: row.urls_scanned,
+            total_urls: row.total_urls,
+            broken_links: row.broken_links || 0,
+            total_links: row.total_links || 0,
+            scan_config: typeof row.scan_config === 'string' ? JSON.parse(row.scan_config) : row.scan_config,
+            error: row.error || undefined,
             results,
-            state: prismaJob.state || undefined,
+            state: row.state || undefined,
         };
     }
 }

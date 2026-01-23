@@ -29,13 +29,7 @@ export async function GET(
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      try {
-        return await getConfigFromSupabase(configId);
-      } catch (error) {
-        console.error('Error getting configuration from Supabase:', error);
-        // Fall back to Prisma if Supabase fails
-        return await getConfigFromPrisma(configId);
-      }
+      return await getConfigFromSupabase(configId);
     } else {
       return await getConfigFromPrisma(configId);
     }

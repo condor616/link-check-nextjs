@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     const sql = `
     CREATE TABLE IF NOT EXISTS scan_jobs (
-      id UUID PRIMARY KEY,
+      id TEXT PRIMARY KEY,
       status TEXT NOT NULL,
       scan_url TEXT NOT NULL,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -23,9 +23,12 @@ export async function POST(request: NextRequest) {
       current_url TEXT,
       urls_scanned INTEGER DEFAULT 0,
       total_urls INTEGER DEFAULT 0,
+      broken_links INTEGER DEFAULT 0,
+      total_links INTEGER DEFAULT 0,
       scan_config JSONB NOT NULL,
       error TEXT,
-      results JSONB
+      results JSONB,
+      state TEXT
     );
   `;
 

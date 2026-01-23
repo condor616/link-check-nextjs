@@ -21,13 +21,7 @@ export async function GET() {
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      try {
-        return await getConfigsFromSupabase();
-      } catch (supabaseError) {
-        console.error('Error getting configurations from Supabase - falling back to empty array:', supabaseError);
-        // Fall back to Prisma on Supabase error
-        return await getConfigsFromPrisma();
-      }
+      return await getConfigsFromSupabase();
     } else {
       return await getConfigsFromPrisma();
     }

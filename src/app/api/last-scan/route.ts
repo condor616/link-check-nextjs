@@ -9,13 +9,7 @@ export async function GET() {
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      try {
-        return await getLastScanFromSupabase();
-      } catch (supabaseError) {
-        console.error('Error getting last scan from Supabase:', supabaseError);
-        // Fall back to Prisma on Supabase error
-        return await getLastScanFromPrisma();
-      }
+      return await getLastScanFromSupabase();
     } else {
       return await getLastScanFromPrisma();
     }

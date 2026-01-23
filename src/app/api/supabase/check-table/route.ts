@@ -4,7 +4,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 export async function POST(request: Request) {
   try {
     const supabase = await getSupabaseClient();
-    
+
     if (!supabase) {
       console.error('Check Table: Supabase client not available. Check configuration.');
       return NextResponse.json(
@@ -23,9 +23,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     const { table } = body;
-    
+
     if (!table) {
       return NextResponse.json(
         { error: 'Table name is required' },
@@ -42,14 +42,15 @@ export async function POST(request: Request) {
         .from(table)
         .select('id')
         .limit(1);
-      
+
       if (error) {
-        // If the error is "relation does not exist", the table doesn't exist
-        if (error.message.includes('does not exist')) {
-          console.log(`Check Table: Table ${table} does not exist`);
+        // If the error is "relation does not exist" or "schema cache" error, 
+        // it likely means the table hasn't been created yet.
+        if (error.message.includes('does not exist') || error.message.includes('schema cache')) {
+          console.log(`Check Table: Table ${table} does not exist (Error: ${error.message})`);
           return NextResponse.json({ exists: false });
         }
-        
+
         // For other errors, return the error
         console.error(`Check Table: Error checking table ${table}`, error);
         return NextResponse.json(
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
-      
+
       // If there's no error, the table exists
       console.log(`Check Table: Table ${table} exists`);
       return NextResponse.json({ exists: true });
@@ -70,12 +71,12 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error('Error checking table existence:', error);
-    
+
     let errorMessage = 'Failed to check table existence';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    
+
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

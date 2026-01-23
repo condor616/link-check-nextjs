@@ -21,13 +21,7 @@ export async function GET(
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      try {
-        return await getScanFromSupabase(scanId);
-      } catch (supabaseError) {
-        console.error('Error getting scan from Supabase:', supabaseError);
-        // Fall back to Prisma on Supabase error
-        return await getScanFromPrisma(scanId);
-      }
+      return await getScanFromSupabase(scanId);
     } else {
       return await getScanFromPrisma(scanId);
     }
@@ -163,13 +157,7 @@ export async function DELETE(
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      try {
-        return await deleteScanFromSupabase(scanId);
-      } catch (supabaseError) {
-        console.error('Error deleting scan from Supabase:', supabaseError);
-        // Fall back to Prisma on Supabase error
-        return await deleteScanFromPrisma(scanId);
-      }
+      return await deleteScanFromSupabase(scanId);
     } else {
       return await deleteScanFromPrisma(scanId);
     }

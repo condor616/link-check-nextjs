@@ -39,6 +39,7 @@ async function processJob(job: any) {
 
                 // Throttle DB updates and checks
                 if (now - lastProgressUpdate > 1000) {
+                    lastProgressUpdate = now; // Set early
                     const progressPercent = totalCount > 0 ? Math.round((processedCount / totalCount) * 100) : 0;
 
                     // Update progress
@@ -55,33 +56,34 @@ async function processJob(job: any) {
                 }
 
                 // Check for status changes (pause/stop signals)
-                // Reduced throttle to 100ms for near-instant responsiveness
-                if (now - lastStatusCheck > 100) {
+                // Slightly increased throttle to 1000ms for status check to further reduce load
+                if (now - lastStatusCheck > 1000) {
+                    lastStatusCheck = now; // Set early to prevent concurrent calls in next processUrl ticks
                     try {
-                        const currentJob = await jobService.getJob(job.id);
-                        if (!currentJob) {
+                        const status = await jobService.getJobStatus(job.id);
+                        if (!status) {
                             console.log(`Job ${job.id} no longer exists. Aborting scanner.`);
                             stopReason = 'stopped';
                             await scanner.stop(); // Stop immediately
                             return;
                         }
 
-                        if (currentJob.status === 'pausing') {
+                        if (status === 'pausing') {
                             console.log(`Job ${job.id} pause requested.`);
                             stopReason = 'paused';
                             const state = await scanner.pause();
                             await jobService.updateJobState(job.id, JSON.stringify(state));
                             await jobService.updateJobStatus(job.id, 'paused');
-                        } else if (currentJob.status === 'stopping') {
+                        } else if (status === 'stopping') {
                             console.log(`Job ${job.id} stop requested.`);
                             stopReason = 'stopped';
                             await scanner.stop(); // Stop immediately
                             await jobService.updateJobStatus(job.id, 'stopped');
                         }
                     } catch (err) {
-                        console.error('Error checking job status:', err);
+                        // Log but don't abort - these could be transient DB errors
+                        console.error('Error checking job status (will retry):', err);
                     }
-                    lastStatusCheck = now;
                 }
             },
             onError: (error) => {

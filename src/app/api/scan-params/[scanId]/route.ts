@@ -22,14 +22,7 @@ export async function GET(
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      try {
-        // Get directly from scan_history table
-        return await getScanParamsFromSupabaseHistory(scanId);
-      } catch (supabaseError) {
-        console.error('Error getting scan params from Supabase:', supabaseError);
-        // Fall back to Prisma on Supabase error
-        return await getScanParamsFromPrisma(scanId);
-      }
+      return await getScanParamsFromSupabaseHistory(scanId);
     } else {
       return await getScanParamsFromPrisma(scanId);
     }

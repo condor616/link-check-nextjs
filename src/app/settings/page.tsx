@@ -88,8 +88,8 @@ export default function SettingsPage() {
         }
 
         // Basic URL validation
-        if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
-          throw new Error('Supabase URL should be in the format https://your-project.supabase.co');
+        if (!supabaseUrl.startsWith('http://') && !supabaseUrl.startsWith('https://')) {
+          throw new Error('Supabase URL should start with http:// or https://');
         }
 
         // Basic key validation (should be a long string)
@@ -216,7 +216,7 @@ export default function SettingsPage() {
 
     try {
       // First check if tables already exist
-      const tableNames = ['scan_configs', 'scan_history', 'scan_params'];
+      const tableNames = ['scan_configs', 'scan_history', 'scan_jobs'];
       let allTablesExist = true;
 
       for (const table of tableNames) {
@@ -319,7 +319,7 @@ export default function SettingsPage() {
 
     try {
       // Check if all required tables exist
-      const tableNames = ['scan_configs', 'scan_history', 'scan_params'];
+      const tableNames = ['scan_configs', 'scan_history', 'scan_jobs'];
       let allTablesExist = true;
 
       for (const table of tableNames) {

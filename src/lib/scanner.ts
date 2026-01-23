@@ -77,6 +77,9 @@ class Scanner {
     protected isRunning: boolean = false;
     protected isPaused: boolean = false;
 
+    // Optimized counters for progress reporting
+    private _brokenLinksCount: number = 0;
+
     // Use the inferred type for the limiter instance
     protected limit: LimitFunction | null = null;
     // Cache for auth headers to avoid recomputing for each request
@@ -105,7 +108,7 @@ class Scanner {
             wildcardExclusions: config.wildcardExclusions ?? [], // Default to empty array
             cssSelectors: config.cssSelectors ?? [], // Default to empty array
             cssSelectorsForceExclude: config.cssSelectorsForceExclude ?? false, // Default to false
-            requestTimeout: config.requestTimeout ?? 30000, // Default to 30 seconds (up from 10)
+            requestTimeout: config.requestTimeout ?? 30000, // Default to 30 seconds
             useAuthForAllDomains: config.useAuthForAllDomains ?? false,
             processHtml: config.processHtml ?? true,
             skipExternalDomains: config.skipExternalDomains ?? true,
@@ -121,24 +124,24 @@ class Scanner {
             throw new Error("Request timeout must be a positive number.");
         }
 
-        // Initialize auth headers cache if auth is provided
+        // Initialize auth headers cache
         if (this.config.auth?.username && this.config.auth?.password) {
             const credentials = Buffer.from(`${this.config.auth.username}:${this.config.auth.password}`).toString('base64');
             this.authHeadersCache = {
                 'User-Agent': 'LinkCheckerProBot/1.0',
                 'Authorization': `Basic ${credentials}`,
-                'Connection': 'keep-alive' // Enable connection reuse
+                'Connection': 'keep-alive'
             };
         } else {
             this.authHeadersCache = {
                 'User-Agent': 'LinkCheckerProBot/1.0',
-                'Connection': 'keep-alive' // Enable connection reuse
+                'Connection': 'keep-alive'
             };
         }
 
         this.callbacks = callbacks;
 
-        // Initialize state from initialState if provided, otherwise default
+        // Initialize state
         if (initialState) {
             this.visitedLinks = new Set(initialState.visitedLinks);
 
@@ -146,17 +149,12 @@ class Scanner {
             this.results = new Map();
             if (initialState.results) {
                 initialState.results.forEach((r: any) => {
-                    // Rehydrate foundOn Set
                     const foundOn = new Set<string>(Array.isArray(r.foundOn) ? r.foundOn : []);
-
-                    // Rehydrate htmlContexts Map
                     let htmlContexts: Map<string, string[]> | undefined;
                     if (r.htmlContexts) {
                         if (Array.isArray(r.htmlContexts)) {
-                            // Handle array of entries [[k,v], [k,v]]
                             htmlContexts = new Map(r.htmlContexts);
                         } else if (typeof r.htmlContexts === 'object') {
-                            // Handle object {k:v}
                             htmlContexts = new Map(Object.entries(r.htmlContexts));
                         }
                     }
@@ -170,17 +168,15 @@ class Scanner {
                 });
             }
 
-            // queuedLinks will be repopulated as we process the queue
+            this.recalculateBrokenLinksCount();
             this.queuedLinks = new Set();
 
-            // Pre-populate pendingUrls from the saved queue
             if (initialState.queue) {
                 initialState.queue.forEach(item => {
                     this.pendingUrls.set(item.url, item.depth);
                 });
             }
 
-            // Pre-populate abortedUrls from the saved state
             if (initialState.aborted) {
                 initialState.aborted.forEach(item => {
                     this.abortedUrls.set(item.url, item.depth);
@@ -257,9 +253,26 @@ class Scanner {
         }
     }
 
+    protected isProblematic(status?: string, statusCode?: number): boolean {
+        return status === 'broken' || status === 'error' || (statusCode !== undefined && statusCode >= 400);
+    }
+
+    private recalculateBrokenLinksCount(): void {
+        let count = 0;
+        for (const result of this.results.values()) {
+            if (this.isProblematic(result.status, result.statusCode)) {
+                count++;
+            }
+        }
+        this._brokenLinksCount = count;
+    }
+
     // Helper to add or update link results with HTML context
     protected addOrUpdateResultWithContext(linkUrl: string, sourceUrl: string, htmlContext: string, partialResult: Partial<Omit<ScanResult, 'url' | 'foundOn' | 'htmlContexts'>> = {}) {
         let entry = this.results.get(linkUrl);
+
+        // Track if status changed from/to problematic
+        const wasProblematic = entry ? this.isProblematic(entry.status, entry.statusCode) : false;
 
         // Determine if we should store the HTML context
         // Only store for problematic links or if status is not yet determined
@@ -299,6 +312,14 @@ class Scanner {
                 Object.assign(entry, partialResult);
             }
 
+            // Update broken link count if status changed
+            const isNowProblematic = this.isProblematic(entry.status, entry.statusCode);
+            if (!wasProblematic && isNowProblematic) {
+                this._brokenLinksCount++;
+            } else if (wasProblematic && !isNowProblematic) {
+                this._brokenLinksCount--;
+            }
+
             if (this.callbacks.onResult) {
                 this.callbacks.onResult(entry);
             }
@@ -319,10 +340,19 @@ class Scanner {
             };
             this.results.set(linkUrl, entry);
 
+            // Update broken link count
+            if (this.isProblematic(entry.status, entry.statusCode)) {
+                this._brokenLinksCount++;
+            }
+
             if (this.callbacks.onResult) {
                 this.callbacks.onResult(entry);
             }
         }
+    }
+
+    protected get brokenLinksCount(): number {
+        return this._brokenLinksCount;
     }
 
     // Function to process a single URL
@@ -865,11 +895,7 @@ export class WebsiteScanner extends Scanner {
         console.log(`[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
 
         if (this.callbacks.onProgress) {
-            const resultsArray = Array.from(this.results.values());
-            const brokenCount = resultsArray.filter(r =>
-                r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400)
-            ).length;
-            this.callbacks.onProgress(this.visitedLinks.size, urlToProcess, brokenCount, resultsArray.length);
+            this.callbacks.onProgress(this.visitedLinks.size, urlToProcess, this.brokenLinksCount, this.results.size);
         }
 
         // Fetch and process
