@@ -609,9 +609,9 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       >
         <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
           <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-2 min-w-0 max-w-[70%]">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               <StatusBadge status={link.status} code={link.statusCode} usedAuth={link.usedAuth} />
-              <ExpandableUrl url={link.url} truncateLength={50} showIcon={false} className="min-w-0" />
+              <ExpandableUrl url={link.url} truncateLength={50} showIcon={false} className="flex-1 min-w-0" externalExpanded={isExpanded} />
             </div>
             <div className="flex gap-1 items-center shrink-0">
               <span className="text-xs text-muted-foreground mr-2">
