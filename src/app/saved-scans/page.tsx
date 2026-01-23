@@ -475,7 +475,7 @@ export default function SavedScansPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {configs.map(config => (
-            <Card key={config.id} className="bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300">
+            <Card key={config.id} className="bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 cursor-pointer">
               <CardHeader className="pb-2">
                 <CardTitle className="text-xl">{config.name}</CardTitle>
                 <CardDescription>

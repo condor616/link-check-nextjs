@@ -92,7 +92,7 @@ export function MobileNav() {
 
 function MobileLink({ href, icon: Icon, label, onClick }: { href: string, icon: any, label: string, onClick: () => void }) {
     return (
-        <div onClick={onClick}>
+        <div onClick={onClick} className="cursor-pointer">
             <TransitionLink
                 href={href}
                 className="flex items-center gap-3 p-3 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200"

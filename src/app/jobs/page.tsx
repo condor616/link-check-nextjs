@@ -159,7 +159,7 @@ export default function ActiveJobsPage() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={fetchJobs}
-                            className="p-2 rounded-md border border-border hover:bg-sidebar-accent transition-colors"
+                            className="p-2 rounded-md border border-border hover:bg-sidebar-accent transition-colors cursor-pointer"
                         >
                             <RefreshCcw size={18} className={loading ? "animate-spin" : ""} />
                         </button>
@@ -229,7 +229,7 @@ export default function ActiveJobsPage() {
 
                                         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 min-w-0">
                                             <ExpandableUrl url={job.scan_url} truncateLength={40} showIcon={false} className="min-w-0" />
-                                            <a href={job.scan_url} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <a href={job.scan_url} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                                 <ExternalLink size={14} className="text-primary hover:scale-110 transition-transform" />
                                             </a>
                                         </h3>
@@ -273,7 +273,7 @@ export default function ActiveJobsPage() {
                                         {job.status === 'paused' ? (
                                             <button
                                                 onClick={() => handleJobAction(job.id, 'resume')}
-                                                className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg transition-all"
+                                                className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg transition-all cursor-pointer"
                                                 title="Resume Scan"
                                             >
                                                 <Play size={20} fill="currentColor" />
@@ -282,7 +282,7 @@ export default function ActiveJobsPage() {
                                             <button
                                                 onClick={() => handleJobAction(job.id, 'pause')}
                                                 disabled={job.status === 'pausing' || job.status === 'stopping'}
-                                                className="p-3 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-white rounded-lg transition-all disabled:opacity-50"
+                                                className="p-3 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-white rounded-lg transition-all disabled:opacity-50 cursor-pointer"
                                                 title="Pause Scan"
                                             >
                                                 <Pause size={20} fill="currentColor" />
@@ -291,7 +291,7 @@ export default function ActiveJobsPage() {
 
                                         <button
                                             onClick={() => setJobToRemove({ id: job.id, status: job.status })}
-                                            className="p-3 bg-sidebar-accent text-muted-foreground hover:bg-destructive hover:text-white rounded-lg transition-all"
+                                            className="p-3 bg-sidebar-accent text-muted-foreground hover:bg-destructive hover:text-white rounded-lg transition-all cursor-pointer"
                                             title="Delete Scan"
                                         >
                                             <Trash2 size={20} />

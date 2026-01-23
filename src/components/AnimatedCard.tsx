@@ -29,7 +29,7 @@ export function AnimatedCard({
         transition: { duration: 0.2 }
       }}
       className={cn(
-        "bg-card text-card-foreground rounded-xl border border-border shadow-sm p-6 transition-all duration-300 hover:border-primary/50 hover:shadow-[0_0_30px_-5px_var(--primary)] hover:bg-card/80",
+        "bg-card text-card-foreground rounded-xl border border-border shadow-sm p-6 transition-all duration-300 hover:border-primary/50 hover:shadow-[0_0_30px_-5px_var(--primary)] hover:bg-card/80 cursor-pointer",
         className
       )}
       {...props}

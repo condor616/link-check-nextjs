@@ -45,7 +45,7 @@ export function ExpandableUrl({
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1 text-muted-foreground hover:text-accent-primary transition-colors"
+                            className="p-1 text-muted-foreground hover:text-accent-primary transition-colors cursor-pointer"
                         >
                             <ExternalLink className="h-3.5 w-3.5" />
                         </a>

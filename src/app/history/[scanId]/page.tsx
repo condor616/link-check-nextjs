@@ -298,7 +298,7 @@ function ScanDetailsContent() {
 
     return (
       <main className="container mx-auto p-4 max-w-none">
-        <Card className="w-full bg-card border-border shadow-sm">
+        <Card className="w-full bg-card border-border shadow-sm cursor-pointer">
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
               <Button variant="ghost" className="p-0" asChild>
@@ -438,7 +438,7 @@ function ScanDetailsContent() {
   // Show Completed Scan
   return (
     <main className="container mx-auto p-4 max-w-none">
-      <Card className="w-full bg-card border-border shadow-sm">
+      <Card className="w-full bg-card border-border shadow-sm cursor-pointer">
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <Button variant="ghost" className="p-0" asChild>

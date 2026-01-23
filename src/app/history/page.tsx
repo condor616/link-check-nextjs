@@ -382,7 +382,7 @@ export default function HistoryPage() {
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Total Scans Card */}
-          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl">
+          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl cursor-pointer">
             <CardContent className="p-6">
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 <div className="rounded-full bg-purple-50 p-3 group-hover:bg-purple-100 transition-colors">
@@ -397,7 +397,7 @@ export default function HistoryPage() {
           </Card>
 
           {/* Active Jobs Card */}
-          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl">
+          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl cursor-pointer">
             <CardContent className="p-6">
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 <div className="rounded-full bg-blue-50 p-3 group-hover:bg-blue-100 transition-colors">
@@ -412,7 +412,7 @@ export default function HistoryPage() {
           </Card>
 
           {/* Last Scan Card */}
-          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl">
+          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl cursor-pointer">
             <CardContent className="p-6">
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 <div className="rounded-full bg-green-50 p-3 group-hover:bg-green-100 transition-colors">
@@ -540,7 +540,7 @@ export default function HistoryPage() {
                   </TableHeader>
                   <TableBody>
                     {scans.map((scan) => (
-                      <TableRow key={scan.id}>
+                      <TableRow key={scan.id} className="cursor-pointer">
                         <TableCell className="font-medium truncate max-w-[200px]" title={scan.scanUrl}>
                           {scan.scanUrl}
                         </TableCell>

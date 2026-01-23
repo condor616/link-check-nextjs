@@ -82,7 +82,7 @@ export function TopNav() {
 
             {/* Actions */}
             <div className="flex items-center">
-                <button className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors group text-sm font-medium">
+                <button className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors group text-sm font-medium cursor-pointer">
                     <LogOut size={18} className="group-hover:rotate-90 transition-transform" />
                     <span>Disconnect</span>
                 </button>

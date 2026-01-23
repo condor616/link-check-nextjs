@@ -649,7 +649,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                   e.stopPropagation();
                   handleCopyUrl(link.url);
                 }}
-                className="text-muted-foreground hover:text-foreground shrink-0 p-2"
+                className="text-muted-foreground hover:text-foreground shrink-0 p-2 cursor-pointer transition-colors"
                 title="Copy URL"
               >
                 {copiedUrl === link.url ? (
@@ -662,7 +662,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground shrink-0 p-2"
+                className="text-muted-foreground hover:text-foreground shrink-0 p-2 cursor-pointer transition-colors"
                 title="Open URL"
                 onClick={e => e.stopPropagation()}
               >
@@ -785,7 +785,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                 href={page}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline inline-flex items-center"
+                                className="text-blue-600 hover:text-primary hover:underline inline-flex items-center cursor-pointer transition-all"
                                 title={page}
                               >
                                 {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
