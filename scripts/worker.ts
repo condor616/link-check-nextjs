@@ -39,12 +39,14 @@ async function processJob(job: any) {
 
                 // Throttle DB updates and checks
                 if (now - lastProgressUpdate > 1000) {
+                    const progressPercent = totalCount > 0 ? Math.round((processedCount / totalCount) * 100) : 0;
+
                     // Update progress
                     jobService.updateJobProgress(job.id, {
-                        percent: 0,
+                        percent: progressPercent,
                         currentUrl,
                         scanned: processedCount,
-                        total: 0,
+                        total: totalCount,
                         brokenLinks: brokenCount,
                         totalLinks: totalCount
                     }).catch(err => console.error('Failed to update progress:', err));
