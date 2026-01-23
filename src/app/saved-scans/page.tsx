@@ -659,7 +659,7 @@ export default function SavedScansPage() {
               </div>
 
               {editUseAuth && (
-                <div className="pl-8 space-y-4 bg-gray-50 p-4 rounded-md">
+                <div className="pl-8 space-y-4 bg-gray-50 dark:bg-muted/20 p-4 rounded-md border border-transparent dark:border-border">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="editUsername" className="text-base">Username</Label>
@@ -668,7 +668,7 @@ export default function SavedScansPage() {
                         type="text"
                         value={editUsername}
                         onChange={(e) => setEditUsername(e.target.value)}
-                        className="text-base p-3 h-11"
+                        className="text-base p-3 h-11 bg-white dark:bg-background"
                       />
                     </div>
 
@@ -679,7 +679,7 @@ export default function SavedScansPage() {
                         type="password"
                         value={editPassword}
                         onChange={(e) => setEditPassword(e.target.value)}
-                        className="text-base p-3 h-11"
+                        className="text-base p-3 h-11 bg-white dark:bg-background"
                       />
                     </div>
                   </div>
@@ -709,7 +709,7 @@ export default function SavedScansPage() {
             </Button>
 
             {editShowAdvanced && (
-              <div className="border border-border rounded-lg p-6 space-y-6 mt-2 bg-gray-50">
+              <div className="border border-border rounded-lg p-6 space-y-6 mt-2 bg-gray-50 dark:bg-muted/20">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Left column */}
                   <div className="space-y-6">

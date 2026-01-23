@@ -2728,7 +2728,7 @@ function ScanForm() {
 
       {/* Auth Dialog */}
       <AlertDialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-background dark:bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle>HTTP Basic Authentication</AlertDialogTitle>
           </AlertDialogHeader>
@@ -2741,6 +2741,7 @@ function ScanForm() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Username"
+                className="bg-background dark:bg-input/20"
               />
             </div>
             <div className="space-y-2">
@@ -2751,6 +2752,7 @@ function ScanForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
+                className="bg-background dark:bg-input/20"
               />
             </div>
             <div className="flex items-center space-x-2 pt-2">

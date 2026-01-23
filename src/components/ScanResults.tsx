@@ -608,12 +608,12 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
         className={`text-sm ${index !== total - 1 ? 'border-b' : ''}`}
       >
         <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
-          <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0 w-full">
               <StatusBadge status={link.status} code={link.statusCode} usedAuth={link.usedAuth} />
               <ExpandableUrl url={link.url} truncateLength={50} showIcon={false} className="flex-1 min-w-0" externalExpanded={isExpanded} />
             </div>
-            <div className="flex gap-1 items-center shrink-0">
+            <div className="flex gap-1 items-center shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-border/50 pt-2 md:pt-0 mt-1 md:mt-0">
               <span className="text-xs text-muted-foreground mr-2">
                 {uniquePages.length} page{uniquePages.length !== 1 ? 's' : ''}
               </span>

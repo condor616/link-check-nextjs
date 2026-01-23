@@ -22,17 +22,17 @@ export function AnimatedButton({
   const getVariantClasses = () => {
     switch (variant) {
       case "primary":
-        return "bg-primary text-primary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--primary)] border border-transparent";
+        return "bg-primary text-primary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--primary)] border border-primary/50 rounded-none";
       case "secondary":
-        return "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-transparent";
+        return "bg-secondary text-secondary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--secondary)] border border-secondary/50 rounded-none";
       case "outline":
-        return "bg-transparent border border-input hover:border-primary hover:text-primary hover:bg-primary/10 hover:shadow-[0_0_15px_-5px_var(--primary)]";
+        return "bg-transparent border border-primary/50 text-primary hover:bg-primary/10 hover:shadow-[0_0_15px_-5px_var(--primary)] rounded-none";
       case "ghost":
-        return "bg-transparent hover:bg-accent hover:text-accent-foreground";
+        return "bg-transparent hover:bg-white/5 hover:text-primary rounded-none";
       case "destructive":
-        return "bg-destructive text-destructive-foreground hover:bg-destructive/90 border border-transparent";
+        return "bg-destructive text-destructive-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--destructive)] border border-transparent rounded-none";
       default:
-        return "bg-primary text-primary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--primary)] border border-transparent";
+        return "bg-primary text-primary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--primary)] border border-primary/50 rounded-none";
     }
   };
 
