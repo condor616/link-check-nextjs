@@ -6,9 +6,13 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertCircle, ArrowLeft, Trash2, CheckCircle2, XCircle, RefreshCw, Pause, Play, Square } from 'lucide-react';
+import {
+  Loader2, AlertCircle, ArrowLeft, Trash2, CheckCircle2,
+  XCircle, RefreshCw, Pause, Play, Square, ExternalLink
+} from 'lucide-react';
 import { ScanResult } from '@/lib/scanner';
 import ScanResults from '@/components/ScanResults';
+import { ExpandableUrl } from '@/components/ExpandableUrl';
 import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
@@ -362,10 +366,12 @@ function ScanDetailsContent() {
                 </AlertDialogContent>
               </AlertDialog>
             </div>
-            <CardTitle className="text-2xl flex items-center gap-2">
-              Scan {isActive ? 'in Progress' : isPaused ? 'Paused' : job.status === 'stopped' ? 'Stopped' : 'Status'}
-              <span className="text-sm font-normal text-muted-foreground">
-                ({job.scan_url})
+            <CardTitle className="text-2xl flex items-center gap-2 min-w-0">
+              <span className="shrink-0 text-foreground">
+                Scan {isActive ? 'in Progress' : isPaused ? 'Paused' : job.status === 'stopped' ? 'Stopped' : 'Status'}
+              </span>
+              <span className="text-sm font-normal text-muted-foreground min-w-0 truncate">
+                (<ExpandableUrl url={job.scan_url} truncateLength={40} showIcon={false} className="inline-flex" />)
               </span>
             </CardTitle>
             <CardDescription>
@@ -387,8 +393,10 @@ function ScanDetailsContent() {
                 <p className="text-xl font-semibold">{job.urls_scanned}</p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg border border-border/50 min-w-0">
-                <p className="text-muted-foreground">Current URL</p>
-                <p className="font-medium truncate block" title={job.current_url}>{job.current_url || 'Waiting...'}</p>
+                <p className="text-muted-foreground mb-1">Current URL</p>
+                <div className="font-medium text-foreground">
+                  <ExpandableUrl url={job.current_url} truncateLength={50} />
+                </div>
               </div>
             </div>
 
@@ -452,11 +460,11 @@ function ScanDetailsContent() {
             </div>
           </div>
 
-          <CardTitle className="text-2xl flex items-center gap-2">
-            Scan Details
+          <CardTitle className="text-2xl flex items-center gap-2 min-w-0">
+            <span className="shrink-0 text-foreground">Scan Details</span>
             {scan && (
-              <span className="text-sm font-normal text-muted-foreground">
-                ({scan.scanUrl.replace(/^https?:\/\//, '')})
+              <span className="text-sm font-normal text-muted-foreground min-w-0">
+                (<ExpandableUrl url={scan.scanUrl} truncateLength={40} showIcon={false} className="inline-flex" />)
               </span>
             )}
           </CardTitle>

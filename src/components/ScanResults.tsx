@@ -61,6 +61,7 @@ import {
 } from '@/components/ui/table';
 import ExportScanButton from './ExportScanButton';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { ExpandableUrl } from './ExpandableUrl';
 
 // Update the ScanResult interface for serialized HTML contexts
 interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
@@ -608,9 +609,9 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       >
         <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
           <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-2 truncate max-w-[70%]">
+            <div className="flex items-center gap-2 min-w-0 max-w-[70%]">
               <StatusBadge status={link.status} code={link.statusCode} usedAuth={link.usedAuth} />
-              <span className="truncate font-medium" title={link.url}>{link.url.replace(/^https?:\/\//, '')}</span>
+              <ExpandableUrl url={link.url} truncateLength={50} showIcon={false} className="min-w-0" />
             </div>
             <div className="flex gap-1 items-center shrink-0">
               <span className="text-xs text-muted-foreground mr-2">

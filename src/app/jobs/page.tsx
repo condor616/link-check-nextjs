@@ -14,6 +14,7 @@ import {
     Trash2
 } from 'lucide-react';
 import { PageTransition } from '@/components/PageTransition';
+import { ExpandableUrl } from '@/components/ExpandableUrl';
 import { AnimatedCard } from '@/components/AnimatedCard';
 import { AnimatedButton } from '@/components/AnimatedButton';
 import {
@@ -225,9 +226,9 @@ export default function ActiveJobsPage() {
                                             </span>
                                         </div>
 
-                                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                                            {job.scan_url}
-                                            <a href={job.scan_url} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 min-w-0">
+                                            <ExpandableUrl url={job.scan_url} truncateLength={40} showIcon={false} className="min-w-0" />
+                                            <a href={job.scan_url} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <ExternalLink size={14} className="text-primary hover:scale-110 transition-transform" />
                                             </a>
                                         </h3>
@@ -243,10 +244,10 @@ export default function ActiveJobsPage() {
                                                 <span className="text-foreground font-medium">{job.urls_scanned} / {job.total_urls || '?'}</span>
                                             </div>
                                             <div className="hidden md:flex flex-col flex-1 min-w-0">
-                                                <span className="text-muted-foreground text-xs uppercase font-semibold">Current URL</span>
-                                                <span className="text-foreground font-medium truncate italic block" title={job.current_url}>
-                                                    {job.current_url || 'Initializing...'}
-                                                </span>
+                                                <span className="text-muted-foreground text-xs uppercase font-semibold mb-1">Current URL</span>
+                                                <div className="text-foreground font-medium w-full overflow-hidden">
+                                                    <ExpandableUrl url={job.current_url} truncateLength={45} />
+                                                </div>
                                             </div>
                                         </div>
 
