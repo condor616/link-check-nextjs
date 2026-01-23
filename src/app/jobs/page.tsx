@@ -68,9 +68,14 @@ export default function ActiveJobsPage() {
 
     useEffect(() => {
         fetchJobs();
-        const interval = setInterval(fetchJobs, 2000); // Poll every 2 seconds
-        return () => clearInterval(interval);
     }, [fetchJobs]);
+
+    useEffect(() => {
+        // Poll every 2 seconds if there are active jobs, otherwise every 20 seconds
+        const intervalTime = jobs.length > 0 ? 2000 : 20000;
+        const interval = setInterval(fetchJobs, intervalTime);
+        return () => clearInterval(interval);
+    }, [fetchJobs, jobs.length]);
 
     const handleJobAction = async (id: string, action: 'pause' | 'resume' | 'stop') => {
         try {

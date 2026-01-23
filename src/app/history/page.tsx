@@ -77,16 +77,20 @@ export default function HistoryPage() {
   // Load scans and jobs on initial render
   useEffect(() => {
     fetchData();
+  }, []);
 
-    // Poll for job updates if there are active jobs
+  // Poll for job updates with a dynamic interval
+  useEffect(() => {
+    // Determine interval: 5 seconds if there are active jobs, otherwise 30 seconds
+    const hasActiveJobs = jobs.some(j => j.status === 'queued' || j.status === 'running');
+    const intervalTime = hasActiveJobs ? 5000 : 30000;
+
     const interval = setInterval(() => {
-      // We could optimize this to only poll if we know there are active jobs,
-      // but for simplicity let's just refresh jobs every 5 seconds
       fetchJobs();
-    }, 5000);
+    }, intervalTime);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [jobs]); // Re-run effect when jobs array changes to update interval
 
   const fetchData = async () => {
     setIsLoading(true);
