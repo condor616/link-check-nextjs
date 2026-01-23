@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     try {
-        const jobs = await jobService.getJobs();
+        const jobs = await jobService.getJobsMinimal();
         return NextResponse.json(jobs);
     } catch (error: any) {
         console.error('Error fetching scan jobs:', error);

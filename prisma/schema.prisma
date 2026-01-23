@@ -18,6 +18,8 @@ model Job {
   current_url     String?
   urls_scanned    Int      @default(0)
   total_urls      Int      @default(0)
+  broken_links    Int      @default(0)
+  total_links     Int      @default(0)
   scan_config     String   // JSON string
   error           String?
   results         String?  // JSON string (serialized ScanResult[])
@@ -29,6 +31,8 @@ model ScanHistory {
   scan_url        String
   scan_date       DateTime
   duration_seconds Float
+  broken_links    Int      @default(0)
+  total_links     Int      @default(0)
   config          String   // JSON string
   results         String   // JSON string
 }

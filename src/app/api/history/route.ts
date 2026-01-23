@@ -29,6 +29,15 @@ export async function GET(_request: NextRequest) {
 async function getHistoryFromPrisma() {
   try {
     const scans = await prisma.scanHistory.findMany({
+      select: {
+        id: true,
+        scan_url: true,
+        scan_date: true,
+        duration_seconds: true,
+        broken_links: true,
+        total_links: true,
+        config: true
+      },
       where: {
         NOT: {
           id: {
@@ -39,24 +48,7 @@ async function getHistoryFromPrisma() {
       orderBy: { scan_date: 'desc' }
     });
 
-    const summaries = scans.map(scan => {
-      let resultsArr: any[] = [];
-      try {
-        const parsedResults = JSON.parse(scan.results);
-        if (Array.isArray(parsedResults)) {
-          resultsArr = parsedResults;
-        } else if (parsedResults && typeof parsedResults === 'object') {
-          resultsArr = Object.values(parsedResults);
-        }
-      } catch (e) {
-        console.error(`Error parsing results for scan ${scan.id}:`, e);
-      }
-
-      const resultsCount = resultsArr.length;
-      const brokenLinksCount = resultsArr.filter((r: any) =>
-        r && (r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400))
-      ).length;
-
+    const summaries = scans.map((scan: any) => {
       let config = {};
       try {
         config = JSON.parse(scan.config);
@@ -70,8 +62,8 @@ async function getHistoryFromPrisma() {
         scanDate: scan.scan_date.toISOString(),
         durationSeconds: scan.duration_seconds,
         timestamp: scan.scan_date.getTime(),
-        resultsCount,
-        brokenLinksCount,
+        resultsCount: scan.total_links,
+        brokenLinksCount: scan.broken_links,
         config
       };
     });
@@ -94,7 +86,7 @@ async function getHistoryFromSupabase() {
 
     const { data, error } = await supabase
       .from('scan_history')
-      .select('*')
+      .select('id, scan_url, scan_date, duration_seconds, broken_links, total_links, config')
       .not('id', 'like', 'temp_%')
       .order('scan_date', { ascending: false });
 
@@ -102,40 +94,16 @@ async function getHistoryFromSupabase() {
       throw new Error(`Supabase error: ${error.message}`);
     }
 
-    // Define interface for Supabase response since we don't have generated types
-    interface ScanHistoryItem {
-      id: string;
-      scan_url: string;
-      scan_date: string;
-      duration_seconds: number;
-      results: any[];
-      config: any;
-    }
-
-    const scans = data as unknown as ScanHistoryItem[];
-
     // Convert to the expected format
-    const summaries = scans.map(scan => {
-      let resultsArr: any[] = [];
-      if (Array.isArray(scan.results)) {
-        resultsArr = scan.results;
-      } else if (scan.results && typeof scan.results === 'object') {
-        resultsArr = Object.values(scan.results);
-      }
-
-      const resultsCount = resultsArr.length;
-      const brokenLinksCount = resultsArr.filter((r: any) =>
-        r && (r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400))
-      ).length;
-
+    const summaries = (data as any[]).map((scan: any) => {
       return {
         id: scan.id,
         scanUrl: scan.scan_url,
         scanDate: scan.scan_date,
         durationSeconds: scan.duration_seconds,
         timestamp: new Date(scan.scan_date as string).getTime(),
-        resultsCount,
-        brokenLinksCount,
+        resultsCount: scan.total_links || 0,
+        broken_links: scan.broken_links || 0,
         config: scan.config
       };
     });

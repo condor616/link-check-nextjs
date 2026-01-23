@@ -34,7 +34,7 @@ async function processJob(job: any) {
             onStart: (estimatedUrls) => {
                 console.log(`Scan started. Estimated URLs: ${estimatedUrls}`);
             },
-            onProgress: async (processedCount, currentUrl) => {
+            onProgress: async (processedCount, currentUrl, brokenCount, totalCount) => {
                 const now = Date.now();
 
                 // Throttle DB updates and checks
@@ -44,7 +44,9 @@ async function processJob(job: any) {
                         percent: 0,
                         currentUrl,
                         scanned: processedCount,
-                        total: 0
+                        total: 0,
+                        brokenLinks: brokenCount,
+                        totalLinks: totalCount
                     }).catch(err => console.error('Failed to update progress:', err));
 
                     lastProgressUpdate = now;

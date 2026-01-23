@@ -10,6 +10,8 @@ export interface SaveScanPayload {
     durationSeconds: number;
     config: ScanConfig;
     results: ScanResult[];
+    brokenLinksCount?: number;
+    totalLinksCount?: number;
 }
 
 // Define the structure of the saved file
@@ -34,9 +36,19 @@ export class HistoryService {
             htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
         }));
 
+        const brokenLinksCount = payload.brokenLinksCount !== undefined
+            ? payload.brokenLinksCount
+            : payload.results.filter(r => r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400)).length;
+
+        const totalLinksCount = payload.totalLinksCount !== undefined
+            ? payload.totalLinksCount
+            : payload.results.length;
+
         const savedData: SavedScan = {
             id: scanId,
             ...payload,
+            brokenLinksCount,
+            totalLinksCount,
             results: serializedResults as any // Cast to any to match ScanResult[] interface which expects Set/Map
         };
 
@@ -61,6 +73,8 @@ export class HistoryService {
                     scan_url: savedData.scanUrl,
                     scan_date: new Date(savedData.scanDate),
                     duration_seconds: savedData.durationSeconds,
+                    broken_links: savedData.brokenLinksCount || 0,
+                    total_links: savedData.totalLinksCount || 0,
                     config: JSON.stringify(savedData.config),
                     results: JSON.stringify(savedData.results)
                 }
@@ -90,6 +104,8 @@ export class HistoryService {
                     scan_url: savedData.scanUrl,
                     scan_date: savedData.scanDate,
                     duration_seconds: savedData.durationSeconds,
+                    broken_links: savedData.brokenLinksCount || 0,
+                    total_links: savedData.totalLinksCount || 0,
                     config: savedData.config,
                     results: savedData.results
                 });

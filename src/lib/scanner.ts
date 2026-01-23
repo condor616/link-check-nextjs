@@ -46,7 +46,7 @@ export interface ScanResult {
  */
 export interface ScanCallbacks {
     onStart?: (estimatedUrls: number) => void;
-    onProgress?: (processedCount: number, currentUrl: string) => void;
+    onProgress?: (processedCount: number, currentUrl: string, brokenCount: number, totalCount: number) => void;
     onResult?: (result: ScanResult) => void;
     onComplete?: (results: ScanResult[]) => void;
     onError?: (error: Error) => void;
@@ -842,7 +842,11 @@ export class WebsiteScanner extends Scanner {
         console.log(`[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
 
         if (this.callbacks.onProgress) {
-            this.callbacks.onProgress(this.visitedLinks.size, urlToProcess);
+            const resultsArray = Array.from(this.results.values());
+            const brokenCount = resultsArray.filter(r =>
+                r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400)
+            ).length;
+            this.callbacks.onProgress(this.visitedLinks.size, urlToProcess, brokenCount, resultsArray.length);
         }
 
         // Fetch and process

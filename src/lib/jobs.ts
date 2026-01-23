@@ -19,6 +19,8 @@ export interface ScanJob {
     current_url?: string;
     urls_scanned: number;
     total_urls: number;
+    broken_links: number;
+    total_links: number;
     scan_config: ScanConfig;
     error?: string;
     results?: ScanResult[]; // Optional, might be stored separately or here
@@ -58,6 +60,8 @@ export class JobService {
             progress_percent: 0,
             urls_scanned: 0,
             total_urls: 0,
+            broken_links: 0,
+            total_links: 0,
             scan_config: config,
         };
 
@@ -80,6 +84,8 @@ export class JobService {
                     progress_percent: newJob.progress_percent,
                     urls_scanned: newJob.urls_scanned,
                     total_urls: newJob.total_urls,
+                    broken_links: newJob.broken_links,
+                    total_links: newJob.total_links,
                     scan_config: JSON.stringify(newJob.scan_config),
                 }
             });
@@ -89,7 +95,51 @@ export class JobService {
     }
 
     /**
-     * Retrieves all jobs (ordered by creation date desc).
+     * Retrieves all jobs (minimal metadata for list views).
+     */
+    async getJobsMinimal(): Promise<Partial<ScanJob>[]> {
+        if (this.useSupabase && this.supabase) {
+            const { data, error } = await this.supabase
+                .from('scan_jobs')
+                .select('id, status, scan_url, created_at, started_at, completed_at, progress_percent, urls_scanned, total_urls, broken_links, total_links')
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (error) {
+                console.error('Supabase getJobsMinimal error:', error);
+                return [];
+            }
+            return data as Partial<ScanJob>[];
+        } else {
+            const jobs = await prisma.job.findMany({
+                select: {
+                    id: true,
+                    status: true,
+                    scan_url: true,
+                    created_at: true,
+                    started_at: true,
+                    completed_at: true,
+                    progress_percent: true,
+                    urls_scanned: true,
+                    total_urls: true,
+                    broken_links: true,
+                    total_links: true
+                },
+                orderBy: { created_at: 'desc' },
+                take: 50
+            });
+
+            return jobs.map((j: any) => ({
+                ...j,
+                created_at: j.created_at.toISOString(),
+                started_at: j.started_at?.toISOString(),
+                completed_at: j.completed_at?.toISOString(),
+            }));
+        }
+    }
+
+    /**
+     * Retrieves all jobs.
      */
     async getJobs(): Promise<ScanJob[]> {
         if (this.useSupabase && this.supabase) {
@@ -158,6 +208,8 @@ export class JobService {
             current_url: updateData.current_url,
             urls_scanned: updateData.urls_scanned,
             total_urls: updateData.total_urls,
+            broken_links: updateData.broken_links,
+            total_links: updateData.total_links,
             error: updateData.error,
             state: updateData.state,
         };
@@ -166,8 +218,15 @@ export class JobService {
         if (updateData.completed_at) prismaUpdate.completed_at = new Date(updateData.completed_at);
         if (updateData.scan_config) prismaUpdate.scan_config = JSON.stringify(updateData.scan_config);
 
-        // Handle results serialization
+        // Handle results serialization and count calculation
         if (updateData.results) {
+            const brokenCount = updateData.results.filter((r: any) =>
+                r.status === 'broken' || r.status === 'error' || (r.statusCode !== undefined && r.statusCode >= 400)
+            ).length;
+
+            prismaUpdate.broken_links = brokenCount;
+            prismaUpdate.total_links = updateData.results.length;
+
             prismaUpdate.results = JSON.stringify(updateData.results.map((r: any) => ({
                 ...r,
                 foundOn: Array.from(r.foundOn || []),
@@ -205,7 +264,9 @@ export class JobService {
                             ? (new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000
                             : 0,
                         config: job.scan_config,
-                        results: job.results
+                        results: job.results,
+                        brokenLinksCount: job.broken_links,
+                        totalLinksCount: job.total_links
                     };
 
                     // Save to history using the same ID
@@ -221,13 +282,16 @@ export class JobService {
     /**
      * Updates progress specifically.
      */
-    async updateJobProgress(id: string, progress: { percent: number; currentUrl: string; scanned: number; total: number }): Promise<void> {
-        const updateData = {
+    async updateJobProgress(id: string, progress: { percent: number; currentUrl: string; scanned: number; total: number; brokenLinks?: number; totalLinks?: number }): Promise<void> {
+        const updateData: any = {
             progress_percent: progress.percent,
             current_url: progress.currentUrl,
             urls_scanned: progress.scanned,
             total_urls: progress.total,
         };
+
+        if (progress.brokenLinks !== undefined) updateData.broken_links = progress.brokenLinks;
+        if (progress.totalLinks !== undefined) updateData.total_links = progress.totalLinks;
 
         if (this.useSupabase && this.supabase) {
             const { error } = await this.supabase
@@ -414,6 +478,8 @@ export class JobService {
             current_url: prismaJob.current_url || undefined,
             urls_scanned: prismaJob.urls_scanned,
             total_urls: prismaJob.total_urls,
+            broken_links: prismaJob.broken_links || 0,
+            total_links: prismaJob.total_links || 0,
             scan_config: JSON.parse(prismaJob.scan_config),
             error: prismaJob.error || undefined,
             results,

@@ -37,6 +37,7 @@ interface ScanJob {
     current_url?: string;
     urls_scanned: number;
     total_urls: number;
+    broken_links?: number;
 }
 
 export default function ActiveJobsPage() {
@@ -242,6 +243,13 @@ export default function ActiveJobsPage() {
                                             <div className="flex flex-col">
                                                 <span className="text-muted-foreground text-xs uppercase font-semibold">Links Scanned</span>
                                                 <span className="text-foreground font-medium">{job.urls_scanned} / {job.total_urls || '?'}</span>
+                                            </div>
+                                            <div className="h-8 w-px bg-border/50" />
+                                            <div className="flex flex-col">
+                                                <span className="text-muted-foreground text-xs uppercase font-semibold">Broken Links</span>
+                                                <span className={`font-medium ${(job.broken_links || 0) > 0 ? 'text-destructive' : 'text-green-500'}`}>
+                                                    {job.broken_links || 0}
+                                                </span>
                                             </div>
                                             <div className="hidden md:flex flex-col flex-1 min-w-0">
                                                 <span className="text-muted-foreground text-xs uppercase font-semibold mb-1">Current URL</span>
