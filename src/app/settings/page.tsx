@@ -515,7 +515,7 @@ export default function SettingsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-4">Settings</h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-muted-foreground mb-6">
           Configure your application settings
         </p>
       </div>
@@ -572,7 +572,7 @@ export default function SettingsPage() {
                 </div>
 
                 {storageType === 'supabase' && (
-                  <div className="space-y-6 p-4 border rounded-md bg-slate-50">
+                  <div className="space-y-6 p-4 border rounded-md bg-muted/20 border-border">
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <Label htmlFor="supabase-url">Supabase URL<span className="text-red-500">*</span></Label>
@@ -580,7 +580,7 @@ export default function SettingsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                            className="flex items-center gap-1 text-primary hover:text-primary/80 hover:bg-primary/10"
                             onClick={() => setShowHelpDialog(true)}
                           >
                             <HelpCircle className="h-4 w-4" />
@@ -629,7 +629,8 @@ export default function SettingsPage() {
 
                     {connectionTestResult && !connectionTestResult.success && (
                       <Alert
-                        className="mt-2 bg-red-50 text-red-800 border-red-200"
+                        variant="destructive"
+                        className="mt-2"
                       >
                         <AlertCircle className="h-5 w-5" />
                         <AlertDescription>
@@ -673,9 +674,9 @@ export default function SettingsPage() {
                       </div>
 
                       {!supabaseUrl || !supabaseKey ? (
-                        <Alert className="bg-amber-50 text-amber-800 border-amber-200">
+                        <Alert className="bg-amber-500/10 text-amber-500 border-amber-500/20">
                           <AlertCircle className="h-5 w-5" />
-                          <AlertDescription>
+                          <AlertDescription className="text-amber-500/90">
                             Please enter both Supabase URL and key before attempting to manage tables.
                           </AlertDescription>
                         </Alert>
@@ -762,30 +763,30 @@ export default function SettingsPage() {
             <ol className="list-decimal list-inside space-y-4 mt-3">
               <li>
                 <span className="font-medium">Create a Supabase account</span>
-                <p className="ml-5 text-gray-700">If you don't have one already, sign up at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://supabase.com</a></p>
+                <p className="ml-5 text-muted-foreground">If you don't have one already, sign up at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">https://supabase.com</a></p>
               </li>
               <li>
                 <span className="font-medium">Create a new project</span>
-                <p className="ml-5 text-gray-700">From your Supabase dashboard, click "New Project" and follow the setup wizard</p>
+                <p className="ml-5 text-muted-foreground">From your Supabase dashboard, click "New Project" and follow the setup wizard</p>
               </li>
               <li>
                 <span className="font-medium">Get your project API credentials</span>
-                <p className="ml-5 text-gray-700">In your project dashboard, go to Settings → API</p>
-                <p className="ml-5 text-gray-700">Under "Project URL", copy the URL (e.g., <code>https://abcdefghijklm.supabase.co</code>)</p>
-                <p className="ml-5 text-gray-700">Under "Project API keys", copy the "anon" public key</p>
+                <p className="ml-5 text-muted-foreground">In your project dashboard, go to Settings → API</p>
+                <p className="ml-5 text-muted-foreground">Under "Project URL", copy the URL (e.g., <code>https://abcdefghijklm.supabase.co</code>)</p>
+                <p className="ml-5 text-muted-foreground">Under "Project API keys", copy the "anon" public key</p>
               </li>
               <li>
                 <span className="font-medium">Enter credentials in this form</span>
-                <p className="ml-5 text-gray-700">Paste the URL and anon key into the fields above</p>
+                <p className="ml-5 text-muted-foreground">Paste the URL and anon key into the fields above</p>
               </li>
               <li>
                 <span className="font-medium">Save your settings</span>
-                <p className="ml-5 text-gray-700">Click "Save Settings" button to save your Supabase configuration</p>
+                <p className="ml-5 text-muted-foreground">Click "Save Settings" button to save your Supabase configuration</p>
               </li>
               <li>
                 <span className="font-medium">Initialize the database schema</span>
-                <p className="ml-5 text-gray-700">After saving, click the "Initialize Schema" button</p>
-                <p className="ml-5 text-gray-700">If you see SQL commands, you'll need to run them in the Supabase SQL Editor (Project → SQL Editor)</p>
+                <p className="ml-5 text-muted-foreground">After saving, click the "Initialize Schema" button</p>
+                <p className="ml-5 text-muted-foreground">If you see SQL commands, you'll need to run them in the Supabase SQL Editor (Project → SQL Editor)</p>
               </li>
             </ol>
           </div>
@@ -812,7 +813,7 @@ export default function SettingsPage() {
           </DialogHeader>
 
           <div className="mt-4">
-            <div className="bg-gray-900 text-gray-100 p-3 rounded overflow-auto max-h-[60vh] text-sm">
+            <div className="bg-zinc-950 text-zinc-100 p-3 rounded-lg border border-border overflow-auto max-h-[60vh] text-sm">
               <pre className="whitespace-pre-wrap break-all">{sqlCommands ? sqlCommands.join('\n\n') : ''}</pre>
             </div>
           </div>
