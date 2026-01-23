@@ -792,69 +792,71 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
                               </a>
 
-                              <TooltipProvider>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground">
-                                      <Info className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[500px] p-3" align="start" side="left">
-                                    <div className="space-y-2">
-                                      <h4 className="text-sm font-medium">Link HTML Context:</h4>
-                                      <div className="max-h-[300px] overflow-y-auto space-y-3">
-                                        {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
-                                          const html = generateHtmlContext(link.url, page, idx + 1);
-                                          return (
-                                            <div key={idx} className="relative">
-                                              <div className="absolute top-1 right-1 flex space-x-1">
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="h-6 w-6 p-0 text-muted-foreground"
-                                                  onClick={() => handleCopyUrl(html)}
-                                                  title="Copy HTML"
-                                                >
-                                                  <ClipboardCopy className="h-3.5 w-3.5" />
-                                                </Button>
+                              {(link.status === 'broken' || link.status === 'error' || (link.statusCode !== undefined && link.statusCode >= 400)) && (
+                                <TooltipProvider>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground">
+                                        <Info className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[500px] p-3" align="start" side="left">
+                                      <div className="space-y-2">
+                                        <h4 className="text-sm font-medium">Link HTML Context:</h4>
+                                        <div className="max-h-[300px] overflow-y-auto space-y-3">
+                                          {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
+                                            const html = generateHtmlContext(link.url, page, idx + 1);
+                                            return (
+                                              <div key={idx} className="relative">
+                                                <div className="absolute top-1 right-1 flex space-x-1">
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-6 w-6 p-0 text-muted-foreground"
+                                                    onClick={() => handleCopyUrl(html)}
+                                                    title="Copy HTML"
+                                                  >
+                                                    <ClipboardCopy className="h-3.5 w-3.5" />
+                                                  </Button>
+                                                </div>
+                                                <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
+                                                  style={{ maxHeight: "250px", fontSize: "12px" }}>
+                                                  <code dangerouslySetInnerHTML={{
+                                                    __html: html
+                                                      // Use syntax highlighting for HTML
+                                                      .replace(/&/g, '&amp;')
+                                                      .replace(/</g, '&lt;')
+                                                      .replace(/>/g, '&gt;')
+                                                      .replace(/"/g, '&quot;')
+                                                      // Highlight comments
+                                                      .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6A9955;">$1</span>')
+                                                      // Highlight the attribute containing the broken link
+                                                      .replace(
+                                                        new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
+                                                        '<span style="background-color: rgba(255,0,0,0.2); color: #d20000; font-weight: bold; padding: 0 3px; border-radius: 2px;">$1' + link.url + '$2</span>'
+                                                      )
+                                                      // Highlight tags
+                                                      .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span style="color: #569cd6;">$1</span>$2')
+                                                      // Highlight attributes
+                                                      .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span style="color: #9cdcfe;">$2</span>$3')
+                                                      // Highlight quotes and their content
+                                                      .replace(/(&quot;)(.*?)(&quot;)/g, '<span style="color: #ce9178;">$1$2$3</span>')
+                                                  }} />
+                                                </pre>
                                               </div>
-                                              <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
-                                                style={{ maxHeight: "250px", fontSize: "12px" }}>
-                                                <code dangerouslySetInnerHTML={{
-                                                  __html: html
-                                                    // Use syntax highlighting for HTML
-                                                    .replace(/&/g, '&amp;')
-                                                    .replace(/</g, '&lt;')
-                                                    .replace(/>/g, '&gt;')
-                                                    .replace(/"/g, '&quot;')
-                                                    // Highlight comments
-                                                    .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6A9955;">$1</span>')
-                                                    // Highlight the attribute containing the broken link
-                                                    .replace(
-                                                      new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
-                                                      '<span style="background-color: rgba(255,0,0,0.2); color: #d20000; font-weight: bold; padding: 0 3px; border-radius: 2px;">$1' + link.url + '$2</span>'
-                                                    )
-                                                    // Highlight tags
-                                                    .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span style="color: #569cd6;">$1</span>$2')
-                                                    // Highlight attributes
-                                                    .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span style="color: #9cdcfe;">$2</span>$3')
-                                                    // Highlight quotes and their content
-                                                    .replace(/(&quot;)(.*?)(&quot;)/g, '<span style="color: #ce9178;">$1$2$3</span>')
-                                                }} />
-                                              </pre>
-                                            </div>
-                                          );
-                                        })}
-                                        {occurrences > 3 && (
-                                          <p className="text-xs text-muted-foreground">
-                                            {occurrences - 3} more occurrence(s) on this page...
-                                          </p>
-                                        )}
+                                            );
+                                          })}
+                                          {occurrences > 3 && (
+                                            <p className="text-xs text-muted-foreground">
+                                              {occurrences - 3} more occurrence(s) on this page...
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              </TooltipProvider>
+                                    </PopoverContent>
+                                  </Popover>
+                                </TooltipProvider>
+                              )}
                             </>
                           )}
                         </li>

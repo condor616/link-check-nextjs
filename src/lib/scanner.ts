@@ -260,19 +260,37 @@ class Scanner {
     // Helper to add or update link results with HTML context
     protected addOrUpdateResultWithContext(linkUrl: string, sourceUrl: string, htmlContext: string, partialResult: Partial<Omit<ScanResult, 'url' | 'foundOn' | 'htmlContexts'>> = {}) {
         let entry = this.results.get(linkUrl);
+
+        // Determine if we should store the HTML context
+        // Only store for problematic links or if status is not yet determined
+        const isProblematicStatus = (status?: string) => status === 'broken' || status === 'error';
+        const shouldStoreContext = sourceUrl !== 'initial' && (
+            !entry ||
+            isProblematicStatus(entry.status) ||
+            entry.status === undefined ||
+            isProblematicStatus(partialResult.status)
+        );
+
         if (entry) {
             if (sourceUrl !== 'initial') {
                 entry.foundOn.add(sourceUrl);
 
-                // Add HTML context
-                if (!entry.htmlContexts) {
-                    entry.htmlContexts = new Map<string, string[]>();
-                }
+                // Add HTML context only if necessary
+                if (shouldStoreContext) {
+                    if (!entry.htmlContexts) {
+                        entry.htmlContexts = new Map<string, string[]>();
+                    }
 
-                if (!entry.htmlContexts.has(sourceUrl)) {
-                    entry.htmlContexts.set(sourceUrl, [htmlContext]);
-                } else {
-                    entry.htmlContexts.get(sourceUrl)?.push(htmlContext);
+                    if (!entry.htmlContexts.has(sourceUrl)) {
+                        entry.htmlContexts.set(sourceUrl, [htmlContext]);
+                    } else {
+                        entry.htmlContexts.get(sourceUrl)?.push(htmlContext);
+                    }
+                } else if (entry.htmlContexts) {
+                    // Purge contexts if we now know it's not problematic
+                    if (partialResult.status && !isProblematicStatus(partialResult.status)) {
+                        entry.htmlContexts = undefined;
+                    }
                 }
             }
 
@@ -286,7 +304,7 @@ class Scanner {
             }
         } else {
             const htmlContexts = new Map<string, string[]>();
-            if (sourceUrl !== 'initial') {
+            if (shouldStoreContext) {
                 htmlContexts.set(sourceUrl, [htmlContext]);
             }
 
@@ -297,7 +315,7 @@ class Scanner {
                 contentType: partialResult.contentType,
                 errorMessage: partialResult.errorMessage,
                 foundOn: new Set(sourceUrl === 'initial' ? [] : [sourceUrl]),
-                htmlContexts
+                htmlContexts: htmlContexts.size > 0 ? htmlContexts : undefined
             };
             this.results.set(linkUrl, entry);
 
@@ -374,6 +392,11 @@ class Scanner {
             currentResult.status = isBroken ? 'broken' : 'ok';
             currentResult.statusCode = status;
             currentResult.contentType = contentType;
+
+            // Purge HTML contexts if the link is OK to save space
+            if (!isBroken) {
+                currentResult.htmlContexts = undefined;
+            }
 
             // Parse HTML and queue new links if applicable
             if (!isBroken && contentType.includes('text/html') && this.config.processHtml) {
