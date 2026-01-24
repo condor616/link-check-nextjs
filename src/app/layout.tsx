@@ -22,6 +22,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Link Checker Pro",
   description: "Scan websites for broken links",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
