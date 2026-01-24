@@ -5,7 +5,6 @@ import {
     Activity,
     Pause,
     Play,
-    Square,
     RefreshCcw,
     ExternalLink,
     AlertCircle,
@@ -17,16 +16,7 @@ import { PageTransition } from '@/components/PageTransition';
 import { ExpandableUrl } from '@/components/ExpandableUrl';
 import { AnimatedCard } from '@/components/AnimatedCard';
 import { AnimatedButton } from '@/components/AnimatedButton';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { SimpleModal } from "@/components/SimpleModal";
 
 interface ScanJob {
     id: string;
@@ -132,48 +122,49 @@ export default function ActiveJobsPage() {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'running': return 'text-primary';
-            case 'paused': return 'text-yellow-500';
+            case 'paused': return 'text-warning';
             case 'pausing':
-            case 'stopping': return 'text-orange-500';
-            case 'queued': return 'text-blue-400';
-            case 'completed': return 'text-green-500';
+            case 'stopping': return 'text-warning';
+            case 'queued': return 'text-info';
+            case 'completed': return 'text-success';
             case 'failed':
-            case 'stopped': return 'text-destructive';
-            default: return 'text-muted-foreground';
+            case 'stopped': return 'text-danger';
+            default: return 'text-muted';
         }
     };
 
     return (
         <PageTransition>
-            <div className="container mx-auto py-8 px-4 max-w-6xl">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div className="w-100 py-4">
+                <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                        <h1 className="display-6 fw-bold text-body d-flex align-items-center gap-2">
                             <Activity className="text-primary" /> Active Jobs
                         </h1>
-                        <p className="text-muted-foreground mt-1 text-sm">
+                        <p className="text-muted mt-1 small">
                             Monitor and manage your ongoing scans in real-time.
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="d-flex align-items-center gap-2">
                         <button
                             onClick={fetchJobs}
-                            className="p-2 rounded-md border border-border hover:bg-sidebar-accent transition-colors cursor-pointer"
+                            className="btn btn-outline-secondary d-flex align-items-center justify-content-center p-2"
+                            style={{ width: '40px', height: '40px' }}
                         >
                             <RefreshCcw size={18} className={loading ? "animate-spin" : ""} />
                         </button>
 
                         <AnimatedButton
-                            variant="destructive"
+                            variant="danger"
                             onClick={() => setShowStopAllConfirm(true)}
                             disabled={jobs.length === 0 || stoppingAll}
-                            className="bg-destructive/10 text-destructive hover:bg-destructive hover:text-white border-destructive/20"
+                            className="d-flex align-items-center gap-2 bg-danger bg-opacity-10 text-danger border-danger border-opacity-25"
                         >
                             {stoppingAll ? (
-                                <Loader2 size={18} className="animate-spin mr-2" />
+                                <Loader2 size={18} className="animate-spin" />
                             ) : (
-                                <XOctagon size={18} className="mr-2" />
+                                <XOctagon size={18} />
                             )}
                             Stop All
                         </AnimatedButton>
@@ -181,99 +172,100 @@ export default function ActiveJobsPage() {
                 </div>
 
                 {error && (
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg mb-6 flex items-center gap-3">
+                    <div className="alert alert-danger d-flex align-items-center gap-3 mb-4" role="alert">
                         <AlertCircle size={20} />
                         <span>Error: {error}</span>
                     </div>
                 )}
 
                 {loading && jobs.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 bg-sidebar/30 rounded-xl border border-dashed border-border/50">
-                        <Loader2 className="animate-spin text-primary mb-4" size={32} />
-                        <p className="text-muted-foreground">Initializing access to workers...</p>
+                    <div className="d-flex flex-column align-items-center justify-content-center py-5 bg-light rounded-3 border border-dashed">
+                        <Loader2 className="animate-spin text-primary mb-3" size={32} />
+                        <p className="text-muted">Initializing access to workers...</p>
                     </div>
                 ) : jobs.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 bg-sidebar/30 rounded-xl border border-dashed border-border/50 text-center px-10">
-                        <div className="w-16 h-16 bg-sidebar-accent/50 rounded-full flex items-center justify-center mb-4">
-                            <Activity size={32} className="text-muted-foreground opacity-50" />
+                    <div className="d-flex flex-column align-items-center justify-content-center py-5 bg-light rounded-3 border border-dashed text-center px-4">
+                        <div className="p-3 bg-secondary bg-opacity-10 rounded-circle mb-3">
+                            <Activity size={32} className="text-muted opacity-50" />
                         </div>
-                        <h3 className="text-lg font-medium text-foreground">No active jobs found</h3>
-                        <p className="text-muted-foreground max-w-md mt-2">
+                        <h3 className="h5 fw-medium text-body">No active jobs found</h3>
+                        <p className="text-muted text-center max-w-md mt-1 mb-4">
                             When you start a scan, it will appear here. You can then monitor its progress and control it.
                         </p>
                         <AnimatedButton
                             href="/scan"
-                            className="mt-6"
+                            variant="primary"
                         >
                             Start New Scan
                         </AnimatedButton>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="d-flex flex-column gap-3">
                         {jobs.map((job) => (
-                            <AnimatedCard key={job.id} className="group overflow-hidden">
-                                <div className="p-5 flex flex-col md:flex-row gap-6">
+                            <AnimatedCard key={job.id} className="overflow-hidden">
+                                <div className="d-flex flex-column flex-md-row gap-4">
                                     {/* Info Section */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-sidebar-accent ${getStatusColor(job.status)}`}>
+                                    <div className="flex-grow-1 min-w-0">
+                                        <div className="d-flex align-items-center justify-content-between mb-2">
+                                            <div className="d-flex align-items-center gap-2">
+                                                <span className={`badge bg-light text-uppercase tracking-wider px-2 py-1 ${getStatusColor(job.status)}`}>
                                                     {job.status}
                                                 </span>
-                                                <span className="text-xs text-muted-foreground font-mono">ID: {job.id.slice(0, 8)}...</span>
+                                                <span className="small text-muted font-monospace">ID: {job.id.slice(0, 8)}...</span>
                                             </div>
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className="small text-muted">
                                                 Started {new Date(job.created_at).toLocaleTimeString()}
                                             </span>
                                         </div>
 
-                                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 min-w-0">
-                                            <ExpandableUrl url={job.scan_url} truncateLength={40} showIcon={false} className="min-w-0" />
-                                            <a href={job.scan_url} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                                <ExternalLink size={14} className="text-primary hover:scale-110 transition-transform" />
+                                        <h3 className="h5 fw-bold text-body d-flex align-items-center gap-2 text-truncate">
+                                            <ExpandableUrl url={job.scan_url} truncateLength={40} showIcon={false} className="text-truncate" />
+                                            <a href={job.scan_url} target="_blank" rel="noopener noreferrer" className="opacity-50 hover-opacity-100 transition-opacity">
+                                                <ExternalLink size={14} className="text-primary" />
                                             </a>
                                         </h3>
 
-                                        <div className="mt-4 flex items-center gap-4 text-sm w-full min-w-0">
-                                            <div className="flex flex-col">
-                                                <span className="text-muted-foreground text-xs uppercase font-semibold">Progress</span>
-                                                <span className="text-foreground font-medium">{Math.round(job.progress_percent)}%</span>
+                                        <div className="mt-3 d-flex flex-wrap align-items-center gap-4 small w-100">
+                                            <div className="d-flex flex-column">
+                                                <span className="text-muted text-uppercase fw-semibold" style={{ fontSize: '0.7rem' }}>Progress</span>
+                                                <span className="text-body fw-medium">{Math.round(job.progress_percent)}%</span>
                                             </div>
-                                            <div className="h-8 w-px bg-border/50" />
-                                            <div className="flex flex-col">
-                                                <span className="text-muted-foreground text-xs uppercase font-semibold">Links Scanned</span>
-                                                <span className="text-foreground font-medium">{job.urls_scanned} / {job.total_urls || '?'}</span>
+                                            <div className="vr h-100 bg-secondary opacity-25" style={{ minHeight: '30px' }}></div>
+                                            <div className="d-flex flex-column">
+                                                <span className="text-muted text-uppercase fw-semibold" style={{ fontSize: '0.7rem' }}>Links Scanned</span>
+                                                <span className="text-body fw-medium">{job.urls_scanned} / {job.total_urls || '?'}</span>
                                             </div>
-                                            <div className="h-8 w-px bg-border/50" />
-                                            <div className="flex flex-col">
-                                                <span className="text-muted-foreground text-xs uppercase font-semibold">Broken Links</span>
-                                                <span className={`font-medium ${(job.broken_links || 0) > 0 ? 'text-destructive' : 'text-green-500'}`}>
+                                            <div className="vr h-100 bg-secondary opacity-25" style={{ minHeight: '30px' }}></div>
+                                            <div className="d-flex flex-column">
+                                                <span className="text-muted text-uppercase fw-semibold" style={{ fontSize: '0.7rem' }}>Broken Links</span>
+                                                <span className={`fw-medium ${(job.broken_links || 0) > 0 ? 'text-danger' : 'text-success'}`}>
                                                     {job.broken_links || 0}
                                                 </span>
                                             </div>
-                                            <div className="hidden md:flex flex-col flex-1 min-w-0">
-                                                <span className="text-muted-foreground text-xs uppercase font-semibold mb-1">Current URL</span>
-                                                <div className="text-foreground font-medium w-full overflow-hidden">
+                                            <div className="d-none d-md-flex flex-column flex-grow-1 min-w-0 ms-2">
+                                                <span className="text-muted text-uppercase fw-semibold mb-1" style={{ fontSize: '0.7rem' }}>Current URL</span>
+                                                <div className="text-body fw-medium text-truncate w-100">
                                                     <ExpandableUrl url={job.current_url} truncateLength={45} />
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Progress Bar */}
-                                        <div className="mt-4 w-full h-1.5 bg-sidebar-accent rounded-full overflow-hidden">
+                                        <div className="mt-3 w-100 bg-light rounded-pill overflow-hidden" style={{ height: '6px' }}>
                                             <div
-                                                className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
-                                                style={{ width: `${job.progress_percent}%` }}
+                                                className="h-100 bg-primary transition-all duration-500"
+                                                style={{ width: `${job.progress_percent}%`, boxShadow: '0 0 10px rgba(var(--bs-primary-rgb), 0.5)' }}
                                             />
                                         </div>
                                     </div>
 
                                     {/* Action Section */}
-                                    <div className="flex items-center gap-2 self-end md:self-center">
+                                    <div className="d-flex align-items-center gap-2 align-self-end align-self-md-center">
                                         {job.status === 'paused' ? (
                                             <button
                                                 onClick={() => handleJobAction(job.id, 'resume')}
-                                                className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg transition-all cursor-pointer"
+                                                className="btn btn-primary bg-opacity-10 text-primary border-0 p-2 rounded-3 d-flex align-items-center justify-content-center"
+                                                style={{ width: '40px', height: '40px' }}
                                                 title="Resume Scan"
                                             >
                                                 <Play size={20} fill="currentColor" />
@@ -282,7 +274,8 @@ export default function ActiveJobsPage() {
                                             <button
                                                 onClick={() => handleJobAction(job.id, 'pause')}
                                                 disabled={job.status === 'pausing' || job.status === 'stopping'}
-                                                className="p-3 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-white rounded-lg transition-all disabled:opacity-50 cursor-pointer"
+                                                className="btn btn-warning bg-opacity-10 text-warning border-0 p-2 rounded-3 d-flex align-items-center justify-content-center"
+                                                style={{ width: '40px', height: '40px' }}
                                                 title="Pause Scan"
                                             >
                                                 <Pause size={20} fill="currentColor" />
@@ -291,7 +284,8 @@ export default function ActiveJobsPage() {
 
                                         <button
                                             onClick={() => setJobToRemove({ id: job.id, status: job.status })}
-                                            className="p-3 bg-sidebar-accent text-muted-foreground hover:bg-destructive hover:text-white rounded-lg transition-all cursor-pointer"
+                                            className="btn btn-light text-muted border-0 p-2 rounded-3 d-flex align-items-center justify-content-center hover-bg-danger hover-text-white"
+                                            style={{ width: '40px', height: '40px' }}
                                             title="Delete Scan"
                                         >
                                             <Trash2 size={20} />
@@ -300,7 +294,8 @@ export default function ActiveJobsPage() {
                                         <AnimatedButton
                                             href={`/history/${job.id}`}
                                             variant="secondary"
-                                            className="ml-2"
+                                            className="ms-2"
+                                            size="sm"
                                         >
                                             View Details
                                         </AnimatedButton>
@@ -312,42 +307,46 @@ export default function ActiveJobsPage() {
                 )}
 
                 {/* Confirm Stop All Dialog */}
-                <AlertDialog open={showStopAllConfirm} onOpenChange={setShowStopAllConfirm}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Stop All Scans?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Are you sure you want to stop all active jobs? This will immediately abort all workers and you will lose any unsaved progress for ongoing scans.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleStopAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                <SimpleModal
+                    isOpen={showStopAllConfirm}
+                    onClose={() => setShowStopAllConfirm(false)}
+                    title="Stop All Scans?"
+                    footer={
+                        <div className="d-flex justify-content-end gap-2">
+                            <AnimatedButton variant="secondary" onClick={() => setShowStopAllConfirm(false)}>
+                                Cancel
+                            </AnimatedButton>
+                            <AnimatedButton variant="danger" onClick={handleStopAll}>
                                 Abort All
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                            </AnimatedButton>
+                        </div>
+                    }
+                >
+                    <p className="mb-0">Are you sure you want to stop all active jobs? This will immediately abort all workers and you will lose any unsaved progress for ongoing scans.</p>
+                </SimpleModal>
 
                 {/* Confirm Remove Job Dialog */}
-                <AlertDialog open={!!jobToRemove} onOpenChange={(open) => !open && setJobToRemove(null)}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Scan?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                {jobToRemove && ['queued', 'running', 'pausing', 'paused', 'stopping'].includes(jobToRemove.status)
-                                    ? 'This scan is currently active. Deleting it will stop the worker and abort the scan immediately. Proceed?'
-                                    : 'Are you sure you want to delete this scan? This action cannot be undone.'}
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleRemoveJob} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                <SimpleModal
+                    isOpen={!!jobToRemove}
+                    onClose={() => setJobToRemove(null)}
+                    title="Delete Scan?"
+                    footer={
+                        <div className="d-flex justify-content-end gap-2">
+                            <AnimatedButton variant="secondary" onClick={() => setJobToRemove(null)}>
+                                Cancel
+                            </AnimatedButton>
+                            <AnimatedButton variant="danger" onClick={handleRemoveJob}>
                                 Delete
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                            </AnimatedButton>
+                        </div>
+                    }
+                >
+                    <p className="mb-0">
+                        {jobToRemove && ['queued', 'running', 'pausing', 'paused', 'stopping'].includes(jobToRemove.status)
+                            ? 'This scan is currently active. Deleting it will stop the worker and abort the scan immediately. Proceed?'
+                            : 'Are you sure you want to delete this scan? This action cannot be undone.'}
+                    </p>
+                </SimpleModal>
             </div>
         </PageTransition>
     );

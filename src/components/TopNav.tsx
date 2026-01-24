@@ -3,84 +3,103 @@
 import {
     History,
     Settings,
-    LogOut,
-    Save,
     Home,
     Search,
-    Terminal,
-    Activity
+    Activity,
+    ShieldCheck
 } from 'lucide-react';
 import { TransitionLink } from "@/components/TransitionLink";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { cn } from "@/lib/utils";
+import { Logo } from "@/components/Logo";
 
 export function TopNav() {
     return (
-        <header className="hidden md:flex w-full h-16 border-b border-primary/20 bg-background/90 text-foreground sticky top-0 z-50 items-center px-6 justify-between backdrop-blur-md cyber-scanlines">
-            {/* Logo */}
-            <div className="flex items-center gap-2 group cursor-pointer">
-                <div className="p-1 border border-primary/50 relative">
-                    <Terminal className="text-primary w-5 h-5" />
-                    <div className="absolute inset-0 bg-primary/10 group-hover:bg-primary/20 transition-colors" />
+        <nav className="navbar navbar-expand-md main-nav px-4 bg-white dark:bg-dark d-none d-md-flex">
+            <div className="container-fluid">
+                {/* Logo integrated into text */}
+                <TransitionLink href="/" className="navbar-brand d-flex align-items-center">
+                    <span className="fw-bold tracking-tight fs-4 mb-0 text-dark dark:text-light d-flex align-items-center">
+                        LinkChecker
+                        <span className="text-primary d-flex align-items-center ms-0">
+                            Pr
+                            <span className="d-inline-flex align-items-center" style={{ marginTop: '4px' }}>
+                                <Logo size={24} />
+                            </span>
+                        </span>
+                    </span>
+                </TransitionLink>
+
+                {/* Desktop Menu */}
+                <div className="collapse navbar-collapse justify-content-center" id="navbarNav">
+                    <ul className="navbar-nav gap-2">
+                        <li className="nav-item">
+                            <TransitionLink
+                                href="/"
+                                className="nav-link d-flex align-items-center gap-2 px-3 fw-semibold text-muted"
+                                activeClassName="text-primary active border-bottom border-primary border-2"
+                            >
+                                <Home size={18} />
+                                <span>Dashboard</span>
+                            </TransitionLink>
+                        </li>
+                        <li className="nav-item">
+                            <TransitionLink
+                                href="/scan"
+                                className="nav-link d-flex align-items-center gap-2 px-3 fw-semibold text-muted"
+                                activeClassName="text-primary active border-bottom border-primary border-2"
+                            >
+                                <Search size={18} />
+                                <span>Scan</span>
+                            </TransitionLink>
+                        </li>
+                        <li className="nav-item">
+                            <TransitionLink
+                                href="/jobs"
+                                className="nav-link d-flex align-items-center gap-2 px-3 fw-semibold text-muted"
+                                activeClassName="text-primary active border-bottom border-primary border-2"
+                            >
+                                <Activity size={18} />
+                                <span>Status</span>
+                            </TransitionLink>
+                        </li>
+                        <li className="nav-item">
+                            <TransitionLink
+                                href="/history"
+                                className="nav-link d-flex align-items-center gap-2 px-3 fw-semibold text-muted"
+                                activeClassName="text-primary active border-bottom border-primary border-2"
+                            >
+                                <History size={18} />
+                                <span>History</span>
+                            </TransitionLink>
+                        </li>
+                        <li className="nav-item">
+                            <TransitionLink
+                                href="/saved-scans"
+                                className="nav-link d-flex align-items-center gap-2 px-3 fw-semibold text-muted"
+                                activeClassName="text-primary active border-bottom border-primary border-2"
+                            >
+                                <ShieldCheck size={18} />
+                                <span>Saved</span>
+                            </TransitionLink>
+                        </li>
+                        <li className="nav-item">
+                            <TransitionLink
+                                href="/settings"
+                                className="nav-link d-flex align-items-center gap-2 px-3 fw-semibold text-muted"
+                                activeClassName="text-primary active border-bottom border-primary border-2"
+                            >
+                                <Settings size={18} />
+                                <span>Settings</span>
+                            </TransitionLink>
+                        </li>
+                    </ul>
                 </div>
-                <h1 className="text-xl font-bold tracking-tighter text-foreground uppercase italic shadow-primary/20 shadow-sm">
-                    LinkCheck<span className="text-primary glow-text-primary">Pro</span>
-                </h1>
+
+                {/* Right Actions */}
+                <div className="d-none d-md-flex align-items-center gap-3">
+                    <ThemeToggle />
+                </div>
             </div>
-
-            {/* Navigation */}
-            <nav className="flex items-center gap-0">
-                <TransitionLink
-                    href="/"
-                    className="flex items-center gap-2 px-6 py-5 hover:bg-primary/5 hover:text-primary transition-all duration-200 group border-b-2 border-transparent text-xs uppercase tracking-widest font-bold"
-                    activeClassName="border-primary text-primary bg-primary/5 shadow-[inset_0_-10px_20px_-15px_var(--primary)]"
-                >
-                    <Home size={16} className="group-hover:scale-110 transition-transform" />
-                    <span>Dashboard</span>
-                </TransitionLink>
-
-                <TransitionLink
-                    href="/scan"
-                    className="flex items-center gap-2 px-6 py-5 hover:bg-primary/5 hover:text-primary transition-all duration-200 group border-b-2 border-transparent text-xs uppercase tracking-widest font-bold"
-                    activeClassName="border-primary text-primary bg-primary/5 shadow-[inset_0_-10px_20px_-15px_var(--primary)]"
-                >
-                    <Search size={16} className="group-hover:scale-110 transition-transform" />
-                    <span>Scan</span>
-                </TransitionLink>
-
-                <TransitionLink
-                    href="/jobs"
-                    className="flex items-center gap-2 px-6 py-5 hover:bg-primary/5 hover:text-primary transition-all duration-200 group border-b-2 border-transparent text-xs uppercase tracking-widest font-bold"
-                    activeClassName="border-primary text-primary bg-primary/5 shadow-[inset_0_-10px_20px_-15px_var(--primary)]"
-                >
-                    <Activity size={16} className="group-hover:scale-110 transition-transform" />
-                    <span>Status</span>
-                </TransitionLink>
-
-
-                <TransitionLink
-                    href="/saved-scans"
-                    className="flex items-center gap-2 px-6 py-5 hover:bg-primary/5 hover:text-primary transition-all duration-200 group border-b-2 border-transparent text-xs uppercase tracking-widest font-bold"
-                    activeClassName="border-primary text-primary bg-primary/5 shadow-[inset_0_-10px_20px_-15px_var(--primary)]"
-                >
-                    <History size={16} className="group-hover:scale-110 transition-transform" />
-                    <span>History</span>
-                </TransitionLink>
-
-                <TransitionLink
-                    href="/settings"
-                    className="flex items-center gap-2 px-6 py-5 hover:bg-primary/5 hover:text-primary transition-all duration-200 group border-b-2 border-transparent text-xs uppercase tracking-widest font-bold"
-                    activeClassName="border-primary text-primary bg-primary/5 shadow-[inset_0_-10px_20px_-15px_var(--primary)]"
-                >
-                    <Settings size={16} className="group-hover:scale-110 transition-transform" />
-                    <span>Settings</span>
-                </TransitionLink>
-            </nav>
-
-            {/* Actions */}
-            <div className="flex items-center gap-4">
-                <ThemeToggle />
-            </div>
-        </header>
+        </nav>
     );
 }

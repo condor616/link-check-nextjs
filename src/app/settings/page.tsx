@@ -1,28 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Check, Database, FileJson, HelpCircle, Trash, X, RefreshCw, Eraser, Palette } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Database, HelpCircle, Trash, RefreshCw, Eraser, AlertCircle, Check, Copy } from "lucide-react";
 import { useNotification } from "@/components/NotificationContext";
-import { useTheme } from "next-themes";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogClose
-} from "@/components/ui/dialog";
+
+import { AnimatedCard } from "@/components/AnimatedCard";
+import { AnimatedButton } from "@/components/AnimatedButton";
+import { SimpleModal } from "@/components/SimpleModal";
 
 type StorageType = 'file' | 'sqlite' | 'supabase';
 
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState("data-storage");
   const [storageType, setStorageType] = useState<StorageType>('sqlite');
   const [supabaseUrl, setSupabaseUrl] = useState('');
   const [supabaseKey, setSupabaseKey] = useState('');
@@ -44,7 +33,6 @@ export default function SettingsPage() {
 
   // Get notification context to show global notifications
   const { addNotification } = useNotification();
-  const { theme, setTheme } = useTheme();
 
   // Load settings on page load
   useEffect(() => {
@@ -512,394 +500,336 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold mb-4">Settings</h1>
-        <p className="text-muted-foreground mb-6">
+    <div className="w-100 py-4">
+      <div className="mb-4">
+        <h1 className="display-5 fw-bold mb-2">Settings</h1>
+        <p className="text-muted fs-5">
           Configure your application settings
         </p>
       </div>
 
-      <Tabs defaultValue="data-storage" className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="data-storage">Data Storage</TabsTrigger>
-          <TabsTrigger value="themes">Themes</TabsTrigger>
-          {/* Add other settings tabs here in the future */}
-        </TabsList>
-
-        <TabsContent value="data-storage">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
+      <div className="row">
+        <div className="col-12 col-md-3 mb-4">
+          <div className="nav flex-column nav-pills" role="tablist">
+            <button
+              className={`nav-link text-start py-3 px-4 mb-2 ${activeTab === 'data-storage' ? 'active shadow-sm' : ''}`}
+              onClick={() => setActiveTab('data-storage')}
+            >
+              <div className="d-flex align-items-center gap-2">
                 <Database className="h-5 w-5" />
-                Data Storage Configuration
-              </CardTitle>
-              <CardDescription>
-                Choose how you want to store your scan data and configurations
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="storage-type">Storage Type</Label>
-                  <Select
-                    value={storageType}
-                    onValueChange={(value) => setStorageType(value as StorageType)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a storage type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sqlite" className="flex items-center gap-2">
-                        <span className="flex items-center gap-2">
-                          <Database className="h-4 w-4" />
-                          Local Database (SQLite)
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="supabase" className="flex items-center gap-2">
-                        <span className="flex items-center gap-2">
-                          <Database className="h-4 w-4" />
-                          Supabase Database
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {(storageType === 'file' || storageType === 'sqlite')
-                      ? 'Data will be stored in a local SQLite database'
-                      : 'Data will be stored in a Supabase database'}
-                  </p>
-                </div>
+                Data Storage
+              </div>
+            </button>
 
-                {storageType === 'supabase' && (
-                  <div className="space-y-6 p-4 border rounded-md bg-muted/20 border-border">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <Label htmlFor="supabase-url">Supabase URL<span className="text-red-500">*</span></Label>
+          </div>
+        </div>
+
+        <div className="col-12 col-md-9">
+          {activeTab === 'data-storage' && (
+            <AnimatedCard>
+              <div className="d-flex align-items-center gap-2 mb-4">
+                <div className="p-2 bg-primary bg-opacity-10 rounded">
+                  <Database className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="card-title mb-0">Data Storage Configuration</h3>
+                  <p className="text-muted small mb-0">Choose how you want to store your scan data and configurations</p>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="storage-type" className="form-label fw-medium">Storage Type</label>
+                <select
+                  id="storage-type"
+                  className="form-select form-select-lg"
+                  value={storageType}
+                  onChange={(e) => setStorageType(e.target.value as StorageType)}
+                >
+                  <option value="sqlite">Local Database (SQLite)</option>
+                  <option value="supabase">Supabase Database</option>
+                </select>
+                <div className="form-text mt-2">
+                  {(storageType === 'file' || storageType === 'sqlite')
+                    ? 'Data will be stored in a local SQLite database for maximum privacy and offline access.'
+                    : 'Data will be stored in a Supabase cloud database, enabling access from multiple devices.'}
+                </div>
+              </div>
+
+              {storageType === 'supabase' && (
+                <div className="card border rounded bg-light mb-4 shadow-sm">
+                  <div className="card-body">
+                    <h5 className="mb-3">Supabase Initialization</h5>
+                    <div className="mb-3">
+                      <label htmlFor="supabase-url" className="form-label d-flex justify-content-between">
+                        <span>Supabase URL <span className="text-danger">*</span></span>
                         {(!supabaseUrl || !supabaseKey) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="flex items-center gap-1 text-primary hover:text-primary/80 hover:bg-primary/10"
+                          <button
+                            className="btn btn-link btn-sm p-0 text-decoration-none d-flex align-items-center gap-1"
                             onClick={() => setShowHelpDialog(true)}
                           >
                             <HelpCircle className="h-4 w-4" />
                             Need help?
-                          </Button>
+                          </button>
                         )}
-                      </div>
-                      <Input
+                      </label>
+                      <input
                         id="supabase-url"
+                        type="text"
+                        className="form-control"
                         value={supabaseUrl}
                         onChange={(e) => setSupabaseUrl(e.target.value)}
                         placeholder="https://your-project.supabase.co"
-                        className="w-full"
                       />
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Your Supabase project URL, e.g. https://abcdefghijklm.supabase.co
-                      </p>
+                      <div className="form-text">Your Supabase project URL</div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="supabase-key">Supabase Anon Key<span className="text-red-500">*</span></Label>
-                      <Input
+                    <div className="mb-4">
+                      <label htmlFor="supabase-key" className="form-label">Supabase Anon Key <span className="text-danger">*</span></label>
+                      <input
                         id="supabase-key"
+                        type="password"
+                        className="form-control"
                         value={supabaseKey}
                         onChange={(e) => setSupabaseKey(e.target.value)}
-                        type="password"
                         placeholder="Your Supabase anon key"
-                        className="w-full"
                       />
-                      <p className="text-sm text-muted-foreground mt-1">
-                        The anon/public API key for your Supabase project
-                      </p>
+                      <div className="form-text">The anon/public API key for your Supabase project</div>
                     </div>
 
-                    <div className="mt-2">
-                      <Button
-                        variant="outline"
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      <AnimatedButton
+                        variant="outline-secondary" // Changed from outline to outline-secondary
                         onClick={testSupabaseConnection}
                         disabled={isTesting || !supabaseUrl || !supabaseKey}
-                        className="w-full md:w-auto justify-start flex items-center gap-2"
+                        size="sm"
+                        className="gap-2"
                       >
                         <RefreshCw className={`h-4 w-4 ${isTesting ? "animate-spin" : ""}`} />
                         {isTesting ? "Testing..." : "Test Connection"}
-                      </Button>
+                      </AnimatedButton>
                     </div>
 
                     {connectionTestResult && !connectionTestResult.success && (
-                      <Alert
-                        variant="destructive"
-                        className="mt-2"
-                      >
-                        <AlertCircle className="h-5 w-5" />
-                        <AlertDescription>
-                          {connectionTestResult.message}
-                        </AlertDescription>
-                      </Alert>
+                      <div className="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+                        <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                        <div>{connectionTestResult.message}</div>
+                      </div>
                     )}
 
-                    <div className="pt-4 space-y-4 border-t">
-                      <h3 className="font-medium">Supabase Management</h3>
-
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
+                    <div className="border-top pt-3 mt-3">
+                      <h6 className="fw-bold mb-3">Database Management</h6>
+                      <div className="d-flex flex-wrap gap-2">
+                        <AnimatedButton
+                          variant="outline-primary" // Changed from outline to outline-primary
                           onClick={resetSupabaseTables}
                           disabled={isResetting || tablesExist}
-                          className={`md:w-auto justify-start ${tablesExist ? "opacity-50 cursor-not-allowed" : ""}`}
+                          className={tablesExist ? "opacity-50" : ""}
+                          size="sm"
                         >
                           {isResetting ? "Setting up..." : "Initialize Schema"}
-                        </Button>
+                        </AnimatedButton>
 
-                        <Button
-                          variant="destructive"
+                        <AnimatedButton
+                          variant="danger" // Changed from destructive to danger
                           onClick={deleteSupabaseTables}
                           disabled={isDeleting || !tablesExist}
-                          className={`md:w-auto justify-start flex items-center gap-2 ${!tablesExist ? "opacity-50 cursor-not-allowed" : ""}`}
+                          className={`gap-2 ${!tablesExist ? "opacity-50" : ""}`}
+                          size="sm"
                         >
                           <Trash className="h-4 w-4" />
                           {isDeleting ? "Loading..." : "Show SQL to Delete Tables"}
-                        </Button>
+                        </AnimatedButton>
 
-                        <Button
-                          variant="outline"
+                        <AnimatedButton
+                          variant="outline-secondary" // Changed from outline to outline-secondary
                           onClick={clearTableData}
                           disabled={isClearing || !tablesExist}
-                          className={`md:w-auto justify-start flex items-center gap-2 ${!tablesExist ? "opacity-50 cursor-not-allowed" : ""}`}
+                          className={`gap-2 ${!tablesExist ? "opacity-50" : ""}`}
+                          size="sm"
                         >
                           <Eraser className="h-4 w-4" />
                           {isClearing ? "Clearing..." : "Clear All Data"}
-                        </Button>
+                        </AnimatedButton>
                       </div>
 
                       {!supabaseUrl || !supabaseKey ? (
-                        <Alert className="bg-amber-500/10 text-amber-500 border-amber-500/20">
-                          <AlertCircle className="h-5 w-5" />
-                          <AlertDescription className="text-amber-500/90">
-                            Please enter both Supabase URL and key before attempting to manage tables.
-                          </AlertDescription>
-                        </Alert>
+                        <div className="alert alert-warning d-flex align-items-center gap-2 mt-3 mb-0">
+                          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                          <div className="small">Please enter both Supabase URL and key before attempting to manage tables.</div>
+                        </div>
                       ) : null}
                     </div>
                   </div>
-                )}
-
-                <div className="pt-4">
-                  <Button
-                    onClick={saveSettings}
-                    disabled={isSaving}
-                    className="w-full md:w-auto"
-                  >
-                    {isSaving ? "Saving..." : "Save Settings"}
-                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              )}
 
-        <TabsContent value="themes">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Theme Settings
-              </CardTitle>
-              <CardDescription>
-                Customize the look and feel of the application
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="theme-select">Color Theme</Label>
-                  <Select
-                    value={theme}
-                    onValueChange={setTheme}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a theme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dark" className="flex items-center gap-2">
-                        <span className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full bg-slate-900 border border-slate-700"></div>
-                          Dark Blue (Default)
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="matrix" className="flex items-center gap-2">
-                        <span className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full bg-black border border-green-500"></div>
-                          Matrix
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Choose a color theme for the application interface.
-                  </p>
-                </div>
+              <div className="d-flex justify-content-end">
+                <AnimatedButton
+                  onClick={saveSettings}
+                  disabled={isSaving}
+                  size="lg"
+                  className="px-4"
+                >
+                  {isSaving ? "Saving..." : "Save Settings"}
+                </AnimatedButton>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </AnimatedCard>
+          )}
+
+
+        </div>
+      </div>
 
       {/* Help Dialog */}
-      <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
-        <DialogContent className="max-w-md md:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <HelpCircle className="h-5 w-5" />
-              How to Configure Supabase
-            </DialogTitle>
-            <DialogDescription>
-              Follow these steps to set up your Supabase connection
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-4">
-            <ol className="list-decimal list-inside space-y-4 mt-3">
-              <li>
-                <span className="font-medium">Create a Supabase account</span>
-                <p className="ml-5 text-muted-foreground">If you don't have one already, sign up at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">https://supabase.com</a></p>
-              </li>
-              <li>
-                <span className="font-medium">Create a new project</span>
-                <p className="ml-5 text-muted-foreground">From your Supabase dashboard, click "New Project" and follow the setup wizard</p>
-              </li>
-              <li>
-                <span className="font-medium">Get your project API credentials</span>
-                <p className="ml-5 text-muted-foreground">In your project dashboard, go to Settings → API</p>
-                <p className="ml-5 text-muted-foreground">Under "Project URL", copy the URL (e.g., <code>https://abcdefghijklm.supabase.co</code>)</p>
-                <p className="ml-5 text-muted-foreground">Under "Project API keys", copy the "anon" public key</p>
-              </li>
-              <li>
-                <span className="font-medium">Enter credentials in this form</span>
-                <p className="ml-5 text-muted-foreground">Paste the URL and anon key into the fields above</p>
-              </li>
-              <li>
-                <span className="font-medium">Save your settings</span>
-                <p className="ml-5 text-muted-foreground">Click "Save Settings" button to save your Supabase configuration</p>
-              </li>
-              <li>
-                <span className="font-medium">Initialize the database schema</span>
-                <p className="ml-5 text-muted-foreground">After saving, click the "Initialize Schema" button</p>
-                <p className="ml-5 text-muted-foreground">If you see SQL commands, you'll need to run them in the Supabase SQL Editor (Project → SQL Editor)</p>
-              </li>
-            </ol>
+      <SimpleModal
+        isOpen={showHelpDialog}
+        onClose={() => setShowHelpDialog(false)}
+        title="How to Configure Supabase"
+        footer={
+          <div className="d-flex justify-content-end">
+            <AnimatedButton variant="secondary" onClick={() => setShowHelpDialog(false)}>
+              Close
+            </AnimatedButton>
           </div>
-
-          <div className="flex justify-end mt-6">
-            <DialogClose asChild>
-              <Button>Close</Button>
-            </DialogClose>
-          </div>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        <div className="mt-2">
+          <p className="text-muted mb-3">Follow these steps to set up your Supabase connection:</p>
+          <ol className="list-group list-group-numbered list-group-flush">
+            <li className="list-group-item bg-transparent">
+              <div className="ms-2">
+                <span className="fw-medium">Create a Supabase account</span>
+                <p className="small text-muted mb-0">If you don't have one already, sign up at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-primary text-decoration-none hover:underline">https://supabase.com</a></p>
+              </div>
+            </li>
+            <li className="list-group-item bg-transparent">
+              <div className="ms-2">
+                <span className="fw-medium">Create a new project</span>
+                <p className="small text-muted mb-0">From your Supabase dashboard, click "New Project" and follow the setup wizard</p>
+              </div>
+            </li>
+            <li className="list-group-item bg-transparent">
+              <div className="ms-2">
+                <span className="fw-medium">Get your project API credentials</span>
+                <p className="small text-muted mb-1">In your project dashboard, go to Settings → API</p>
+                <p className="small text-muted mb-1">Under "Project URL", copy the URL (e.g., <code>https://abcdefghijklm.supabase.co</code>)</p>
+                <p className="small text-muted mb-0">Under "Project API keys", copy the "anon" public key</p>
+              </div>
+            </li>
+            <li className="list-group-item bg-transparent">
+              <div className="ms-2">
+                <span className="fw-medium">Enter credentials in this form</span>
+                <p className="small text-muted mb-0">Paste the URL and anon key into the fields above</p>
+              </div>
+            </li>
+            <li className="list-group-item bg-transparent">
+              <div className="ms-2">
+                <span className="fw-medium">Save your settings</span>
+                <p className="small text-muted mb-0">Click "Save Settings" button to save your Supabase configuration</p>
+              </div>
+            </li>
+            <li className="list-group-item bg-transparent">
+              <div className="ms-2">
+                <span className="fw-medium">Initialize the database schema</span>
+                <p className="small text-muted mb-1">After saving, click the "Initialize Schema" button</p>
+                <p className="small text-muted mb-0">If you see SQL commands, you'll need to run them in the Supabase SQL Editor (Project → SQL Editor)</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </SimpleModal>
 
       {/* SQL Commands Dialog */}
-      <Dialog open={showSqlCommands} onOpenChange={setShowSqlCommands}>
-        <DialogContent className="max-w-md md:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Database className="h-5 w-5" />
-              SQL Commands
-            </DialogTitle>
-            <DialogDescription>
-              Run these commands in the Supabase SQL Editor
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-4">
-            <div className="bg-zinc-950 text-zinc-100 p-3 rounded-lg border border-border overflow-auto max-h-[60vh] text-sm">
-              <pre className="whitespace-pre-wrap break-all">{sqlCommands ? sqlCommands.join('\n\n') : ''}</pre>
-            </div>
-          </div>
-
-          <div className="flex justify-between mt-6">
-            <Button
-              variant="outline"
+      <SimpleModal
+        isOpen={showSqlCommands}
+        onClose={() => setShowSqlCommands(false)}
+        title="SQL Commands"
+        size="lg"
+        footer={
+          <div className="d-flex justify-content-between w-100">
+            <AnimatedButton
+              variant="outline-primary"
               onClick={() => {
                 if (sqlCommands) {
                   navigator.clipboard.writeText(sqlCommands.join('\n\n'));
                   addNotification('success', 'SQL commands copied to clipboard');
                 }
               }}
+              className="d-flex align-items-center gap-2"
             >
+              <Copy className="h-4 w-4" />
               Copy to Clipboard
-            </Button>
-            <DialogClose asChild>
-              <Button>Close</Button>
-            </DialogClose>
+            </AnimatedButton>
+            <AnimatedButton variant="secondary" onClick={() => setShowSqlCommands(false)}>
+              Close
+            </AnimatedButton>
           </div>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        <div className="mb-3">
+          <p className="text-muted">Run these commands in the Supabase SQL Editor:</p>
+          <div className="bg-dark text-light p-3 rounded border overflow-auto" style={{ maxHeight: '60vh' }}>
+            <pre className="mb-0 small whitespace-pre-wrap break-all">{sqlCommands ? sqlCommands.join('\n\n') : ''}</pre>
+          </div>
+        </div>
+      </SimpleModal>
 
       {/* Confirm Clear Data Dialog */}
-      <Dialog open={showConfirmClearDialog} onOpenChange={setShowConfirmClearDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <AlertCircle className="h-5 w-5 text-red-500" />
-              Confirm Data Deletion
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to clear all data from the tables? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setShowConfirmClearDialog(false)}>
+      <SimpleModal
+        isOpen={showConfirmClearDialog}
+        onClose={() => setShowConfirmClearDialog(false)}
+        title="Confirm Data Deletion"
+        footer={
+          <div className="d-flex justify-content-end gap-2">
+            <AnimatedButton variant="secondary" onClick={() => setShowConfirmClearDialog(false)}>
               Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmClearData}>
+            </AnimatedButton>
+            <AnimatedButton variant="danger" onClick={confirmClearData}>
               Yes, Clear All Data
-            </Button>
+            </AnimatedButton>
           </div>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        <div className="d-flex align-items-center gap-3">
+          <AlertCircle className="h-10 w-10 text-danger" />
+          <p className="mb-0">Are you sure you want to clear all data from the tables? This action cannot be undone.</p>
+        </div>
+      </SimpleModal>
 
       {/* Connection Success Dialog */}
-      <Dialog open={showConnectionSuccessDialog} onOpenChange={setShowConnectionSuccessDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Check className="h-5 w-5 text-green-500" />
-              Connection Successful
-            </DialogTitle>
-            <DialogDescription>
-              Your Supabase connection is working correctly, but you need to initialize the database schema.
-            </DialogDescription>
-          </DialogHeader>
+      <SimpleModal
+        isOpen={showConnectionSuccessDialog}
+        onClose={() => setShowConnectionSuccessDialog(false)}
+        title="Connection Successful"
+        footer={
+          <div className="d-flex justify-content-between w-100">
+            <AnimatedButton
+              variant="primary"
+              onClick={() => {
+                setShowConnectionSuccessDialog(false);
+                initializeSchema();
+              }}
+              disabled={isInitializing}
+              className="gap-2"
+            >
+              <Database className="h-4 w-4" />
+              {isInitializing ? "Initializing..." : "Initialize Schema"}
+            </AnimatedButton>
 
-          <div className="mt-4">
-            <p className="text-sm mb-4">
-              Initialize your database schema to start using Supabase storage.
-            </p>
-
-            <div className="flex justify-between">
-              <Button
-                variant="default"
-                onClick={() => {
-                  setShowConnectionSuccessDialog(false);
-                  initializeSchema();
-                }}
-                disabled={isInitializing}
-                className="flex items-center gap-2"
-              >
-                <Database className="h-4 w-4" />
-                {isInitializing ? "Initializing..." : "Initialize Schema"}
-              </Button>
-
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-            </div>
+            <AnimatedButton variant="secondary" onClick={() => setShowConnectionSuccessDialog(false)}>
+              Cancel
+            </AnimatedButton>
           </div>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        <div className="d-flex flex-column gap-3">
+          <div className="d-flex align-items-center gap-2 text-success">
+            <Check className="h-5 w-5" />
+            <span className="fw-bold">Your Supabase connection is working correctly!</span>
+          </div>
+          <p className="mb-0">However, you still need to initialize the database schema to start using Supabase storage.</p>
+        </div>
+      </SimpleModal>
     </div>
   );
-} 
+}

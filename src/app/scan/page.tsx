@@ -2,57 +2,52 @@
 
 import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScanResult } from '@/lib/scanner';
 import {
   Loader2,
   AlertCircle,
-  CheckCircle2,
-  XCircle,
-  Save,
-  FileDown,
-  Download,
-  Home,
+  Clock,
   ArrowLeft,
   Key,
   Check,
   X,
   Plus,
   ChevronDown,
+  HelpCircle,
+  ShieldCheck,
+  Globe,
+  Settings,
+  Activity,
+  Rocket,
+  Save,
+  CheckCircle2,
   FileUp,
-  Copy,
-  ClipboardCheck,
   FileCode,
-  HelpCircle
+  XCircle
 } from 'lucide-react';
 import ScanResults from '@/components/ScanResults';
-import Link from 'next/link';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { motion } from 'framer-motion';
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import JSONPreview from '@/components/JSONPreview';
-import { Textarea } from "@/components/ui/textarea";
+import { JSONPreview } from '@/components/JSONPreview';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatedCard } from '@/components/AnimatedCard';
+import { AnimatedButton } from '@/components/AnimatedButton';
+import { TransitionLink } from '@/components/TransitionLink';
+
+// Loading fallback for Suspense
+function ScannerLoading() {
+  return (
+    <div className="w-100 py-5 mt-5 text-center fade-in-up">
+      <AnimatedCard className="border-0 shadow-lg">
+        <div className="py-5">
+          <div className="spinner-border text-primary mb-4" role="status" style={{ width: '3rem', height: '3rem' }}>
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <h2 className="h4 fw-bold text-dark dark:text-light mb-2">Initializing System</h2>
+          <p className="text-muted">Preparing the Link Checker Pro engine for your analysis...</p>
+        </div>
+      </AnimatedCard>
+    </div>
+  );
+}
 
 // Define the scan status interface
 interface ScanStatus {
@@ -74,50 +69,6 @@ interface ScanStatus {
 interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
   foundOn: string[]; // Instead of Set<string>
   htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
-}
-
-// Loading fallback for Suspense
-function ScannerLoading() {
-  return (
-    <main className="container mx-auto p-4 max-w-none">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="w-full"
-      >
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="text-2xl">Loading Scan...</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex justify-center items-center py-8">
-              <motion.div
-                animate={{
-                  rotate: 360,
-                  transition: {
-                    duration: 1,
-                    ease: "linear",
-                    repeat: Infinity
-                  }
-                }}
-              >
-                <Loader2 className="h-8 w-8 text-primary" />
-              </motion.div>
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="ml-2 text-lg"
-              >
-                Initializing...
-              </motion.span>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </main>
-  );
 }
 
 // The main scanner component that uses useSearchParams
@@ -645,696 +596,369 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
   // Modify the confirmation dialog to include scanId info and handle loading states
   if (isLoadingParams) {
     return (
-      <main className="container mx-auto p-4 max-w-none">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="w-full"
-        >
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-2xl">Loading Scan Parameters...</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 animate-spin text-primary" />
-                <span className="ml-2">Loading scan parameters...</span>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </main>
+      <div className="w-100 py-5 mt-5 text-center fade-in-up">
+        <AnimatedCard className="border-0 shadow-lg">
+          <div className="py-5">
+            <div className="spinner-border text-primary mb-4" role="status" style={{ width: '3rem', height: '3rem' }}>
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <h2 className="h4 fw-bold text-dark dark:text-light mb-2">Decrypting Configuration</h2>
+            <p className="text-muted">Extracting scan parameters from the secure link...</p>
+          </div>
+        </AnimatedCard>
+      </div>
     );
   }
 
   if (loadParamsError) {
     return (
-      <main className="container mx-auto p-4 max-w-none">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="w-full"
-        >
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-2xl">Error Loading Scan</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{loadParamsError}</AlertDescription>
-              </Alert>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={() => router.push('/')}>
-                Return to Home
-              </Button>
-            </CardFooter>
-          </Card>
-        </motion.div>
-      </main>
+      <div className="w-100 py-5 mt-5 fade-in-up">
+        <AnimatedCard className="border-0 shadow-lg text-center p-5">
+          <div className="mb-4">
+            <AlertCircle size={64} className="text-danger opacity-75" />
+          </div>
+          <h2 className="h4 fw-bold mb-3 text-dark dark:text-light">Access Denied / Invalid Link</h2>
+          <div className="alert alert-danger border-0 bg-danger bg-opacity-10 mb-4 py-3 mx-auto" style={{ maxWidth: '500px' }}>
+            <div className="fw-bold small mb-1">Error Details:</div>
+            <div className="small opacity-75">{loadParamsError}</div>
+          </div>
+          <TransitionLink href="/" className="btn btn-primary px-4 fw-bold">
+            Return to Dashboard
+          </TransitionLink>
+        </AnimatedCard>
+      </div>
     );
   }
 
   if (!scanConfirmed) {
     return (
-      <main className="container mx-auto p-4 max-w-none">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="w-full"
-        >
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-2xl">Confirm Scan</CardTitle>
-              <CardDescription>You're about to scan the following URL. You can modify scan parameters below.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Alert variant="default" className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <AlertTitle className="text-yellow-600">Scan Confirmation Required</AlertTitle>
-                <AlertDescription className="text-yellow-700 dark:text-yellow-400">
-                  For security reasons, please confirm that you want to scan this URL.
-                </AlertDescription>
-              </Alert>
+      <div className="w-100 py-4 fade-in-up">
+        <AnimatedCard className="border-0 shadow-lg">
+          <div className="card-header bg-transparent border-0 pb-0">
+            <h2 className="h4 fw-bold mb-1 text-dark dark:text-light">Confirm Analysis</h2>
+            <p className="text-muted small">Verify and adjust scan parameters before proceeding.</p>
+          </div>
 
-              <div className="p-4 border rounded-md bg-muted/50">
-                <p className="font-medium break-all">{paramUrl}</p>
-
-                {editedConfig && (
-                  <div className="mt-4 space-y-4">
-                    <h3 className="text-sm font-medium">Edit Scan Parameters</h3>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="scanDepth">Scan Depth</Label>
-                        <Input
-                          id="scanDepth"
-                          type="number"
-                          min="0"
-                          max="5"
-                          value={editedConfig.depth || 0}
-                          onChange={(e) => updateConfigField('depth', parseInt(e.target.value) || 0)}
-                        />
-                        <p className="text-xs text-muted-foreground">0 for current page only, higher for deeper scans</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="concurrency">Concurrency</Label>
-                        <Input
-                          id="concurrency"
-                          type="number"
-                          min="1"
-                          max="50"
-                          value={editedConfig.concurrency || 10}
-                          onChange={(e) => updateConfigField('concurrency', parseInt(e.target.value) || 10)}
-                        />
-                        <p className="text-xs text-muted-foreground">Number of simultaneous requests (1-50)</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="requestTimeout">Request Timeout (seconds)</Label>
-                        <Input
-                          id="requestTimeout"
-                          type="number"
-                          min="5"
-                          max="180"
-                          value={(editedConfig.requestTimeout || 30000) / 1000}
-                          onChange={(e) => updateConfigField('requestTimeout', (parseInt(e.target.value) || 30) * 1000)}
-                        />
-                        <p className="text-xs text-muted-foreground">Time before giving up on a single URL (5-180 seconds)</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="scanSameLinkOnce"
-                        checked={editedConfig.scanSameLinkOnce !== false}
-                        onCheckedChange={(checked) => updateConfigField('scanSameLinkOnce', !!checked)}
-                      />
-                      <Label htmlFor="scanSameLinkOnce" className="cursor-pointer text-sm font-normal">
-                        Check each link only once
-                      </Label>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="skipExternalDomains"
-                        checked={editedConfig.skipExternalDomains !== false} // Default to true if undefined
-                        onCheckedChange={(checked) => updateConfigField('skipExternalDomains', !!checked)}
-                      />
-                      <Label htmlFor="skipExternalDomains" className="cursor-pointer text-sm font-normal">
-                        Skip external domains
-                      </Label>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="excludeSubdomains"
-                        checked={editedConfig.excludeSubdomains !== false} // Default to true if undefined
-                        onCheckedChange={(checked) => updateConfigField('excludeSubdomains', !!checked)}
-                      />
-                      <Label htmlFor="excludeSubdomains" className="cursor-pointer text-sm font-normal">
-                        Do not check subdomains
-                      </Label>
-                    </div>
-
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto text-purple-600"
-                      onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
-                    >
-                      {showAdvancedEdit ? 'Hide' : 'Show'} Advanced Options
-                    </Button>
-
-                    {showAdvancedEdit && (
-                      <div className="border border-border rounded-lg p-4 space-y-6 mt-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Left column */}
-                          <div className="space-y-6">
-                            {/* Wildcard Exclusion Rules */}
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 relative">
-                                <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
-                                <div >
-                                  <button
-                                    type="button"
-                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                    onClick={() => setShowUrlExclusionHelp(!showUrlExclusionHelp)}
-                                    aria-label="URL Exclusion Patterns Help"
-                                  >
-                                    <HelpCircle className="h-4 w-4" />
-                                  </button>
-
-                                  {showUrlExclusionHelp && (
-                                    <div
-                                      ref={urlExclusionHelpRef}
-                                      className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
-                                    >
-                                      <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-medium">URL Exclusion Patterns Help</h3>
-                                        <button
-                                          type="button"
-                                          className="text-muted-foreground hover:text-foreground"
-                                          onClick={() => setShowUrlExclusionHelp(false)}
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      </div>
-
-                                      <p className="mb-2">You can use various formats for URL exclusion patterns:</p>
-
-                                      <ul className="space-y-1 mb-2 list-disc pl-4">
-                                        <li><span className="font-medium">Domain + path:</span> <code>example.com/about/*</code></li>
-                                        <li><span className="font-medium">Path only:</span> <code>/about/*</code></li>
-                                        <li><span className="font-medium">Full URL:</span> <code>https://example.com/about/*</code></li>
-                                        <li><span className="font-medium">Just domain:</span> <code>example.com</code> (excludes all URLs on that domain)</li>
-                                      </ul>
-
-                                      <p className="mb-2"><span className="font-medium">Wildcards:</span></p>
-                                      <ul className="space-y-1 list-disc pl-4">
-                                        <li><code>*</code> matches any sequence of characters</li>
-                                        <li><code>?</code> matches a single character</li>
-                                      </ul>
-
-                                      <p className="mt-2 text-xs text-muted-foreground">Example: <code>example.com/node/*/printable/print</code> will exclude all printable pages in the node section.</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                Simple URL patterns to exclude (e.g., "example.com/about/*")
-                              </p>
-
-                              {wildcardExclusions.map((pattern, index) => (
-                                <div key={`wildcard-${index}`} className="flex gap-2 items-center mb-2">
-                                  <div className="w-1.5 h-10 bg-yellow-400 rounded-sm mr-1"></div>
-                                  <Input
-                                    value={pattern}
-                                    onChange={(e) => updateWildcardExclusion(index, e.target.value)}
-                                    placeholder="e.g. example.com/about/*"
-                                    className="flex-1"
-                                  />
-
-                                  {index === wildcardExclusions.length - 1 ? (
-                                    <>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeWildcardExclusion(index)}
-                                        disabled={wildcardExclusions.length <= 1}
-                                        className="shrink-0"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={addWildcardExclusion}
-                                        className="shrink-0"
-                                      >
-                                        <Plus className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removeWildcardExclusion(index)}
-                                      className="shrink-0"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Regex Exclusion Rules */}
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 relative">
-                                <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
-                                <div >
-                                  <button
-                                    type="button"
-                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                    onClick={() => setShowRegexExclusionHelp(!showRegexExclusionHelp)}
-                                    aria-label="Regex Exclusion Patterns Help"
-                                  >
-                                    <HelpCircle className="h-4 w-4" />
-                                  </button>
-
-                                  {showRegexExclusionHelp && (
-                                    <div
-                                      ref={regexExclusionHelpRef}
-                                      className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
-                                    >
-                                      <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-medium">Regex Exclusion Patterns Help</h3>
-                                        <button
-                                          type="button"
-                                          className="text-muted-foreground hover:text-foreground"
-                                          onClick={() => setShowRegexExclusionHelp(false)}
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      </div>
-
-                                      <p className="mb-2">Regular expression patterns to exclude URLs from scanning.</p>
-
-                                      <p className="mb-2">Examples of regex patterns:</p>
-                                      <ul className="space-y-1 mb-2 list-disc pl-4">
-                                        <li><code>\.pdf$</code> - URLs ending with .pdf</li>
-                                        <li><code>/assets/.*\.zip$</code> - ZIP files in the assets directory</li>
-                                        <li><code>(login|signin|register)</code> - URLs containing login, signin, or register</li>
-                                        <li><code>^https://api\.</code> - URLs starting with https://api.</li>
-                                      </ul>
-
-                                      <p className="mt-2 text-xs text-muted-foreground">Remember to escape special characters with a backslash, like <code>\.</code> for periods.</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                Links matching these patterns will be skipped
-                              </p>
-
-                              {regexExclusions.map((regex, index) => (
-                                <div key={`regex-${index}`} className="flex gap-2 items-center mb-2">
-                                  <div className="w-1.5 h-10 bg-blue-400 rounded-sm mr-1"></div>
-                                  <Input
-                                    value={regex}
-                                    onChange={(e) => updateRegexExclusion(index, e.target.value)}
-                                    placeholder="e.g. \/assets\/.*\.pdf$"
-                                    className="flex-1"
-                                  />
-
-                                  {index === regexExclusions.length - 1 ? (
-                                    <>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeRegexExclusion(index)}
-                                        disabled={regexExclusions.length <= 1}
-                                        className="shrink-0"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={addRegexExclusion}
-                                        className="shrink-0"
-                                      >
-                                        <Plus className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removeRegexExclusion(index)}
-                                      className="shrink-0"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Right column */}
-                          <div className="space-y-6">
-                            {/* CSS Selector Exclusions */}
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 relative">
-                                <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
-                                <div >
-                                  <button
-                                    type="button"
-                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                    onClick={() => setShowCssSelectorsHelp(!showCssSelectorsHelp)}
-                                    aria-label="CSS Selector Exclusions Help"
-                                  >
-                                    <HelpCircle className="h-4 w-4" />
-                                  </button>
-
-                                  {showCssSelectorsHelp && (
-                                    <div
-                                      ref={cssSelectorsHelpRef}
-                                      className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
-                                    >
-                                      <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-medium">CSS Selector Exclusions Help</h3>
-                                        <button
-                                          type="button"
-                                          className="text-muted-foreground hover:text-foreground"
-                                          onClick={() => setShowCssSelectorsHelp(false)}
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      </div>
-
-                                      <p className="mb-2">Links inside elements matching these CSS selectors will be excluded from the scan.</p>
-
-                                      <p className="mb-2">Examples of valid CSS selectors:</p>
-                                      <ul className="space-y-1 mb-2 list-disc pl-4">
-                                        <li><code>.footer</code> - Elements with class "footer"</li>
-                                        <li><code>#navigation</code> - Element with ID "navigation"</li>
-                                        <li><code>footer a</code> - All links inside footer elements</li>
-                                        <li><code>.sidebar, .footer</code> - Multiple selectors (comma-separated)</li>
-                                        <li><code>[data-skip]</code> - Elements with attribute "data-skip"</li>
-                                      </ul>
-
-                                      <p className="mt-2 text-xs text-muted-foreground">Example: <code>#block-polaris-languagecountryselectorfordesktop</code> will exclude all links in the language selector.</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                Links within these CSS selectors will be skipped
-                              </p>
-
-                              {cssSelectors.map((selector, index) => (
-                                <div key={`selector-${index}`} className="flex gap-2 items-center mb-2">
-                                  <div className="w-1.5 h-10 bg-green-400 rounded-sm mr-1"></div>
-                                  <Input
-                                    value={selector}
-                                    onChange={(e) => updateCssSelector(index, e.target.value)}
-                                    placeholder="e.g. .footer, #navigation, [data-skip]"
-                                    className="flex-1"
-                                  />
-
-                                  {index === cssSelectors.length - 1 ? (
-                                    <>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeCssSelector(index)}
-                                        disabled={cssSelectors.length <= 1}
-                                        className="shrink-0"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={addCssSelector}
-                                        className="shrink-0"
-                                      >
-                                        <Plus className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removeCssSelector(index)}
-                                      className="shrink-0"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
-
-                              <div className="flex items-center space-x-2 pt-4">
-                                <Checkbox
-                                  id="cssSelectorsForceExclude"
-                                  checked={cssSelectorsForceExclude}
-                                  onCheckedChange={(checked) => setCssSelectorsForceExclude(!!checked)}
-                                />
-                                <Label htmlFor="cssSelectorsForceExclude" className="cursor-pointer text-sm font-normal">
-                                  Force Exclude - Links in CSS selectors are excluded entirely, even if found elsewhere on the page
-                                </Label>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Configuration JSON (Read-only) */}
-                        <div className="border-t border-border pt-6">
-                          <JSONPreview
-                            data={{
-                              name: scanId ? `Scan ${scanId}` : "Current Configuration",
-                              url: paramUrl || "",
-                              config: {
-                                ...editedConfig,
-                                regexExclusions: regexExclusions.filter(r => r.trim() !== ""),
-                                cssSelectors: cssSelectors.filter(s => s.trim() !== ""),
-                                cssSelectorsForceExclude: cssSelectorsForceExclude,
-                                wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== ""),
-                                excludeSubdomains: editedConfig.excludeSubdomains !== false
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {scanId && (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    <p>Scan ID: {scanId}</p>
-                  </div>
-                )}
+          <div className="card-body">
+            <div className="alert alert-warning border-0 bg-warning bg-opacity-10 d-flex align-items-center mb-4 rounded-3">
+              <AlertCircle className="me-3 text-warning" size={24} />
+              <div className="text-warning-emphasis">
+                <div className="fw-bold">Scan Confirmation Required</div>
+                <div className="small">Please review the target URL and configuration below.</div>
               </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => router.push('/')}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" /> Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmScan}
-                className="gap-2"
-                disabled={isScanning}
-              >
-                {isScanning ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" /> Confirm Scan
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        </motion.div>
-      </main>
+            </div>
+
+            <div className="bg-light dark:bg-dark p-3 rounded-3 border mb-4">
+              <div className="text-muted small mb-1">Target URL</div>
+              <div className="fw-bold text-break text-primary">{paramUrl}</div>
+            </div>
+
+            {editedConfig && (
+              <div className="space-y-4">
+                <div className="row g-3">
+                  <div className="col-md-4">
+                    <label className="form-label fw-semibold small">Scan Depth</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="0"
+                      max="5"
+                      value={editedConfig.depth || 0}
+                      onChange={(e) => updateConfigField('depth', parseInt(e.target.value) || 0)}
+                    />
+                    <div className="form-text x-small">0 = current page only, higher = deeper</div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <label className="form-label fw-semibold small">Concurrency</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="1"
+                      max="50"
+                      value={editedConfig.concurrency || 10}
+                      onChange={(e) => updateConfigField('concurrency', parseInt(e.target.value) || 10)}
+                    />
+                    <div className="form-text x-small">Simultaneous requests (1-50)</div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <label className="form-label fw-semibold small">Timeout (seconds)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="5"
+                      max="180"
+                      value={(editedConfig.requestTimeout || 30000) / 1000}
+                      onChange={(e) => updateConfigField('requestTimeout', (parseInt(e.target.value) || 30) * 1000)}
+                    />
+                    <div className="form-text x-small">Maximum time per URL</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="scanSameLinkOnce"
+                      checked={editedConfig.scanSameLinkOnce !== false}
+                      onChange={(e) => updateConfigField('scanSameLinkOnce', e.target.checked)}
+                    />
+                    <label className="form-check-label small" htmlFor="scanSameLinkOnce">
+                      Unique link checking (Recommended)
+                    </label>
+                  </div>
+
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="skipExternalDomains"
+                      checked={editedConfig.skipExternalDomains !== false}
+                      onChange={(e) => updateConfigField('skipExternalDomains', e.target.checked)}
+                    />
+                    <label className="form-check-label small" htmlFor="skipExternalDomains">
+                      Skip external domains
+                    </label>
+                  </div>
+
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="excludeSubdomains"
+                      checked={editedConfig.excludeSubdomains !== false}
+                      onChange={(e) => updateConfigField('excludeSubdomains', e.target.checked)}
+                    />
+                    <label className="form-check-label small" htmlFor="excludeSubdomains">
+                      Strict subdomain enforcement
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-4 border-top pt-3">
+                  <button
+                    className="btn btn-link link-primary p-0 text-decoration-none fw-semibold d-flex align-items-center"
+                    onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
+                  >
+                    <Settings size={18} className="me-2" />
+                    {showAdvancedEdit ? 'Hide' : 'Show'} Advanced Filter Rules
+                  </button>
+
+                  {showAdvancedEdit && (
+                    <div className="mt-3 p-3 bg-light dark:bg-dark rounded-3 border">
+                      <div className="row g-4">
+                        <div className="col-lg-6">
+                          <div className="d-flex align-items-center mb-2">
+                            <span className="fw-bold small me-2">Regex Exclusion Rules</span>
+                            <HelpCircle size={14} className="text-muted cursor-help" />
+                          </div>
+                          {regexExclusions.map((regex, index) => (
+                            <div key={`regex-${index}`} className="input-group mb-2">
+                              <input
+                                type="text"
+                                className="form-control form-control-sm font-monospace"
+                                value={regex}
+                                onChange={(e) => updateRegexExclusion(index, e.target.value)}
+                                placeholder="e.g. \.pdf$"
+                              />
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => removeRegexExclusion(index)}
+                                disabled={regexExclusions.length <= 1}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                          <button className="btn btn-sm btn-outline-primary mt-1" onClick={addRegexExclusion}>
+                            <Plus size={14} className="me-1" /> Add Rule
+                          </button>
+                        </div>
+
+                        <div className="col-lg-6">
+                          <div className="d-flex align-items-center mb-2">
+                            <span className="fw-bold small me-2">CSS Selector Exclusions</span>
+                            <HelpCircle size={14} className="text-muted cursor-help" />
+                          </div>
+                          {cssSelectors.map((selector, index) => (
+                            <div key={`selector-${index}`} className="input-group mb-2">
+                              <input
+                                type="text"
+                                className="form-control form-control-sm font-monospace"
+                                value={selector}
+                                onChange={(e) => updateCssSelector(index, e.target.value)}
+                                placeholder="e.g. .footer"
+                              />
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => removeCssSelector(index)}
+                                disabled={cssSelectors.length <= 1}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                          <button className="btn btn-sm btn-outline-primary mt-1" onClick={addCssSelector}>
+                            <Plus size={14} className="me-1" /> Add Rule
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="card-footer bg-transparent border-0 d-flex flex-column flex-sm-row justify-content-between gap-3 pb-4">
+            <AnimatedButton variant="outline-secondary" onClick={() => router.push('/')}>
+              <ArrowLeft size={18} className="me-2" />
+              Cancel Analysis
+            </AnimatedButton>
+            <AnimatedButton variant="primary" onClick={handleConfirmScan} disabled={isScanning}>
+              {isScanning ? (
+                <>
+                  <Loader2 size={18} className="me-2 spinner-border spinner-border-sm border-0" />
+                  Submitting Request...
+                </>
+              ) : (
+                <>
+                  <Activity size={18} className="me-2" />
+                  Launch Professional Audit
+                </>
+              )}
+            </AnimatedButton>
+          </div>
+        </AnimatedCard>
+      </div>
     );
   }
 
   return (
-    <main className="container mx-auto p-4 max-w-none">
-      <Card className="w-full border-border bg-card">
-        <CardHeader>
-          <div className="flex items-center justify-between mb-4">
-            <Button variant="ghost" className="p-0" asChild>
-              <Link href="/">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Home
-              </Link>
-            </Button>
+    <div className="container py-4 fade-in-up">
+      <AnimatedCard className="border-0 shadow-lg">
+        <div className="card-header bg-transparent border-0 pb-0 d-flex justify-content-between align-items-center">
+          <div>
+            <h2 className="h4 fw-bold mb-1 text-dark dark:text-light">
+              Audit in Progress
+              {paramUrl && <span className="ms-2 fs-6 fw-normal text-muted d-none d-sm-inline">({paramUrl.replace(/^https?:\/\//, '')})</span>}
+            </h2>
+            <p className="text-muted small">
+              {isScanning ? 'Engine is active and analyzing links...' :
+                scanStatus.status === 'completed' ? 'Analysis complete.' : 'System notification.'}
+            </p>
+          </div>
+          <TransitionLink href="/" className="btn btn-outline-secondary btn-sm">
+            <ArrowLeft size={16} className="me-1" /> Back
+          </TransitionLink>
+        </div>
+
+        <div className="card-body">
+          {/* Progress Indicator */}
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-end mb-2">
+              <div>
+                <span className="h3 mb-0 fw-bold text-primary">{scanStatus.progress.processed}</span>
+                <span className="text-muted ms-2 small">/ {scanStatus.progress.total || '?'} links processed</span>
+              </div>
+              <div className="text-end">
+                <div className="fw-bold text-dark dark:text-light small">{progressPercentage}%</div>
+                <div className="text-muted x-small">Audit Completion</div>
+              </div>
+            </div>
+
+            <div className="progress rounded-pill bg-light dark:bg-dark" style={{ height: '8px' }}>
+              <motion.div
+                className={`progress-bar rounded-pill ${scanStatus.status === 'error' ? 'bg-danger' : 'bg-primary'}`}
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPercentage}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+
+            <div className="d-flex justify-content-between mt-2 x-small text-muted">
+              <div><Clock size={12} className="me-1" /> Elapsed: {formatElapsedTime(scanStatus.elapsedSeconds)}</div>
+              <div>Rate: {Math.round((scanStatus.progress.processed / (scanStatus.elapsedSeconds || 1)) * 10) / 10} links/s</div>
+            </div>
           </div>
 
-          <CardTitle className="text-2xl flex items-center gap-2">
-            Scan Progress
-            {paramUrl && (
-              <span className="text-sm font-normal text-muted-foreground">
-                ({paramUrl.replace(/^https?:\/\//, '')})
-              </span>
-            )}
-          </CardTitle>
-
-          <CardDescription>
-            {isScanning && 'Scanning in progress...'}
-            {!isScanning && scanStatus.status === 'completed' && 'Scan completed'}
-            {!isScanning && scanStatus.status === 'error' && 'Scan error'}
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {/* Progress Indicator */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <div className="text-sm font-medium">
-                {scanStatus.progress.processed} / {scanStatus.progress.total || '?'} URLs processed
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {isScanning ? 'Scanning...' : `${progressPercentage}%`}
+          {/* Stats Grid */}
+          <div className="row g-3 mb-4 text-center">
+            <div className="col-6 col-md-3">
+              <div className="p-2 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25">
+                <div className="fw-bold text-success h5 mb-0">{scanStatus.progress.ok}</div>
+                <div className="text-success small x-small fw-semibold">Healthy</div>
               </div>
             </div>
-
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full ${scanStatus.status === 'error' ? 'bg-destructive' : 'bg-primary'}`}
-                style={{ width: `${progressPercentage}%` }}
-              ></div>
+            <div className="col-6 col-md-3">
+              <div className="p-2 rounded-3 bg-danger bg-opacity-10 border border-danger border-opacity-25">
+                <div className="fw-bold text-danger h5 mb-0">{scanStatus.progress.broken}</div>
+                <div className="text-danger small x-small fw-semibold">Broken</div>
+              </div>
             </div>
-
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <div>Time elapsed: {formatElapsedTime(scanStatus.elapsedSeconds)}</div>
+            <div className="col-6 col-md-3">
+              <div className="p-2 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-25">
+                <div className="fw-bold text-warning h5 mb-0">{scanStatus.progress.skipped}</div>
+                <div className="text-warning small x-small fw-semibold">Skipped</div>
+              </div>
+            </div>
+            <div className="col-6 col-md-3">
+              <div className="p-2 rounded-3 bg-info bg-opacity-10 border border-info border-opacity-25">
+                <div className="fw-bold text-info h5 mb-0">{scanStatus.progress.external}</div>
+                <div className="text-info small x-small fw-semibold">External</div>
+              </div>
             </div>
           </div>
 
           {/* Error display */}
           {scanStatus.status === 'error' && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
-                {scanStatus.error || 'An error occurred during the scan'}
-              </AlertDescription>
-            </Alert>
+            <div className="alert alert-danger border-0 shadow-sm mb-4 fade-in">
+              <div className="d-flex align-items-center">
+                <AlertCircle className="me-2" size={20} />
+                <div className="fw-bold">Kernel Panic</div>
+              </div>
+              <div className="mt-2 small opacity-75">
+                {scanStatus.error || 'An unexpected error occurred during the heartbeat cycle.'}
+              </div>
+            </div>
           )}
 
-          {/* Scan Results (if scan is completed or has some results) */}
+          {/* Results Area */}
           {(scanStatus.status === 'completed' || results.length > 0) && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Results</h3>
+            <div className="mt-4">
+              <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-4 gap-3">
+                <h3 className="h5 fw-bold mb-0">Analysis Details</h3>
 
-                <div className="flex items-center gap-2">
+                <div className="d-flex gap-2">
                   {scanStatus.status !== 'error' && (
                     <>
-                      <Button
-                        variant="outline"
-                        size="default"
+                      <AnimatedButton
+                        variant={saveSuccess ? "success" : "outline-primary"}
+                        size="sm"
                         onClick={handleSaveButtonClick}
                         disabled={isSaving || results.length === 0}
                       >
                         {isSaving ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
+                          <><span className="spinner-border spinner-border-sm me-2" /> Saving...</>
                         ) : saveSuccess ? (
-                          <>
-                            <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
-                            Auto-saved
-                          </>
+                          <><Check size={16} className="me-1" /> Saved</>
                         ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save to History
-                          </>
+                          <><Save size={16} className="me-1" /> Save Results</>
                         )}
-                      </Button>
+                      </AnimatedButton>
 
-                      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            size="default"
-                            disabled={!savedScanId}
-                            className="flex items-center"
-                          >
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Scan</AlertDialogTitle>
-                          </AlertDialogHeader>
-                          <div className="mb-4">
-                            <div className="text-sm text-muted-foreground">
-                              Are you sure you want to delete this scan? This action cannot be undone.
-                            </div>
-                          </div>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <Button
-                              variant="destructive"
-                              onClick={() => {
-                                handleDeleteScan().then((success) => {
-                                  // Close the dialog
-                                  setShowDeleteConfirm(false);
-                                  // Redirect to history page after successful deletion
-                                  if (success) {
-                                    router.push('/history');
-                                  }
-                                });
-                              }}
-                              disabled={isDeleting}
-                            >
-                              {isDeleting ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Deleting...
-                                </>
-                              ) : (
-                                "Delete"
-                              )}
-                            </Button>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {savedScanId && (
+                        <button
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => setShowDeleteConfirm(true)}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? <span className="spinner-border spinner-border-sm" /> : <XCircle size={16} />}
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1349,84 +973,51 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
             </div>
           )}
 
-          {/* Loading indicator during scan */}
+          {/* Finalizing Overlay */}
           {isScanning && (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2 text-lg">Scanning in progress...</span>
+            <div className="text-center py-5 border rounded-3 bg-light bg-opacity-50 mt-4">
+              <div className="spinner-border text-primary mb-3" role="status">
+                <span className="visually-hidden">Scanning...</span>
+              </div>
+              <p className="fw-semibold text-muted mb-0">Real-time inspection active...</p>
             </div>
           )}
+        </div>
+      </AnimatedCard>
 
-          {/* Save Success Dialog */}
-          {saveSuccess && savedScanId && (
-            <AlertDialog defaultOpen>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Scan Saved Successfully</AlertDialogTitle>
-                </AlertDialogHeader>
-
-                {/* Use divs instead of AlertDialogDescription to avoid p tag nesting issues */}
-                <div className="mb-4">
-                  <div className="text-sm text-muted-foreground mb-2">
-                    Your scan has been automatically saved to history and can be accessed later.
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Scans are now automatically saved when completed so you won't lose your results.
-                  </div>
-
-                  {/* Show delete error if any */}
-                  {deleteError && (
-                    <div className="mt-2 text-sm text-red-500">
-                      Error: {deleteError}
-                    </div>
-                  )}
-                </div>
-
-                <AlertDialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-4">
-                  <Button
-                    variant="destructive"
-                    onClick={handleDeleteScan}
-                    disabled={isDeleting}
-                    className="w-full sm:w-auto order-2 sm:order-1"
-                  >
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Delete Scan
-                      </>
-                    )}
-                  </Button>
-                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto order-1 sm:order-2">
-                    <Button asChild className="w-full sm:w-auto">
-                      <Link href={`/history/${savedScanId}`}>
-                        View Saved Scan
-                      </Link>
-                    </Button>
-                    <AlertDialogCancel className="w-full sm:w-auto">Close</AlertDialogCancel>
-                  </div>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-
-          {/* Save Error Dialog */}
-          {saveError && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Save Failed</AlertTitle>
-              <AlertDescription>
-                {saveError}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+      {/* Delete Confirmation Modal (Native Mockup) */}
+      {showDeleteConfirm && (
+        <div className="modal show d-block bg-black bg-opacity-50" tabIndex={-1} style={{ backdropFilter: 'blur(4px)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-danger">Discard Scan Results?</h5>
+                <button type="button" className="btn-close" onClick={() => setShowDeleteConfirm(false)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <p className="text-muted mb-0">This operation is irreversible. All captured link data and logs for this specific session will be purged from the archive.</p>
+              </div>
+              <div className="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" className="btn btn-light px-4" onClick={() => setShowDeleteConfirm(false)}>Stay in Archive</button>
+                <button
+                  type="button"
+                  className="btn btn-danger px-4"
+                  disabled={isDeleting}
+                  onClick={() => {
+                    handleDeleteScan().then((success) => {
+                      setShowDeleteConfirm(false);
+                      if (success) router.push('/history');
+                    });
+                  }}
+                >
+                  {isDeleting ? 'Purging...' : 'Confirm Purge'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2094,566 +1685,256 @@ function ScanForm() {
   }, [showUrlExclusionHelp, showCssSelectorsHelp, showRegexExclusionHelp]);
 
   return (
-    <div className="space-y-6 mx-auto container p-4 max-w-none">
-      <h1 className="text-2xl font-bold">New Scan</h1>
+    <div className="w-100 py-5 fade-in-up">
+      <div className="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 className="h3 mb-0 fw-bold text-dark dark:text-light">Initiate Link Analysis</h1>
+        <div className="mt-2 mt-sm-0 d-flex gap-2">
+          <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={toggleImportDialog}>
+            <FileCode size={14} className="me-1" /> Import JSON
+          </button>
+        </div>
+      </div>
 
-      {/* Main scan card */}
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <AnimatedCard className="border-0 shadow-lg mb-5 overflow-visible">
+        <div className="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+          <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
             <div>
-              <CardTitle className="text-2xl">New Scan</CardTitle>
-              <CardDescription>
-                Enter a URL to scan for broken links
-              </CardDescription>
+              <h2 className="h5 fw-bold mb-1">New Audit Configuration</h2>
+              <p className="text-muted small mb-0">Define your target and adjust inspection depth.</p>
             </div>
 
-            {/* Add the Load Scan dropdown here */}
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2"
-                    disabled={isLoadingSavedConfigs || savedConfigs.length === 0}
-                  >
-                    {isLoadingSavedConfigs ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Loading...
-                      </>
-                    ) : (
-                      <>
-                        <FileUp className="h-4 w-4" />
-                        Load Scan
-                        <ChevronDown className="h-4 w-4 ml-1" />
-                      </>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[300px]">
-                  <DropdownMenuLabel>Saved Scan Configurations</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-
-                  {savedConfigs.length === 0 ? (
-                    <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                      No saved scans found
-                    </div>
+            <div className="d-flex align-items-center gap-2">
+              <div className="dropdown">
+                <button
+                  className="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2"
+                  type="button"
+                  data-bs-toggle="dropdown"
+                  disabled={isLoadingSavedConfigs || savedConfigs.length === 0}
+                >
+                  {isLoadingSavedConfigs ? (
+                    <><span className="spinner-border spinner-border-sm" /> Loading...</>
                   ) : (
-                    <div className="max-h-[300px] overflow-y-auto">
-                      {savedConfigs.map((config) => (
-                        <DropdownMenuItem
-                          key={config.id}
-                          onClick={() => loadSavedConfig(config)}
-                          className="cursor-pointer flex flex-col items-start p-3"
-                        >
-                          <div className="font-medium">{config.name}</div>
-                          <div className="text-xs text-muted-foreground truncate max-w-full">
-                            {config.url}
-                          </div>
-                        </DropdownMenuItem>
-                      ))}
-                    </div>
+                    <><FileUp size={16} /> Load Preset</>
                   )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-                onClick={toggleImportDialog}
-              >
-                <FileCode className="h-4 w-4" />
-                Import Scan (JSON)
-              </Button>
-
-              {loadedConfigName && (
-                <div className="text-sm text-muted-foreground">
-                  Loaded: <span className="font-medium">{loadedConfigName}</span>
-                </div>
-              )}
+                </button>
+                <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-3">
+                  <li className="dropdown-header">Saved Configurations</li>
+                  <li><hr className="dropdown-divider" /></li>
+                  {savedConfigs.length === 0 ? (
+                    <li className="px-3 py-2 text-muted small">No presets found</li>
+                  ) : (
+                    savedConfigs.map((config) => (
+                      <li key={config.id}>
+                        <button className="dropdown-item py-2" onClick={() => loadSavedConfig(config)}>
+                          <div className="fw-bold small">{config.name}</div>
+                          <div className="x-small text-muted text-truncate" style={{ maxWidth: '200px' }}>{config.url}</div>
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent>
-          <div className="space-y-4">
-            {/* Add the imported scan notification */}
-            {hasImported && (
-              <div className="flex items-center gap-2 bg-green-50 p-2 rounded-md border border-green-200 text-green-700">
-                <div className="flex-1">
-                  <div className="font-medium">
-                    Configuration imported successfully
-                  </div>
-                  <div className="text-xs text-green-600">
-                    The form has been populated with the imported configuration. You can now modify it and start the scan or save it.
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setHasImported(false)}
-                  className="h-8 text-green-700 hover:text-green-800 hover:bg-green-100"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+        <div className="card-body p-4">
+          {/* Notifications */}
+          {hasImported && (
+            <div className="alert alert-success border-0 bg-success bg-opacity-10 d-flex align-items-center mb-4 fade-in">
+              <CheckCircle2 className="me-2 text-success" size={18} />
+              <div className="flex-grow-1 small text-success-emphasis">Configuration imported successfully.</div>
+              <button className="btn-close btn-sm" onClick={() => setHasImported(false)}></button>
+            </div>
+          )}
+
+          {loadedConfigName && (
+            <div className="alert alert-info border-0 bg-info bg-opacity-10 d-flex align-items-center mb-4 fade-in">
+              <Activity className="me-2 text-info" size={18} />
+              <div className="flex-grow-1 small text-info-emphasis">
+                Loaded preset: <span className="fw-bold">{loadedConfigName}</span>
+              </div>
+              <button className="btn btn-sm btn-link text-info p-0 text-decoration-none fw-bold me-2" onClick={resetLoadedScan}>Reset</button>
+              <button className="btn-close btn-sm" onClick={() => setLoadedConfigName(null)}></button>
+            </div>
+          )}
+
+          <div className="mb-4">
+            <label className="form-label fw-bold small text-uppercase tracking-wider">Target Resource</label>
+            <div className="input-group mb-2">
+              <span className="input-group-text bg-light border-end-0">
+                <Globe size={18} className="text-muted" />
+              </span>
+              <input
+                type="url"
+                className="form-control bg-light border-start-0 ps-0"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://your-enterprise-app.com"
+                required
+              />
+              <button
+                className={`btn ${authEnabled ? 'btn-success' : 'btn-outline-secondary'}`}
+                onClick={toggleAuthDialog}
+                title="Authentication Settings"
+              >
+                <Key size={18} />
+              </button>
+            </div>
+            {authEnabled && (
+              <div className="text-success x-small fw-semibold mt-1 d-flex align-items-center">
+                <Check size={12} className="me-1" /> Authentication layer active
               </div>
             )}
+          </div>
 
-            {/* Load config notification */}
-            {loadedConfigName && (
-              <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-md border border-blue-200 text-blue-700">
-                <div className="flex-1">
-                  <div className="font-medium">
-                    Loaded configuration: {loadedConfigName}
-                  </div>
-                  <div className="text-xs text-blue-600">
-                    Make changes as needed, then click "Start Scan" to run, or "Save Configuration" to save as a new configuration
-                  </div>
+          <div className="row g-3 mb-4">
+            <div className="col-md-4">
+              <label className="form-label fw-semibold small">Scan Depth</label>
+              <input
+                type="number"
+                className="form-control"
+                min="0"
+                max="5"
+                value={depth}
+                onChange={(e) => setDepth(parseInt(e.target.value) || 0)}
+              />
+              <div className="form-text x-small">0 = Landing Page, 1+ = Full Audit</div>
+            </div>
+
+            <div className="col-md-4">
+              <label className="form-label fw-semibold small">Concurrency</label>
+              <input
+                type="number"
+                className="form-control"
+                min="1"
+                max="50"
+                value={concurrency}
+                onChange={(e) => setConcurrency(parseInt(e.target.value) || 10)}
+              />
+              <div className="form-text x-small">Parallel requests (Default: 10)</div>
+            </div>
+
+            <div className="col-md-4">
+              <label className="form-label fw-semibold small">Timeout (s)</label>
+              <input
+                type="number"
+                className="form-control"
+                min="5"
+                max="180"
+                value={requestTimeout}
+                onChange={(e) => setRequestTimeout(parseInt(e.target.value) || 30)}
+              />
+              <div className="form-text x-small">Seconds before aborting URL</div>
+            </div>
+          </div>
+
+          <div className="mb-4 bg-light dark:bg-dark p-3 rounded-3 border">
+            <div className="row g-2">
+              <div className="col-12 col-md-4">
+                <div className="form-check form-switch cursor-pointer">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="scanSameLinkOnce"
+                    checked={scanSameLinkOnce}
+                    onChange={(e) => setScanSameLinkOnce(e.target.checked)}
+                  />
+                  <label className="form-check-label small" htmlFor="scanSameLinkOnce">Unique Check Only</label>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetLoadedScan}
-                  className="h-8 text-blue-700 hover:text-blue-800 hover:bg-blue-100"
-                >
-                  <X className="h-4 w-4 mr-1" /> Clear
-                </Button>
               </div>
-            )}
-
-            <div>
-              <Label htmlFor="url" className="text-base font-medium">URL to scan</Label>
-              <div className="flex mt-1.5 gap-2">
-                <Input
-                  id="url"
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  className="flex-1"
-                  required
-                />
-                <Button
-                  variant={authEnabled ? "secondary" : "outline"}
-                  size="icon"
-                  onClick={toggleAuthDialog}
-                  title="HTTP Basic Authentication"
-                  className="h-10 w-10 flex items-center justify-center"
-                >
-                  <Key className="h-4 w-4" />
-                </Button>
-              </div>
-              {authEnabled && (
-                <div className="text-xs text-muted-foreground mt-1 flex items-center">
-                  <Check className="h-3 w-3 mr-1 text-green-500" />
-                  Basic Auth credentials set
+              <div className="col-12 col-md-4">
+                <div className="form-check form-switch cursor-pointer">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="skipExternalDomains"
+                    checked={skipExternalDomains}
+                    onChange={(e) => setSkipExternalDomains(e.target.checked)}
+                  />
+                  <label className="form-check-label small" htmlFor="skipExternalDomains">Skip External</label>
                 </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="depth">Scan Depth (0 for current page only)</Label>
-                <Input
-                  id="depth"
-                  type="number"
-                  min="0"
-                  max="5"
-                  value={depth}
-                  onChange={(e) => setDepth(parseInt(e.target.value))}
-                />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="concurrency">Concurrency (1-50)</Label>
-                <Input
-                  id="concurrency"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={concurrency}
-                  onChange={(e) => setConcurrency(parseInt(e.target.value) || 10)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="requestTimeout">Request Timeout (seconds)</Label>
-                <Input
-                  id="requestTimeout"
-                  type="number"
-                  min="5"
-                  max="180"
-                  value={requestTimeout}
-                  onChange={(e) => setRequestTimeout(parseInt(e.target.value) || 30)}
-                />
-                <p className="text-xs text-muted-foreground">Time before giving up on a single URL (5-180 seconds)</p>
+              <div className="col-12 col-md-4">
+                <div className="form-check form-switch cursor-pointer">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="excludeSubdomains"
+                    checked={excludeSubdomains}
+                    onChange={(e) => setExcludeSubdomains(e.target.checked)}
+                  />
+                  <label className="form-check-label small" htmlFor="excludeSubdomains">No Subdomains</label>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="scanSameLinkOnce"
-                checked={scanSameLinkOnce}
-                onCheckedChange={(checked) => setScanSameLinkOnce(!!checked)}
-              />
-              <Label htmlFor="scanSameLinkOnce" className="cursor-pointer text-sm font-normal">
-                Check each link only once (recommended)
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="skipExternalDomains"
-                checked={skipExternalDomains}
-                onCheckedChange={(checked) => setSkipExternalDomains(!!checked)}
-              />
-              <Label htmlFor="skipExternalDomains" className="cursor-pointer text-sm font-normal">
-                Skip external domains
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="excludeSubdomains"
-                checked={excludeSubdomains}
-                onCheckedChange={(checked) => setExcludeSubdomains(!!checked)}
-              />
-              <Label htmlFor="excludeSubdomains" className="cursor-pointer text-sm font-normal">
-                Do not check subdomains
-              </Label>
-            </div>
-
-            {/* Button to toggle advanced options */}
-            <Button
-              variant="link"
-              className="p-0 h-auto text-purple-600"
+          <div className="mb-0">
+            <button
+              className="btn btn-link link-primary p-0 text-decoration-none fw-semibold d-flex align-items-center mb-3"
               onClick={() => setShowAdvanced(!showAdvanced)}
             >
-              {showAdvanced ? 'Hide' : 'Show'} Advanced Options
-            </Button>
+              <Settings size={18} className="me-2" />
+              {showAdvanced ? 'Hide' : 'Configure'} Advanced Filtering
+            </button>
 
-            {/* Advanced options */}
             {showAdvanced && (
-              <div className="border border-border rounded-lg p-4 space-y-6 mt-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left column */}
-                  <div className="space-y-6">
-                    {/* Wildcard Exclusion Rules */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 relative">
-                        <Label htmlFor="wildcardExclusions">URL Exclusion Patterns</Label>
-                        <div >
-                          <button
-                            type="button"
-                            className="text-muted-foreground hover:text-foreground focus:outline-none"
-                            onClick={() => setShowUrlExclusionHelp(!showUrlExclusionHelp)}
-                            aria-label="URL Exclusion Patterns Help"
-                          >
-                            <HelpCircle className="h-4 w-4" />
-                          </button>
-
-                          {showUrlExclusionHelp && (
-                            <div
-                              ref={urlExclusionHelpRef}
-                              className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
-                            >
-                              <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-medium">URL Exclusion Patterns Help</h3>
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground"
-                                  onClick={() => setShowUrlExclusionHelp(false)}
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-
-                              <p className="mb-2">You can use various formats for URL exclusion patterns:</p>
-
-                              <ul className="space-y-1 mb-2 list-disc pl-4">
-                                <li><span className="font-medium">Domain + path:</span> <code>example.com/about/*</code></li>
-                                <li><span className="font-medium">Path only:</span> <code>/about/*</code></li>
-                                <li><span className="font-medium">Full URL:</span> <code>https://example.com/about/*</code></li>
-                                <li><span className="font-medium">Just domain:</span> <code>example.com</code> (excludes all URLs on that domain)</li>
-                              </ul>
-
-                              <p className="mb-2"><span className="font-medium">Wildcards:</span></p>
-                              <ul className="space-y-1 list-disc pl-4">
-                                <li><code>*</code> matches any sequence of characters</li>
-                                <li><code>?</code> matches a single character</li>
-                              </ul>
-
-                              <p className="mt-2 text-xs text-muted-foreground">Example: <code>example.com/node/*/printable/print</code> will exclude all printable pages in the node section.</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Simple URL patterns to exclude (e.g., "example.com/about/*")
-                      </p>
-
-                      {wildcardExclusions.map((pattern, index) => (
-                        <div key={`wildcard-${index}`} className="flex gap-2 items-center mb-2">
-                          <div className="w-1.5 h-10 bg-yellow-400 rounded-sm mr-1"></div>
-                          <Input
-                            value={pattern}
-                            onChange={(e) => updateWildcardExclusion(index, e.target.value)}
-                            placeholder="e.g. example.com/about/*"
-                            className="flex-1"
-                          />
-
-                          {index === wildcardExclusions.length - 1 ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeWildcardExclusion(index)}
-                                disabled={wildcardExclusions.length <= 1}
-                                className="shrink-0"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={addWildcardExclusion}
-                                className="shrink-0"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeWildcardExclusion(index)}
-                              className="shrink-0"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+              <div className="p-3 bg-light dark:bg-dark border rounded-3 text-start mb-4 fade-in">
+                <div className="row g-4">
+                  <div className="col-lg-6">
+                    <div className="d-flex align-items-center mb-2">
+                      <span className="fw-bold small me-2">Regex Filter rules</span>
+                      <HelpCircle size={14} className="text-muted cursor-help" />
                     </div>
-
-                    {/* Regex Exclusion Rules */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 relative">
-                        <Label htmlFor="regexExclusions">Regex Exclusion Patterns</Label>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            className="text-muted-foreground hover:text-foreground focus:outline-none"
-                            onClick={() => setShowRegexExclusionHelp(!showRegexExclusionHelp)}
-                            aria-label="Regex Exclusion Patterns Help"
-                          >
-                            <HelpCircle className="h-4 w-4" />
-                          </button>
-
-                          {showRegexExclusionHelp && (
-                            <div
-                              ref={regexExclusionHelpRef}
-                              className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border left-0 mt-2 text-sm"
-                            >
-                              <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-medium">Regex Exclusion Patterns Help</h3>
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground"
-                                  onClick={() => setShowRegexExclusionHelp(false)}
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-
-                              <p className="mb-2">Regular expression patterns to exclude URLs from scanning.</p>
-
-                              <p className="mb-2">Examples of regex patterns:</p>
-                              <ul className="space-y-1 mb-2 list-disc pl-4">
-                                <li><code>\.pdf$</code> - URLs ending with .pdf</li>
-                                <li><code>/assets/.*\.zip$</code> - ZIP files in the assets directory</li>
-                                <li><code>(login|signin|register)</code> - URLs containing login, signin, or register</li>
-                                <li><code>^https://api\.</code> - URLs starting with https://api.</li>
-                              </ul>
-
-                              <p className="mt-2 text-xs text-muted-foreground">Remember to escape special characters with a backslash, like <code>\.</code> for periods.</p>
-                            </div>
-                          )}
-                        </div>
+                    {regexExclusions.map((regex, index) => (
+                      <div key={`regex-${index}`} className="input-group mb-2">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm font-monospace"
+                          value={regex}
+                          onChange={(e) => updateRegexExclusion(index, e.target.value)}
+                          placeholder="e.g. \/ignore\/.*"
+                        />
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => removeRegexExclusion(index)} disabled={regexExclusions.length <= 1}>
+                          <X size={14} />
+                        </button>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Links matching these patterns will be skipped
-                      </p>
-
-                      {regexExclusions.map((regex, index) => (
-                        <div key={`regex-${index}`} className="flex gap-2 items-center mb-2">
-                          <div className="w-1.5 h-10 bg-blue-400 rounded-sm mr-1"></div>
-                          <Input
-                            value={regex}
-                            onChange={(e) => updateRegexExclusion(index, e.target.value)}
-                            placeholder="e.g. \/assets\/.*\.pdf$"
-                            className="flex-1"
-                          />
-
-                          {index === regexExclusions.length - 1 ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeRegexExclusion(index)}
-                                disabled={regexExclusions.length <= 1}
-                                className="shrink-0"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={addRegexExclusion}
-                                className="shrink-0"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeRegexExclusion(index)}
-                              className="shrink-0"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    ))}
+                    <button className="btn btn-sm btn-outline-primary mt-1" onClick={addRegexExclusion}>
+                      <Plus size={14} className="me-1" /> Add Rule
+                    </button>
                   </div>
 
-                  {/* Right column */}
-                  <div className="space-y-6">
-                    {/* CSS Selector Exclusions */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 relative">
-                        <Label htmlFor="cssSelectors">CSS Selector Exclusions</Label>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            className="text-muted-foreground hover:text-foreground focus:outline-none"
-                            onClick={() => setShowCssSelectorsHelp(!showCssSelectorsHelp)}
-                            aria-label="CSS Selector Exclusions Help"
-                          >
-                            <HelpCircle className="h-4 w-4" />
-                          </button>
-
-                          {showCssSelectorsHelp && (
-                            <div
-                              ref={cssSelectorsHelpRef}
-                              className="absolute z-50 w-[550px] p-4 bg-popover text-popover-foreground rounded-md shadow-lg border border-border right-0 mt-2 text-sm"
-                            >
-                              <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-medium">CSS Selector Exclusions Help</h3>
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground"
-                                  onClick={() => setShowCssSelectorsHelp(false)}
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-
-                              <p className="mb-2">Links inside elements matching these CSS selectors will be excluded from the scan.</p>
-
-                              <p className="mb-2">Examples of valid CSS selectors:</p>
-                              <ul className="space-y-1 mb-2 list-disc pl-4">
-                                <li><code>.footer</code> - Elements with class "footer"</li>
-                                <li><code>#navigation</code> - Element with ID "navigation"</li>
-                                <li><code>footer a</code> - All links inside footer elements</li>
-                                <li><code>.sidebar, .footer</code> - Multiple selectors (comma-separated)</li>
-                                <li><code>[data-skip]</code> - Elements with attribute "data-skip"</li>
-                              </ul>
-
-                              <p className="mt-2 text-xs text-muted-foreground">Example: <code>#block-polaris-languagecountryselectorfordesktop</code> will exclude all links in the language selector.</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Links within these CSS selectors will be skipped
-                      </p>
-
-                      {cssSelectors.map((selector, index) => (
-                        <div key={`selector-${index}`} className="flex gap-2 items-center mb-2">
-                          <div className="w-1.5 h-10 bg-green-400 rounded-sm mr-1"></div>
-                          <Input
-                            value={selector}
-                            onChange={(e) => updateCssSelector(index, e.target.value)}
-                            placeholder="e.g. .footer, #navigation, [data-skip]"
-                            className="flex-1"
-                          />
-
-                          {index === cssSelectors.length - 1 ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeCssSelector(index)}
-                                disabled={cssSelectors.length <= 1}
-                                className="shrink-0"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={addCssSelector}
-                                className="shrink-0"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeCssSelector(index)}
-                              className="shrink-0"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-
-                      <div className="flex items-center space-x-2 pt-4">
-                        <Checkbox
-                          id="cssSelectorsForceExclude"
-                          checked={cssSelectorsForceExclude}
-                          onCheckedChange={(checked) => setCssSelectorsForceExclude(!!checked)}
-                        />
-                        <Label htmlFor="cssSelectorsForceExclude" className="cursor-pointer text-sm font-normal">
-                          Force Exclude - Links in CSS selectors are excluded entirely, even if found elsewhere on the page
-                        </Label>
-                      </div>
+                  <div className="col-lg-6">
+                    <div className="d-flex align-items-center mb-2">
+                      <span className="fw-bold small me-2">CSS Selectors to skip</span>
+                      <HelpCircle size={14} className="text-muted cursor-help" />
                     </div>
+                    {cssSelectors.map((selector, index) => (
+                      <div key={`selector-${index}`} className="input-group mb-2">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm font-monospace"
+                          value={selector}
+                          onChange={(e) => updateCssSelector(index, e.target.value)}
+                          placeholder="e.g. .ad-container"
+                        />
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => removeCssSelector(index)} disabled={cssSelectors.length <= 1}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <button className="btn btn-sm btn-outline-primary mt-1" onClick={addCssSelector}>
+                      <Plus size={14} className="me-1" /> Add Rule
+                    </button>
                   </div>
                 </div>
 
-                {/* Configuration JSON (Read-only) */}
-                <div className="border-t border-border pt-6">
+                <div className="mt-4 border-top pt-3">
                   <JSONPreview
                     data={{
                       name: configName || `Scan for ${url ? new URL(url).hostname : "New Domain"}`,
@@ -2670,10 +1951,7 @@ function ScanForm() {
                         cssSelectorsForceExclude: cssSelectorsForceExclude,
                         wildcardExclusions: wildcardExclusions.filter(w => w.trim() !== ""),
                         ...(authEnabled && {
-                          auth: {
-                            username: username,
-                            password: password
-                          },
+                          auth: { username: username, password: password },
                           useAuthForAllDomains: useAuthForAllDomains
                         })
                       }
@@ -2683,230 +1961,180 @@ function ScanForm() {
               </div>
             )}
           </div>
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button
-            variant="outline"
-            type="button"
+        </div>
+
+        <div className="card-footer bg-transparent border-0 d-flex flex-column flex-sm-row justify-content-between gap-3 p-4">
+          <AnimatedButton
+            variant="outline-secondary"
             onClick={toggleSaveDialog}
             disabled={!url}
           >
-            <Save className="mr-2 h-4 w-4" /> Save Scan
-          </Button>
+            <Save size={18} className="me-2" /> Archive Configuration
+          </AnimatedButton>
 
-          <Button
-            variant="default"
-            size="lg"
+          <AnimatedButton
+            variant="primary"
             onClick={handleScan}
-            className="bg-purple-600 hover:bg-purple-700"
             disabled={isCreatingScan}
+            className="px-5"
           >
             {isCreatingScan ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating Scan...
-              </>
+              <><span className="spinner-border spinner-border-sm me-2" /> Building...</>
             ) : (
-              <>
-                <AlertCircle className="mr-2" />
-                Start Scan
-              </>
+              <><Rocket size={18} className="me-2" /> Launch Full Inspection</>
             )}
-          </Button>
-        </CardFooter>
+          </AnimatedButton>
+        </div>
 
         {scanError && (
-          <div className="mt-4 p-4">
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{scanError}</AlertDescription>
-            </Alert>
+          <div className="mx-4 mb-4 alert alert-danger border-0 shadow-sm fade-in">
+            <div className="d-flex align-items-center">
+              <AlertCircle size={18} className="me-2 text-danger" />
+              <div className="fw-bold">Configuration Error</div>
+            </div>
+            <div className="small mt-1 opacity-75">{scanError}</div>
           </div>
         )}
-      </Card>
+      </AnimatedCard>
 
-      {/* Auth Dialog */}
-      <AlertDialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <AlertDialogContent className="bg-background dark:bg-card border-border">
-          <AlertDialogHeader>
-            <AlertDialogTitle>HTTP Basic Authentication</AlertDialogTitle>
-          </AlertDialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
-                className="bg-background dark:bg-input/20"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="bg-background dark:bg-input/20"
-              />
-            </div>
-            <div className="flex items-center space-x-2 pt-2">
-              <Checkbox
-                id="useAuthForAllDomains"
-                checked={useAuthForAllDomains}
-                onCheckedChange={(checked) => setUseAuthForAllDomains(!!checked)}
-              />
-              <Label htmlFor="useAuthForAllDomains" className="cursor-pointer text-sm font-normal">
-                Use auth for all domains
-              </Label>
-            </div>
-          </div>
-          <AlertDialogFooter className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={clearAuthCredentials}
-              className="mr-auto"
-            >
-              Clear
-            </Button>
-            <div>
-              <AlertDialogCancel className="mr-2">Cancel</AlertDialogCancel>
-              <Button variant="default" onClick={saveAuthCredentials}>
-                Save
-              </Button>
-            </div>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Save Configuration Dialog */}
-      <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save Scan</AlertDialogTitle>
-          </AlertDialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="configName">Scan Name</Label>
-              <Input
-                id="configName"
-                type="text"
-                placeholder="My website scan"
-                value={configName}
-                onChange={(e) => setConfigName(e.target.value)}
-              />
-            </div>
-
-            <div className="text-sm text-muted-foreground">
-              This will save your current scan settings including URL, exclusions, and authentication for future use.
-            </div>
-
-            {authEnabled && (
-              <div className="text-sm bg-green-50 p-3 rounded border border-green-200 text-green-800">
-                <p className="font-medium mb-1">Authentication Included:</p>
-                <p className="text-xs">Username: {username}</p>
-                <p className="text-xs">Password saved</p>
-                <p className="text-xs mt-1">{useAuthForAllDomains ? "Applied to all domains" : "Applied to main domain only"}</p>
+      {/* Auth Modal Mockup */}
+      {showAuthDialog && (
+        <div className="modal show d-block bg-black bg-opacity-50" tabIndex={-1} style={{ backdropFilter: 'blur(4px)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold">Enterprise Authentication</h5>
+                <button type="button" className="btn-close" onClick={() => setShowAuthDialog(false)}></button>
               </div>
-            )}
-
-            {saveError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{saveError}</AlertDescription>
-              </Alert>
-            )}
-
-            {saveSuccess && (
-              <Alert className="bg-green-50 text-green-800 border-green-200">
-                <CheckCircle2 className="h-4 w-4" />
-                <AlertDescription>Scan saved successfully!</AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
-            <Button
-              onClick={saveConfiguration}
-              disabled={isSaving || !configName.trim() || !url}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Scan'
-              )}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Add import dialog */}
-      <AlertDialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <AlertDialogContent className="max-w-4xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Import Scan Configuration</AlertDialogTitle>
-          </AlertDialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground mb-2">
-              Paste your scan configuration JSON below. This will populate the scan form fields when you click Submit.
-            </p>
-
-            <div className="mb-4 bg-blue-50 p-3 rounded-md border border-blue-200 text-blue-700 text-sm">
-              <p className="font-medium mb-1">Expected JSON Format:</p>
-              <p className="text-xs mb-2">You can paste a simple JSON with <code>url</code> at the top level, or a full configuration with a nested <code>config</code> object:</p>
-              <pre className="text-xs bg-blue-100 p-2 rounded overflow-auto">
-                {`{
-  "name": "Optional Name",
-  "url": "https://example.com",
-  "config": {
-    "depth": 2,
-    "concurrency": 10,
-    "cssSelectors": ["..."],
-    "regexExclusions": ["..."],
-    ...
-  }
-}`}
-              </pre>
-            </div>
-
-            {importJsonError && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{importJsonError}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="importJsonContent" className="text-base font-medium">
-                Configuration JSON (Editable)
-              </Label>
-              <Textarea
-                id="importJsonContent"
-                value={importJsonContent}
-                onChange={(e) => handleImportJsonChange(e.target.value)}
-                className="font-mono text-sm p-4 max-h-[400px] min-h-[300px]"
-                rows={12}
-              />
+              <div className="modal-body py-4">
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Identity / Username</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="api_key_or_user"
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Credential / Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                  />
+                </div>
+                <div className="form-check py-2 mt-2">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="useAuthForAllDomains"
+                    checked={useAuthForAllDomains}
+                    onChange={(e) => setUseAuthForAllDomains(e.target.checked)}
+                  />
+                  <label className="form-check-label small" htmlFor="useAuthForAllDomains">
+                    Broadcast credentials to all sub-requests
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer border-0 pt-0 pb-4 justify-content-between">
+                <button type="button" className="btn btn-link text-danger p-0 text-decoration-none small" onClick={clearAuthCredentials}>Purge Credentials</button>
+                <div className="d-flex gap-2">
+                  <button type="button" className="btn btn-light" onClick={() => setShowAuthDialog(false)}>Discard</button>
+                  <button type="button" className="btn btn-primary" onClick={saveAuthCredentials}>Apply Identity</button>
+                </div>
+              </div>
             </div>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button variant="default" onClick={handleSubmitImport}>
-              Submit
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        </div>
+      )}
+
+      {/* Save Config Modal Mockup */}
+      {showSaveDialog && (
+        <div className="modal show d-block bg-black bg-opacity-50" tabIndex={-1} style={{ backdropFilter: 'blur(4px)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold">Archive Configuration</h5>
+                <button type="button" className="btn-close" onClick={() => setShowSaveDialog(false)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Configuration Label</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Weekly Production Audit"
+                    value={configName}
+                    onChange={(e) => setConfigName(e.target.value)}
+                  />
+                </div>
+                <p className="small text-muted mb-0">This captures the URL, credentials, and all filtering rules for instant recovery.</p>
+
+                {saveError && (
+                  <div className="alert alert-danger mt-3 mb-0 small py-2">{saveError}</div>
+                )}
+                {saveSuccess && (
+                  <div className="alert alert-success mt-3 mb-0 small py-2">Configuration archived successfully.</div>
+                )}
+              </div>
+              <div className="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" className="btn btn-light" onClick={() => setShowSaveDialog(false)} disabled={isSaving}>Dismiss</button>
+                <button
+                  type="button"
+                  className="btn btn-primary px-4"
+                  onClick={saveConfiguration}
+                  disabled={isSaving || !configName.trim() || !url}
+                >
+                  {isSaving ? <><span className="spinner-border spinner-border-sm me-2" /> Archiving...</> : 'Persist Data'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal Mockup */}
+      {showImportDialog && (
+        <div className="modal show d-block bg-black bg-opacity-50" tabIndex={-1} style={{ backdropFilter: 'blur(4px)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold">Import JSON Payload</h5>
+                <button type="button" className="btn-close" onClick={() => setShowImportDialog(false)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <div className="p-3 bg-light rounded-3 mb-3 small border border-primary border-opacity-10">
+                  <div className="fw-bold mb-1">Advanced Mode</div>
+                  <div className="text-muted">Inject raw JSON configuration to quickly replicate specific scan environments.</div>
+                </div>
+
+                {importJsonError && (
+                  <div className="alert alert-danger mb-3 small py-2">{importJsonError}</div>
+                )}
+
+                <div className="mb-0">
+                  <label className="form-label small fw-bold">Raw JSON Structure</label>
+                  <textarea
+                    className="form-control font-monospace x-small"
+                    rows={10}
+                    value={importJsonContent}
+                    onChange={(e) => handleImportJsonChange(e.target.value)}
+                    style={{ backgroundColor: '#fdfdfd' }}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer border-0 pt-0 pb-4 justify-content-end gap-2">
+                <button type="button" className="btn btn-light" onClick={() => setShowImportDialog(false)}>Cancel</button>
+                <button type="button" className="btn btn-primary px-4 fw-bold" onClick={handleSubmitImport}>Execute Import</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

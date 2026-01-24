@@ -1,19 +1,7 @@
-'use client';
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SavedScanConfig } from '@/app/api/saved-configs/route';
 import {
   Loader2,
@@ -30,19 +18,20 @@ import {
   Copy,
   Database,
   FileJson,
-  Settings
+  Settings,
+  Activity,
+  ChevronRight,
+  Search,
+  History,
+  Info,
+  ExternalLink,
+  Lock as LockIcon,
+  ChevronDown,
+  LayoutGrid
 } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+import { AnimatedCard } from '@/components/AnimatedCard';
+import { AnimatedButton } from '@/components/AnimatedButton';
+import { SimpleModal } from '@/components/SimpleModal';
 import JSONPreview from '@/components/JSONPreview';
 import { useNotification } from '@/components/NotificationContext';
 
@@ -417,596 +406,479 @@ export default function SavedScansPage() {
   };
 
   return (
-    <div className="container mx-auto p-4 max-w-none">
-      <h1 className="text-2xl font-bold mb-6">Saved Scan Configurations</h1>
+    <div className="w-100 py-4 fade-in-up">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-5 mt-3">
+        <div>
+          <h1 className="display-6 fw-bold text-dark dark:text-light mb-1">
+            <LayoutGrid size={32} className="text-primary me-2 mb-1" />
+            Saved <span className="text-primary">Audits</span>
+          </h1>
+          <p className="text-muted mb-0">Manage and relaunch your historical website scan configurations.</p>
+        </div>
+        <AnimatedButton onClick={() => router.push('/scan')} variant="primary" className="px-4">
+          <Plus size={18} className="me-2" /> New Setup
+        </AnimatedButton>
+      </div>
 
       {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-lg">Loading configurations...</span>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5 bg-light rounded-4 dark:bg-dark border border-dashed">
+          <Loader2 size={48} className="text-primary animate-spin mb-3" />
+          <h5 className="text-muted fw-bold">Synchronizing Archives...</h5>
         </div>
       ) : error ? (
         isSupabaseError && settingsType === 'supabase' ? (
-          <div className="p-6 border rounded-lg bg-amber-50">
-            <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <Database className="h-6 w-6 text-amber-600" />
+          <div className="alert border-0 bg-warning bg-opacity-10 dark:bg-warning dark:bg-opacity-5 p-4 rounded-4 shadow-sm border-start border-4 border-warning">
+            <div className="d-flex align-items-start gap-4">
+              <div className="p-3 bg-warning bg-opacity-10 rounded-circle text-warning border border-warning border-opacity-25">
+                <Database size={24} />
               </div>
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium text-amber-800">Database Connection Issue</h3>
-                  <p className="mt-1 text-amber-700">
-                    Unable to connect to the Supabase database. Your settings are configured to use Supabase, but the connection failed.
+                  <h3 className="h5 fw-black text-warning-emphasis mb-1">Cloud Synchronization Offline</h3>
+                  <p className="text-muted small mb-3">
+                    We're unable to connect to your Supabase instance. This prevents access to cloud-stored audits.
                   </p>
                 </div>
-                <div className="space-y-3">
-                  <h4 className="font-medium text-amber-800">You have two options:</h4>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={switchToFileStorage} variant="outline" className="bg-transparent border-input hover:bg-accent hover:text-accent-foreground">
-                      <FileJson className="mr-2 h-4 w-4" />
-                      Switch to File Storage
-                    </Button>
-                    <Button onClick={goToSettings} variant="default">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Fix Supabase Settings
-                    </Button>
-                  </div>
+                <div className="d-flex flex-wrap gap-2">
+                  <AnimatedButton onClick={switchToFileStorage} variant="outline-dark" size="sm">
+                    <FileJson size={14} className="me-2" /> Switch to Offline Mode
+                  </AnimatedButton>
+                  <AnimatedButton onClick={goToSettings} variant="primary" size="sm">
+                    <Settings size={14} className="me-2" /> Configure Connection
+                  </AnimatedButton>
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="alert alert-danger border-0 rounded-4 p-3 d-flex align-items-center shadow-sm">
+            <AlertCircle size={20} className="me-3" />
+            <div className="fw-semibold">{error}</div>
+          </div>
         )
       ) : configs.length === 0 ? (
-        <Card className="bg-card border-border shadow-sm">
-          <CardContent className="pt-6 pb-6">
-            <div className="text-center py-12">
-              <p className="mb-4 text-muted-foreground">No saved configurations found.</p>
-              <Button onClick={() => router.push('/scan')}>
-                Create New Scan
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="text-center py-5 bg-light rounded-4 dark:bg-dark border border-dashed">
+          <div className="mb-4 opacity-25">
+            <History size={64} className="text-muted" />
+          </div>
+          <h4 className="fw-black text-dark dark:text-light mb-2">No Historical Data Found</h4>
+          <p className="text-muted mb-4 max-w-lg mx-auto">Your configuration vault is currently empty. Define your first scan setup to start monitoring site health.</p>
+          <AnimatedButton onClick={() => router.push('/scan')} variant="primary" className="px-4">
+            <Plus size={18} className="me-2" /> Launch Initial Setup
+          </AnimatedButton>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {configs.map(config => (
-            <Card key={config.id} className="bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 cursor-pointer">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl">{config.name}</CardTitle>
-                <CardDescription>
-                  <span className="font-medium">URL:</span> {config.url}
-                </CardDescription>
-                <CardDescription>
-                  <span className="font-medium">Updated:</span> {formatDate(config.updatedAt)}
-                </CardDescription>
-              </CardHeader>
+        <div className="row g-4">
+          {configs.map((config, idx) => (
+            <div key={config.id} className="col-12 col-lg-6">
+              <AnimatedCard delay={idx * 0.05} className="h-100 border-0 shadow-sm hover-translate-y-2 p-0 overflow-hidden bg-white dark:bg-dark">
+                <div className="p-4">
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="p-3 bg-primary bg-opacity-10 text-primary rounded-4 border border-primary border-opacity-10">
+                        <Activity size={24} />
+                      </div>
+                      <div>
+                        <h4 className="h5 fw-black mb-1 text-dark dark:text-light">{config.name}</h4>
+                        <div className="text-truncate text-muted small" style={{ maxWidth: '250px' }}>{config.url}</div>
+                      </div>
+                    </div>
+                    <div className="badge rounded-pill bg-light text-muted border px-3 py-2 small fw-bold">
+                      {formatDate(config.updatedAt)}
+                    </div>
+                  </div>
 
-              <CardContent className="pb-3">
-                <div className="text-sm space-y-2">
-                  <div>
-                    <span className="font-medium">Authentication:</span> {config.config.auth ? 'Enabled' : 'None'}
+                  <div className="row g-2 mb-4">
+                    <div className="col-sm-6">
+                      <div className="p-3 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-3">
+                        <div className="text-primary"><LockIcon size={16} /></div>
+                        <div>
+                          <div className="x-small text-muted fw-bold text-uppercase opacity-75">Auth</div>
+                          <div className="small fw-bold">{config.config.auth ? 'Protected' : 'Anonymous'}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-sm-6">
+                      <div className="p-3 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-3">
+                        <div className="text-primary"><LayoutGrid size={16} /></div>
+                        <div>
+                          <div className="x-small text-muted fw-bold text-uppercase opacity-75">Depth</div>
+                          <div className="small fw-bold">{config.config.depth === 0 ? 'Root Only' : `${config.config.depth} Levels Deep`}</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium">Exclusions:</span> {' '}
-                    {config.config.regexExclusions?.length || 0} regex, {' '}
-                    {config.config.wildcardExclusions?.length || 0} wildcard, {' '}
-                    {config.config.cssSelectors?.length || 0} CSS
-                  </div>
-                  <div>
-                    <span className="font-medium">Concurrent requests:</span> {config.config.concurrency || 10}
+
+                  <div className="d-flex gap-2 mb-0 border-top pt-4">
+                    <AnimatedButton
+                      size="sm"
+                      variant="outline-secondary"
+                      onClick={() => handleEdit(config)}
+                      className="flex-grow-1 border-opacity-25"
+                    >
+                      <Edit size={14} className="me-2" /> Configure
+                    </AnimatedButton>
+                    <AnimatedButton
+                      size="sm"
+                      variant="outline-danger"
+                      onClick={() => confirmDelete(config.id)}
+                      className="flex-grow-1 border-opacity-25"
+                    >
+                      <Trash2 size={14} className="me-2" /> Remove
+                    </AnimatedButton>
+                    <AnimatedButton
+                      size="sm"
+                      onClick={() => handleStartScan(config)}
+                      variant="primary"
+                      className="flex-grow-1 px-4"
+                    >
+                      <Play size={14} className="me-2 fill-current" /> Execute
+                    </AnimatedButton>
                   </div>
                 </div>
-              </CardContent>
-
-              <CardFooter className="flex justify-between pt-2">
-                <div className="space-x-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleEdit(config)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" /> Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => confirmDelete(config.id)}
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" /> Delete
-                  </Button>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleStartScan(config)}
-                  className="bg-primary hover:bg-primary/90 text-white"
-                >
-                  <Play className="h-4 w-4 mr-1" /> Start Scan
-                </Button>
-              </CardFooter>
-            </Card>
+              </AnimatedCard>
+            </div>
           ))}
         </div>
       )}
 
       {/* Edit Dialog */}
-      <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <AlertDialogContent className="!max-w-full sm:!max-w-[95%] md:!max-w-[95%] lg:!max-w-[95%] xl:!max-w-[1400px] w-full h-auto max-h-[95vh] overflow-y-auto p-6 m-4">
-          <AlertDialogHeader className="pb-4">
-            <AlertDialogTitle className="text-2xl">Edit Scan Configuration</AlertDialogTitle>
-            <div className="text-sm text-muted-foreground">
-              Update your saved scan configuration details.
-            </div>
-          </AlertDialogHeader>
-
-          <div className="space-y-6 py-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="editName" className="text-base">Configuration Name</Label>
-                <Input
-                  id="editName"
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="text-base p-3 h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="editUrl" className="text-base">URL</Label>
-                <Input
-                  id="editUrl"
-                  type="url"
-                  value={editUrl}
-                  onChange={(e) => setEditUrl(e.target.value)}
-                  className="text-base p-3 h-11"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-              <div className="space-y-2">
-                <Label htmlFor="editDepth" className="text-base">Scan Depth (0 for current page only)</Label>
-                <Input
-                  id="editDepth"
-                  type="number"
-                  min="0"
-                  max="5"
-                  value={editDepth}
-                  onChange={(e) => setEditDepth(parseInt(e.target.value) || 0)}
-                  className="text-base p-3 h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="editConcurrency" className="text-base">Concurrency (1-50)</Label>
-                <Input
-                  id="editConcurrency"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={editConcurrency}
-                  onChange={(e) => setEditConcurrency(parseInt(e.target.value) || 10)}
-                  className="text-base p-3 h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="editRequestTimeout" className="text-base">Request Timeout (seconds)</Label>
-                <Input
-                  id="editRequestTimeout"
-                  type="number"
-                  min="5"
-                  max="180"
-                  value={editRequestTimeout}
-                  onChange={(e) => setEditRequestTimeout(parseInt(e.target.value) || 30)}
-                  className="text-base p-3 h-11"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Time before giving up on a single URL (5-180 seconds)</p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2 mt-4 py-2">
-              <Checkbox
-                id="editScanSameLinkOnce"
-                checked={editScanSameLinkOnce}
-                onCheckedChange={(checked) => setEditScanSameLinkOnce(!!checked)}
-                className="h-5 w-5"
-              />
-              <Label htmlFor="editScanSameLinkOnce" className="cursor-pointer text-base font-normal">
-                Check each link only once (recommended)
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2 mb-4">
-              <Checkbox
-                id="editSkipExternalDomains"
-                checked={editSkipExternalDomains}
-                onCheckedChange={(checked) => setEditSkipExternalDomains(!!checked)}
-              />
-              <Label htmlFor="editSkipExternalDomains" className="cursor-pointer text-sm font-normal">
-                Skip external domains
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2 mb-4">
-              <Checkbox
-                id="editExcludeSubdomains"
-                checked={editExcludeSubdomains}
-                onCheckedChange={(checked) => setEditExcludeSubdomains(!!checked)}
-              />
-              <Label htmlFor="editExcludeSubdomains" className="cursor-pointer text-sm font-normal">
-                Do not check subdomains
-              </Label>
-            </div>
-
-            <div className="space-y-4 border-t pt-4 mt-2">
-              <div className="flex items-center space-x-2 py-2">
-                <Checkbox
-                  id="editUseAuth"
-                  checked={editUseAuth}
-                  onCheckedChange={(checked) => setEditUseAuth(!!checked)}
-                  className="h-5 w-5"
-                />
-                <Label htmlFor="editUseAuth" className="ml-2 text-base font-medium">
-                  Use HTTP Basic Authentication
-                </Label>
-              </div>
-
-              {editUseAuth && (
-                <div className="pl-8 space-y-4 bg-gray-50 dark:bg-muted/20 p-4 rounded-md border border-transparent dark:border-border">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="editUsername" className="text-base">Username</Label>
-                      <Input
-                        id="editUsername"
-                        type="text"
-                        value={editUsername}
-                        onChange={(e) => setEditUsername(e.target.value)}
-                        className="text-base p-3 h-11 bg-white dark:bg-background"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="editPassword" className="text-base">Password</Label>
-                      <Input
-                        id="editPassword"
-                        type="password"
-                        value={editPassword}
-                        onChange={(e) => setEditPassword(e.target.value)}
-                        className="text-base p-3 h-11 bg-white dark:bg-background"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center mt-2">
-                    <Checkbox
-                      id="editUseAuthForAllDomains"
-                      checked={editUseAuthForAllDomains}
-                      onCheckedChange={(checked) => setEditUseAuthForAllDomains(!!checked)}
-                      className="h-5 w-5"
-                    />
-                    <Label htmlFor="editUseAuthForAllDomains" className="ml-2 text-base">
-                      Use authentication for all domains
-                    </Label>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Advanced Options */}
-            <Button
-              variant="link"
-              className="p-0 h-auto text-purple-600 text-base"
-              onClick={() => setEditShowAdvanced(!editShowAdvanced)}
-            >
-              {editShowAdvanced ? 'Hide' : 'Show'} Advanced Options
-            </Button>
-
-            {editShowAdvanced && (
-              <div className="border border-border rounded-lg p-6 space-y-6 mt-2 bg-gray-50 dark:bg-muted/20">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Left column */}
-                  <div className="space-y-6">
-                    {/* Wildcard Exclusion Rules */}
-                    <div className="space-y-3">
-                      <Label htmlFor="editWildcardExclusions" className="text-base font-medium">URL Exclusion Patterns</Label>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Simple URL patterns to exclude (e.g., "example.com/about/*")
-                      </p>
-
-                      {editWildcardExclusions.map((pattern, index) => (
-                        <div key={`wildcard-${index}`} className="flex gap-3 items-center mb-3">
-                          <div className="w-1.5 h-11 bg-yellow-400 rounded-sm mr-1"></div>
-                          <Input
-                            value={pattern}
-                            onChange={(e) => updateEditWildcardExclusion(index, e.target.value)}
-                            placeholder="e.g. example.com/about/*"
-                            className="flex-1 text-base p-3 h-11"
-                          />
-
-                          {index === editWildcardExclusions.length - 1 ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeEditWildcardExclusion(index)}
-                                disabled={editWildcardExclusions.length <= 1}
-                                className="shrink-0 h-10 w-10"
-                              >
-                                <X className="h-5 w-5" />
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={addEditWildcardExclusion}
-                                className="shrink-0 h-10 w-10"
-                              >
-                                <Plus className="h-5 w-5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeEditWildcardExclusion(index)}
-                              className="shrink-0 h-10 w-10"
-                            >
-                              <X className="h-5 w-5" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Regex Exclusion Rules */}
-                    <div className="space-y-3">
-                      <Label htmlFor="editRegexExclusions" className="text-base font-medium">Regex Exclusion Patterns</Label>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Links matching these patterns will be skipped
-                      </p>
-
-                      {editRegexExclusions.map((regex, index) => (
-                        <div key={`regex-${index}`} className="flex gap-3 items-center mb-3">
-                          <div className="w-1.5 h-11 bg-blue-400 rounded-sm mr-1"></div>
-                          <Input
-                            value={regex}
-                            onChange={(e) => updateEditRegexExclusion(index, e.target.value)}
-                            placeholder="e.g. \/assets\/.*\.pdf$"
-                            className="flex-1 text-base p-3 h-11"
-                          />
-
-                          {index === editRegexExclusions.length - 1 ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeEditRegexExclusion(index)}
-                                disabled={editRegexExclusions.length <= 1}
-                                className="shrink-0 h-10 w-10"
-                              >
-                                <X className="h-5 w-5" />
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={addEditRegexExclusion}
-                                className="shrink-0 h-10 w-10"
-                              >
-                                <Plus className="h-5 w-5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeEditRegexExclusion(index)}
-                              className="shrink-0 h-10 w-10"
-                            >
-                              <X className="h-5 w-5" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right column */}
-                  <div className="space-y-6">
-                    {/* CSS Selector Exclusions */}
-                    <div className="space-y-3">
-                      <Label htmlFor="editCssSelectors" className="text-base font-medium">CSS Selector Exclusions</Label>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Links within these CSS selectors will be skipped
-                      </p>
-
-                      {editCssSelectors.map((selector, index) => (
-                        <div key={`selector-${index}`} className="flex gap-3 items-center mb-3">
-                          <div className="w-1.5 h-11 bg-green-400 rounded-sm mr-1"></div>
-                          <Input
-                            value={selector}
-                            onChange={(e) => updateEditCssSelector(index, e.target.value)}
-                            placeholder="e.g. .footer, #navigation, [data-skip]"
-                            className="flex-1 text-base p-3 h-11"
-                          />
-
-                          {index === editCssSelectors.length - 1 ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeEditCssSelector(index)}
-                                disabled={editCssSelectors.length <= 1}
-                                className="shrink-0 h-10 w-10"
-                              >
-                                <X className="h-5 w-5" />
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={addEditCssSelector}
-                                className="shrink-0 h-10 w-10"
-                              >
-                                <Plus className="h-5 w-5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeEditCssSelector(index)}
-                              className="shrink-0 h-10 w-10"
-                            >
-                              <X className="h-5 w-5" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-
-                      <div className="flex items-center space-x-2 pt-4">
-                        <Checkbox
-                          id="editCssSelectorsForceExclude"
-                          checked={editCssSelectorsForceExclude}
-                          onCheckedChange={(checked) => setEditCssSelectorsForceExclude(!!checked)}
-                          className="h-5 w-5"
-                        />
-                        <Label htmlFor="editCssSelectorsForceExclude" className="cursor-pointer text-base font-normal">
-                          Force Exclude - Links in CSS selectors are excluded entirely, even if found elsewhere on the page
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Use the new JSONPreview component */}
-                <div className="border-t border-border pt-6 mt-4">
-                  <JSONPreview
-                    data={{
-                      name: editName,
-                      url: editUrl,
-                      config: {
-                        depth: editDepth,
-                        concurrency: editConcurrency,
-                        requestTimeout: editRequestTimeout * 1000, // Convert to milliseconds
-                        scanSameLinkOnce: editScanSameLinkOnce,
-                        regexExclusions: editRegexExclusions.filter(r => r.trim() !== ""),
-                        cssSelectors: editCssSelectors.filter(s => s.trim() !== ""),
-                        cssSelectorsForceExclude: editCssSelectorsForceExclude,
-                        wildcardExclusions: editWildcardExclusions.filter(w => w.trim() !== ""),
-                        skipExternalDomains: editSkipExternalDomains,
-                        excludeSubdomains: editExcludeSubdomains,
-                        ...(editUseAuth && {
-                          auth: {
-                            username: editUsername,
-                            password: editPassword
-                          },
-                          useAuthForAllDomains: editUseAuthForAllDomains
-                        })
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {saveError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-5 w-5" />
-                <AlertDescription className="text-base">{saveError}</AlertDescription>
-              </Alert>
-            )}
-
-            {saveSuccess && (
-              <Alert className="bg-green-50 text-green-800 border-green-200">
-                <Check className="h-5 w-5" />
-                <AlertDescription className="text-base">Configuration updated successfully!</AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <AlertDialogFooter className="pt-4">
-            <AlertDialogCancel disabled={isSaving} className="text-base h-11">
-              Cancel
-            </AlertDialogCancel>
-            <Button
+      <SimpleModal
+        isOpen={showEditDialog}
+        onClose={() => setShowEditDialog(false)}
+        title="Intelligence Audit Configuration"
+        size="xl"
+        footer={
+          <>
+            <AnimatedButton variant="outline-secondary" onClick={() => setShowEditDialog(false)}>
+              Discard
+            </AnimatedButton>
+            <AnimatedButton
+              variant="primary"
               onClick={handleSaveEdit}
-              disabled={isSaving || !editName.trim() || !editUrl.trim()}
-              className="text-base h-11 px-6"
+              disabled={isSaving}
+              className="px-4"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Saving...
+                  <Loader2 size={16} className="animate-spin me-2" />
+                  Synchronizing...
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-5 w-5" />
-                  Save Changes
+                  <Save size={16} className="me-2" />
+                  Update Vault
                 </>
               )}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-            <div className="text-sm text-muted-foreground">
-              Are you sure you want to delete this scan configuration? This action cannot be undone.
+            </AnimatedButton>
+          </>
+        }
+      >
+        <div className="row g-4">
+          <div className="col-md-6 border-end pe-md-4">
+            <h6 className="x-small fw-bold text-uppercase tracking-widest text-primary mb-3">Core Parameters</h6>
+            <div className="mb-3">
+              <label className="form-label small fw-bold text-muted">Organization / Project Name</label>
+              <div className="input-group shadow-sm rounded-3 overflow-hidden">
+                <span className="input-group-text bg-light border-0"><Activity size={16} /></span>
+                <input
+                  type="text"
+                  className="form-control border-0 ps-0 shadow-none bg-light"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Corporate Landing Audit"
+                />
+              </div>
             </div>
-          </AlertDialogHeader>
+            <div className="mb-3">
+              <label className="form-label small fw-bold text-muted">Primary Domain URL</label>
+              <div className="input-group shadow-sm rounded-3 overflow-hidden">
+                <span className="input-group-text bg-light border-0"><ExternalLink size={16} /></span>
+                <input
+                  type="url"
+                  className="form-control border-0 ps-0 shadow-none bg-light"
+                  value={editUrl}
+                  onChange={(e) => setEditUrl(e.target.value)}
+                  placeholder="https://example.com"
+                />
+              </div>
+            </div>
 
-          {deleteError && (
-            <Alert variant="destructive" className="mt-2">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{deleteError}</AlertDescription>
-            </Alert>
-          )}
+            <div className="row g-2 mt-2">
+              <div className="col-4">
+                <div className="p-3 bg-light rounded-3 border h-100 shadow-sm border-0">
+                  <label className="form-label x-small fw-bold text-uppercase opacity-50 mb-1 d-block">Depth</label>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm border-0 bg-transparent p-0 fw-bold h4 mb-0 shadow-none"
+                    value={editDepth}
+                    onChange={(e) => setEditDepth(parseInt(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="p-3 bg-light rounded-3 border h-100 shadow-sm border-0">
+                  <label className="form-label x-small fw-bold text-uppercase opacity-50 mb-1 d-block">Queue</label>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm border-0 bg-transparent p-0 fw-bold h4 mb-0 shadow-none"
+                    value={editConcurrency}
+                    onChange={(e) => setEditConcurrency(parseInt(e.target.value) || 10)}
+                  />
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="p-3 bg-light rounded-3 border h-100 shadow-sm border-0">
+                  <label className="form-label x-small fw-bold text-uppercase opacity-50 mb-1 d-block">Time (s)</label>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm border-0 bg-transparent p-0 fw-bold h4 mb-0 shadow-none"
+                    value={editRequestTimeout}
+                    onChange={(e) => setEditRequestTimeout(parseInt(e.target.value) || 30)}
+                  />
+                </div>
+              </div>
+            </div>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <Button
-              variant="destructive"
+            <div className="mt-4">
+              <div className="form-check form-switch mb-2">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="sw-dedupe"
+                  checked={editScanSameLinkOnce}
+                  onChange={(e) => setEditScanSameLinkOnce(e.target.checked)}
+                />
+                <label className="form-check-label small" htmlFor="sw-dedupe">Optimal Deduplication Policy</label>
+              </div>
+              <div className="form-check form-switch mb-2">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="sw-external"
+                  checked={editSkipExternalDomains}
+                  onChange={(e) => setEditSkipExternalDomains(e.target.checked)}
+                />
+                <label className="form-check-label small" htmlFor="sw-external">Isolate Primary Domain Analysis</label>
+              </div>
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="sw-subdomain"
+                  checked={editExcludeSubdomains}
+                  onChange={(e) => setEditExcludeSubdomains(e.target.checked)}
+                />
+                <label className="form-check-label small" htmlFor="sw-subdomain">Enforce Strict Domain Boundary</label>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-6 ps-md-4">
+            <h6 className="x-small fw-bold text-uppercase tracking-widest text-primary mb-3">Security & Protocols</h6>
+            <div className="p-4 rounded-4 bg-light bg-opacity-50 border border-dashed mb-4">
+              <div className="form-check mb-3">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="chk-auth"
+                  checked={editUseAuth}
+                  onChange={(e) => setEditUseAuth(e.target.checked)}
+                />
+                <label className="form-check-label fw-bold" htmlFor="chk-auth">
+                  Credential-Locked Infrastructure
+                </label>
+              </div>
+
+              {editUseAuth && (
+                <div className="row g-2 mt-3 p-3 bg-white rounded-3 shadow-sm">
+                  <div className="col-6">
+                    <label className="form-label x-small fw-bold opacity-50">Username</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm border-0 bg-light"
+                      value={editUsername}
+                      onChange={(e) => setEditUsername(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label x-small fw-bold opacity-50">Security Token</label>
+                    <input
+                      type="password"
+                      className="form-control form-control-sm border-0 bg-light"
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-12 mt-2">
+                    <div className="form-check">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="chk-propagate"
+                        checked={editUseAuthForAllDomains}
+                        onChange={(e) => setEditUseAuthForAllDomains(e.target.checked)}
+                      />
+                      <label className="form-check-label x-small text-muted" htmlFor="chk-propagate">
+                        Propagate credentials across external nodes
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <h6 className="x-small fw-bold text-uppercase tracking-widest text-primary m-0">Inclusion Logic</h6>
+              <button
+                className="btn btn-link btn-sm text-primary p-0 x-small fw-bold text-decoration-none shadow-none"
+                onClick={() => setEditShowAdvanced(!editShowAdvanced)}
+              >
+                {editShowAdvanced ? 'Simplify Architecture' : 'Refine Rulebase'}
+              </button>
+            </div>
+
+            {editShowAdvanced ? (
+              <div className="space-y-4">
+                <div className="p-3 rounded-4 bg-white border shadow-sm">
+                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
+                    <span>Exclusion Patterns (Wildcard)</span>
+                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditWildcardExclusion}><Plus size={14} /></button>
+                  </label>
+                  {editWildcardExclusions.map((pattern, idx) => (
+                    <div key={idx} className="input-group input-group-sm mb-2">
+                      <input
+                        type="text"
+                        className="form-control bg-light border-0"
+                        value={pattern}
+                        onChange={(e) => updateEditWildcardExclusion(idx, e.target.value)}
+                        placeholder="e.g. /private/*"
+                      />
+                      <button className="btn btn-outline-light text-muted border-0 shadow-none" onClick={() => removeEditWildcardExclusion(idx)}><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3">
+                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
+                    <span>DOM Selectors (Exclude)</span>
+                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditCssSelector}><Plus size={14} /></button>
+                  </label>
+                  {editCssSelectors.map((selector, idx) => (
+                    <div key={idx} className="input-group input-group-sm mb-2">
+                      <input
+                        type="text"
+                        className="form-control bg-light border-0"
+                        value={selector}
+                        onChange={(e) => updateEditCssSelector(idx, e.target.value)}
+                        placeholder=".nav-internal"
+                      />
+                      <button className="btn btn-outline-light text-muted border-0 shadow-none" onClick={() => removeEditCssSelector(idx)}><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 text-center bg-light bg-opacity-50 rounded-4 border border-dashed opacity-50">
+                <Search size={32} className="text-muted mb-2" />
+                <div className="x-small fw-bold text-uppercase">Standard Logic Active</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 border-top pt-4">
+          <JSONPreview
+            data={{
+              name: editName,
+              url: editUrl,
+              config: {
+                depth: editDepth,
+                concurrency: editConcurrency,
+                requestTimeout: editRequestTimeout * 1000,
+                scanSameLinkOnce: editScanSameLinkOnce,
+                regexExclusions: editRegexExclusions.filter(r => r.trim() !== ""),
+                cssSelectors: editCssSelectors.filter(s => s.trim() !== ""),
+                cssSelectorsForceExclude: editCssSelectorsForceExclude,
+                wildcardExclusions: editWildcardExclusions.filter(w => w.trim() !== ""),
+                skipExternalDomains: editSkipExternalDomains,
+                excludeSubdomains: editExcludeSubdomains,
+                ...(editUseAuth && {
+                  auth: {
+                    username: editUsername,
+                    password: editPassword
+                  },
+                  useAuthForAllDomains: editUseAuthForAllDomains
+                })
+              }
+            }}
+          />
+        </div>
+
+        {saveError && (
+          <div className="alert alert-danger border-0 rounded-4 p-3 mt-4 d-flex align-items-center shadow-sm">
+            <AlertCircle size={18} className="me-2" />
+            <span className="small fw-bold">{saveError}</span>
+          </div>
+        )}
+
+        {saveSuccess && (
+          <div className="alert alert-success border-0 rounded-4 p-3 mt-4 d-flex align-items-center shadow-sm">
+            <Check size={18} className="me-2" />
+            <span className="small fw-bold">Vault updated successfully. Returning to dashboard...</span>
+          </div>
+        )}
+      </SimpleModal>
+
+      {/* Delete Dialog */}
+      <SimpleModal
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        title="Sanitize Archive Repository"
+        size="md"
+        footer={
+          <>
+            <AnimatedButton variant="outline-secondary" onClick={() => setShowDeleteDialog(false)}>
+              Abort Cleanup
+            </AnimatedButton>
+            <AnimatedButton
+              variant="outline-danger"
               onClick={handleDelete}
               disabled={isDeleting}
+              className="px-4"
             >
               {isDeleting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  <Loader2 size={16} className="animate-spin me-2" />
+                  Sanitizing...
                 </>
               ) : (
                 <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  <Trash2 size={16} className="me-2" />
+                  Execute Deletion
                 </>
               )}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </AnimatedButton>
+          </>
+        }
+      >
+        <div className="text-center py-3">
+          <div className="p-4 bg-danger bg-opacity-10 rounded-circle d-inline-block text-danger mb-4 border border-danger border-opacity-25 shadow-sm">
+            <AlertCircle size={48} />
+          </div>
+          <h4 className="fw-black text-dark dark:text-light mb-2">Irreversible Deletion</h4>
+          <p className="text-muted mb-0">
+            You are about to purge this configuration from the permanent record. This action cannot be undone and will terminate all historical tracking for this scope.
+          </p>
+
+          {deleteError && (
+            <div className="alert alert-danger border-0 rounded-4 p-3 mt-4 d-flex align-items-center shadow-sm">
+              <AlertCircle size={18} className="me-2" />
+              <span className="small fw-bold">{deleteError}</span>
+            </div>
+          )}
+        </div>
+      </SimpleModal>
     </div>
   );
 } 

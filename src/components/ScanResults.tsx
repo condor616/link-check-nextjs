@@ -3,32 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { ScanResult } from '@/lib/scanner';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ExternalLink,
   ClipboardCopy,
   CheckCircle2,
@@ -48,19 +22,16 @@ import {
   AlertCircle,
   CheckCircle,
   Lock as LockIcon,
+  Search,
+  Hash,
+  Filter,
+  ArrowRight,
+  Activity
 } from 'lucide-react';
 import * as cheerio from 'cheerio';
-import { PopoverAnchor } from '@radix-ui/react-popover';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { AnimatedCard } from './AnimatedCard';
+import { AnimatedButton } from './AnimatedButton';
 import ExportScanButton from './ExportScanButton';
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { ExpandableUrl } from './ExpandableUrl';
 
 // Update the ScanResult interface for serialized HTML contexts
@@ -90,6 +61,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
 
   // Use 'all' as the default tab 
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [isShowingHtmlContext, setShowHtmlContext] = useState<string | null>(null);
 
   // Update local results when props change
   useEffect(() => {
@@ -356,59 +328,51 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
 
   // Status badge component
   const StatusBadge = ({ status, code, usedAuth }: { status: string, code?: number, usedAuth?: boolean }) => {
-    let variant: 'default' | 'destructive' | 'secondary' | 'outline' = 'default';
+    let bgClass = "bg-secondary";
     let icon = null;
-    let className = "flex items-center";
+    let label = status;
 
-    // Always consider any status code >= 400 as "broken" regardless of status value
     const isBroken = code !== undefined && code >= 400;
     const displayStatus = isBroken ? 'broken' : status;
 
     switch (displayStatus) {
       case 'broken':
-        variant = 'destructive';
-        icon = <XCircle className="h-3 w-3 mr-1" />;
-        className += " bg-destructive/90 text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground";
+        bgClass = "bg-danger";
+        icon = <XCircle size={12} className="me-1" />;
+        label = "BROKEN";
         break;
       case 'error':
-        variant = 'destructive';
-        icon = <AlertTriangle className="h-3 w-3 mr-1" />;
-        className += " bg-destructive/90 text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground";
+        bgClass = "bg-danger";
+        icon = <AlertTriangle size={12} className="me-1" />;
+        label = "ERROR";
         break;
       case 'ok':
-        variant = 'secondary';
-        icon = <CheckCircle2 className="h-3 w-3 mr-1" />;
-        className += " bg-green-500/90 text-white hover:bg-green-500/90 hover:text-white";
+        bgClass = "bg-success";
+        icon = <CheckCircle2 size={12} className="me-1" />;
+        label = "SUCCESS";
         break;
       case 'external':
-        variant = 'secondary';
-        icon = <ArrowUpRight className="h-3 w-3 mr-1" />;
+        bgClass = "bg-primary";
+        icon = <ArrowUpRight size={12} className="me-1" />;
+        label = "EXTERNAL";
         break;
       case 'skipped':
-        variant = 'outline';
+        bgClass = "bg-light text-dark border";
+        label = "SKIPPED";
         break;
     }
 
     return (
-      <div className="flex items-center gap-1">
-        <Badge variant={variant} className={className}>
+      <div className="d-flex align-items-center gap-1">
+        <span className={`badge rounded-pill ${bgClass} d-flex align-items-center px-2 py-1 small fw-bold tracking-tight`}>
           {icon}
-          {displayStatus}{code ? ` (${code})` : ''}
-        </Badge>
+          {label}{code ? ` [${code}]` : ''}
+        </span>
         {usedAuth && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1">
-                  <LockIcon className="h-2.5 w-2.5 mr-0.5" />
-                  Auth
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">HTTP Basic Auth was used</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <span className="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-25 d-flex align-items-center px-2 py-1 small fw-bold" title="HTTP Basic Auth was used">
+            <LockIcon size={10} className="me-1" />
+            AUTH
+          </span>
         )}
       </div>
     );
@@ -416,88 +380,57 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
 
   // Render pagination controls
   const renderPagination = () => {
+    if (uniqueCurrentList.length === 0) return null;
+
     return (
-      <div className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-muted-foreground">
-            {uniqueCurrentList.length > 0 ?
-              `Showing ${startIndex + 1}-${endIndex} of ${uniqueCurrentList.length} items` :
-              "No items to display"}
+      <div className="d-flex flex-column flex-md-row align-items-center justify-content-between py-3 px-1 border-bottom border-opacity-10">
+        <div className="d-flex align-items-center gap-3 mb-3 mb-md-0">
+          <div className="text-muted x-small fw-semibold text-uppercase tracking-wider">
+            Displaying {startIndex + 1} - {endIndex} of {uniqueCurrentList.length}
           </div>
-          <div className="flex items-center ml-4">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 px-2 flex items-center gap-1 text-xs">
-                  <ListFilter className="h-3.5 w-3.5" />
-                  {currentItemsPerPage} per page
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48" align="start">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium">Items per page</p>
-                  <Select
-                    value={currentItemsPerPage.toString()}
-                    onValueChange={handleItemsPerPageChange}
-                  >
-                    <SelectTrigger className="w-full h-8 text-xs">
-                      <SelectValue placeholder="Select number" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5 items</SelectItem>
-                      <SelectItem value="10">10 items</SelectItem>
-                      <SelectItem value="20">20 items</SelectItem>
-                      <SelectItem value="50">50 items</SelectItem>
-                      <SelectItem value="100">100 items</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </PopoverContent>
-            </Popover>
+
+          <div className="dropdown">
+            <button className="btn btn-sm btn-outline-secondary dropdown-toggle x-small py-1 px-2 border-0 bg-light" type="button" data-bs-toggle="dropdown">
+              <Filter size={12} className="me-1" /> {currentItemsPerPage} / page
+            </button>
+            <ul className="dropdown-menu shadow-sm border-0 small">
+              <li><button className="dropdown-item py-1" onClick={() => handleItemsPerPageChange('10')}>10 items</button></li>
+              <li><button className="dropdown-item py-1" onClick={() => handleItemsPerPageChange('25')}>25 items</button></li>
+              <li><button className="dropdown-item py-1" onClick={() => handleItemsPerPageChange('50')}>50 items</button></li>
+              <li><button className="dropdown-item py-1" onClick={() => handleItemsPerPageChange('100')}>100 items</button></li>
+            </ul>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => goToPage(1)}
-            disabled={currentPage === 1}
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
 
-          <span className="text-xs px-2">
-            Page {currentPage} of {Math.max(1, totalPages)}
-          </span>
+        <nav aria-label="Pagination">
+          <ul className="pagination pagination-sm mb-0 gap-1 border-0">
+            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+              <button className="page-link border-0 rounded-circle p-2 d-flex align-items-center justify-content-center bg-light" onClick={() => goToPage(1)} style={{ width: '32px', height: '32px' }}>
+                <ChevronsLeft size={16} />
+              </button>
+            </li>
+            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+              <button className="page-link border-0 rounded-circle p-2 d-flex align-items-center justify-content-center bg-light mx-1" onClick={() => goToPage(currentPage - 1)} style={{ width: '32px', height: '32px' }}>
+                <ChevronLeft size={16} />
+              </button>
+            </li>
 
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages || totalPages === 0}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => goToPage(totalPages)}
-            disabled={currentPage === totalPages || totalPages === 0}
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </Button>
-        </div>
+            <li className="page-item disabled px-2 d-flex align-items-center">
+              <span className="text-dark dark:text-light small fw-bold">Page {currentPage} of {Math.max(1, totalPages)}</span>
+            </li>
+
+            <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
+              <button className="page-link border-0 rounded-circle p-2 d-flex align-items-center justify-content-center bg-light mx-1" onClick={() => goToPage(currentPage + 1)} style={{ width: '32px', height: '32px' }}>
+                <ChevronRight size={16} />
+              </button>
+            </li>
+            <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
+              <button className="page-link border-0 rounded-circle p-2 d-flex align-items-center justify-content-center bg-light" onClick={() => goToPage(totalPages)} style={{ width: '32px', height: '32px' }}>
+                <ChevronsRight size={16} />
+              </button>
+            </li>
+          </ul>
+        </nav>
       </div>
     );
   };
@@ -587,287 +520,196 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   };
 
   const renderLinkItem = (link: SerializedScanResult, index: number, total: number) => {
-    // Get unique pages with counts
     const pagesWithCounts = countUniquePages(link.foundOn);
     const uniquePages = Array.from(pagesWithCounts.keys());
-
-    // Extract domain for display
-    const urlDomain = (() => {
-      try {
-        return new URL(link.url).hostname;
-      } catch {
-        return link.url;
-      }
-    })();
-
     const isExpanded = expandedItems.has(link.url);
+    const isRechecking = recheckingUrls.has(link.url);
 
     return (
-      <div
-        key={link.url}
-        className={`text-sm ${index !== total - 1 ? 'border-b' : ''}`}
-      >
-        <div className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => toggleItemExpansion(link.url)}>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-2">
-            <div className="flex items-center gap-2 flex-1 min-w-0 w-full">
+      <div key={link.url} className={`border-bottom ${index === total - 1 ? 'border-0' : ''} fade-in`} style={{ animationDelay: `${index * 0.03}s` }}>
+        <div
+          className={`p-3 cursor-pointer hover-bg-light transition-all ${isExpanded ? 'bg-light dark:bg-dark' : ''}`}
+          onClick={() => toggleItemExpansion(link.url)}
+        >
+          <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
+            <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0 w-100">
               <StatusBadge status={link.status} code={link.statusCode} usedAuth={link.usedAuth} />
-              <ExpandableUrl url={link.url} truncateLength={50} showIcon={false} className="flex-1 min-w-0" externalExpanded={isExpanded} />
+              <div className="text-truncate flex-grow-1">
+                <span className="fw-bold text-dark dark:text-light">{link.url}</span>
+              </div>
             </div>
-            <div className="flex gap-1 items-center shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-border/50 pt-2 md:pt-0 mt-1 md:mt-0">
-              <span className="text-xs text-muted-foreground mr-2">
-                {uniquePages.length} page{uniquePages.length !== 1 ? 's' : ''}
+
+            <div className="d-flex align-items-center gap-2 shrink-0 w-100 w-lg-auto justify-content-between border-top border-lg-top-0 pt-2 pt-lg-0">
+              <span className="badge rounded-pill bg-light text-muted border small px-2 py-1 me-2">
+                {uniquePages.length} Source{uniquePages.length !== 1 ? 's' : ''}
               </span>
-              {scanId && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`h-8 px-3 shrink-0 ${recheckingUrls.has(link.url)
-                    ? 'bg-purple-100 text-purple-700'
-                    : ''
-                    }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRecheck(link.url);
-                  }}
-                  disabled={recheckingUrls.has(link.url)}
-                >
-                  {recheckingUrls.has(link.url) ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-1" />
-                      Re-check
-                    </>
-                  )}
-                </Button>
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopyUrl(link.url);
-                }}
-                className="text-muted-foreground hover:text-foreground shrink-0 p-2 cursor-pointer transition-colors"
-                title="Copy URL"
-              >
-                {copiedUrl === link.url ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                ) : (
-                  <ClipboardCopy className="h-4 w-4" />
+
+              <div className="d-flex gap-1">
+                {scanId && (
+                  <button
+                    className={`btn btn-sm ${isRechecking ? 'btn-outline-info' : 'btn-outline-primary'} border-0 rounded-pill px-3 d-flex align-items-center`}
+                    onClick={(e) => { e.stopPropagation(); handleRecheck(link.url); }}
+                    disabled={isRechecking}
+                  >
+                    {isRechecking ? (
+                      <><Loader2 size={12} className="me-2 animate-spin" /> Verifying...</>
+                    ) : (
+                      <><RefreshCw size={12} className="me-2" /> Re-check</>
+                    )}
+                  </button>
                 )}
-              </button>
-              <a
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground shrink-0 p-2 cursor-pointer transition-colors"
-                title="Open URL"
-                onClick={e => e.stopPropagation()}
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-              />
+
+                <button
+                  className="btn btn-sm btn-link text-muted p-2 hover-text-primary"
+                  title="Copy to clipboard"
+                  onClick={(e) => { e.stopPropagation(); handleCopyUrl(link.url); }}
+                >
+                  {copiedUrl === link.url ? <CheckCircle2 size={16} className="text-success" /> : <ClipboardCopy size={16} />}
+                </button>
+
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-sm btn-link text-muted p-2 hover-text-primary"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <ExternalLink size={16} />
+                </a>
+
+                <div className={`ms-2 text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                  <ChevronDown size={18} />
+                </div>
+              </div>
             </div>
           </div>
 
-          {link.errorMessage && (
-            <div className="text-muted-foreground mt-1.5 ml-1">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${link.errorMessage.toLowerCase().includes('timeout') ?
-                'bg-amber-500/10 text-amber-700' :
-                'bg-destructive/10 text-destructive'
-                }`}>
-                {link.errorMessage.toLowerCase().includes('timeout') ? (
-                  <>
-                    <Clock className="h-3 w-3 mr-1" />
+          {(link.errorMessage || recheckErrors.has(link.url) || recheckSuccess.has(link.url)) && (
+            <div className="mt-3">
+              {link.errorMessage && (
+                <div className={`alert border-0 small py-2 d-flex align-items-center ${link.errorMessage.toLowerCase().includes('timeout') ? 'bg-warning bg-opacity-10 text-warning-emphasis' : 'bg-danger bg-opacity-10 text-danger-emphasis'}`}>
+                  {link.errorMessage.toLowerCase().includes('timeout') ? <Clock size={14} className="me-2" /> : <AlertCircle size={14} className="me-2" />}
+                  <div>
                     {link.errorMessage}
-                    <span className="ml-1 text-xs opacity-75">(Try increasing timeout in advanced settings)</span>
-                  </>
-                ) : (
-                  link.errorMessage
-                )}
-              </span>
-            </div>
-          )}
-          {recheckErrors.has(link.url) && (
-            <div className="mt-2">
-              <Alert variant="destructive" className="py-2">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Re-check failed</AlertTitle>
-                <AlertDescription>{recheckErrors.get(link.url)}</AlertDescription>
-              </Alert>
-            </div>
-          )}
-          {recheckSuccess.has(link.url) && (
-            <div className="mt-2">
-              <Alert variant="default" className="py-2 bg-green-50 text-green-800 border-green-200">
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle>Re-check completed</AlertTitle>
-                <AlertDescription>
-                  {/* Split the message into main message and auth info */}
-                  {(() => {
-                    const message = recheckSuccess.get(link.url) || '';
-                    // Check if there's an auth message in parentheses or after a dash
-                    const authStart = message.indexOf(' (HTTP Basic Auth') !== -1
-                      ? message.indexOf(' (HTTP Basic Auth')
-                      : message.indexOf(' - HTTP Basic Auth');
+                    {link.errorMessage.toLowerCase().includes('timeout') && <span className="opacity-75 ms-2">(Consider extending timeout in Advanced Config)</span>}
+                  </div>
+                </div>
+              )}
 
-                    if (authStart !== -1) {
-                      const mainMessage = message.substring(0, authStart);
-                      const authMessage = message.substring(authStart);
+              {recheckErrors.has(link.url) && (
+                <div className="alert alert-danger border-0 small py-2 d-flex align-items-center">
+                  <XCircle size={14} className="me-2" />
+                  <div><strong>Re-check Failed:</strong> {recheckErrors.get(link.url)}</div>
+                </div>
+              )}
 
-                      return (
-                        <>
-                          {mainMessage}
-                          <span className="block mt-1 text-blue-700 text-xs">
-                            <LockIcon className="h-3.5 w-3.5 inline-block mr-1" />
-                            {authMessage.startsWith(' - ') ? authMessage.substring(3) :
-                              authMessage.startsWith(' (') ? authMessage.substring(2, authMessage.length - 1) :
-                                authMessage}
-                          </span>
-                        </>
-                      );
-                    }
-
-                    return message;
-                  })()}
-                </AlertDescription>
-              </Alert>
+              {recheckSuccess.has(link.url) && (
+                <div className="alert alert-success border-0 small py-2 d-flex align-items-center">
+                  <CheckCircle size={14} className="me-2" />
+                  <div><strong>Verification Success:</strong> {recheckSuccess.get(link.url)}</div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {isExpanded && (
-          <div className="px-3 pb-3 pt-0 bg-muted/30">
-            <div className="bg-muted/40 p-2 rounded-sm">
+          <div className="p-4 bg-light bg-opacity-50 dark:bg-dark border-top fade-in">
+            <div className="mb-4">
+              <div className="d-flex align-items-center mb-3">
+                <Hash size={16} className="text-primary me-2" />
+                <h5 className="h6 mb-0 fw-bold">Referencing Locations</h5>
+              </div>
+
               {uniquePages.length > 0 ? (
-                <>
-                  <p className="text-xs text-muted-foreground mb-1.5 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
-                    Found on: {uniquePages.length} page(s)
-                  </p>
-                  <ul className="space-y-1.5 pl-4 text-xs">
-                    {uniquePages.map((page, i) => {
-                      // Format found-on page display
-                      let displayText = page;
-                      const occurrences = pagesWithCounts.get(page) || 0;
-                      let isSelfReference = false;
+                <div className="row g-3">
+                  {uniquePages.map((page, i) => {
+                    let displayText = page;
+                    const occurrences = pagesWithCounts.get(page) || 0;
+                    let isSelfReference = false;
 
-                      try {
-                        if (page !== 'initial') {
-                          const url = new URL(page);
-                          displayText = url.pathname || url.hostname;
+                    try {
+                      if (page !== 'initial') {
+                        const url = new URL(page);
+                        displayText = url.pathname || url.hostname;
+                        if (page === link.url) { isSelfReference = true; displayText = 'SELF-LINK: ' + displayText; }
+                      } else { displayText = 'Genesis Page (Root)'; }
+                    } catch { /* Use original */ }
 
-                          // Check if the page contains a broken link to itself
-                          if (page === link.url) {
-                            isSelfReference = true;
-                            displayText = 'Self reference: ' + displayText;
-                          }
-                        } else {
-                          displayText = 'Initial scan page';
-                        }
-                      } catch {
-                        // Keep original if parsing fails
-                      }
-
-                      return (
-                        <li key={i} className="list-disc flex items-center gap-1">
-                          {page === 'initial' || isSelfReference ? (
-                            <span className={`${isSelfReference ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                              {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                            </span>
-                          ) : (
-                            <>
-                              <a
-                                href={page}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-primary hover:underline inline-flex items-center cursor-pointer transition-all"
-                                title={page}
-                              >
-                                {displayText} {occurrences > 1 && `(${occurrences} occurrences)`}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
+                    return (
+                      <div key={i} className="col-12">
+                        <div className="bg-white dark:bg-dark border rounded-3 p-3 shadow-sm hover-shadow transition-all">
+                          <div className="d-flex justify-between align-items-center">
+                            <div className="d-flex align-items-center gap-2 overflow-hidden">
+                              <div className={`p-1 rounded-circle ${isSelfReference ? 'bg-warning text-warning' : 'bg-primary bg-opacity-10 text-primary'}`}>
+                                <ArrowRight size={14} />
+                              </div>
+                              <a href={page === 'initial' ? '#' : page} target="_blank" rel="noreferrer" className="text-decoration-none text-dark dark:text-light fw-semibold text-truncate small">
+                                {displayText}
                               </a>
+                              <span className="badge bg-light text-muted border small">{occurrences} instances</span>
+                            </div>
 
-                              {(link.status === 'broken' || link.status === 'error' || (link.statusCode !== undefined && link.statusCode >= 400)) && (
-                                <TooltipProvider>
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground">
-                                        <Info className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[500px] p-3" align="start" side="left">
-                                      <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">Link HTML Context:</h4>
-                                        <div className="max-h-[300px] overflow-y-auto space-y-3">
-                                          {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
-                                            const html = generateHtmlContext(link.url, page, idx + 1);
-                                            return (
-                                              <div key={idx} className="relative">
-                                                <div className="absolute top-1 right-1 flex space-x-1">
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-6 w-6 p-0 text-muted-foreground"
-                                                    onClick={() => handleCopyUrl(html)}
-                                                    title="Copy HTML"
-                                                  >
-                                                    <ClipboardCopy className="h-3.5 w-3.5" />
-                                                  </Button>
-                                                </div>
-                                                <pre className="text-xs p-3 bg-muted rounded-md whitespace-pre-wrap overflow-x-auto border border-muted-foreground/20"
-                                                  style={{ maxHeight: "250px", fontSize: "12px" }}>
-                                                  <code dangerouslySetInnerHTML={{
-                                                    __html: html
-                                                      // Use syntax highlighting for HTML
-                                                      .replace(/&/g, '&amp;')
-                                                      .replace(/</g, '&lt;')
-                                                      .replace(/>/g, '&gt;')
-                                                      .replace(/"/g, '&quot;')
-                                                      // Highlight comments
-                                                      .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6A9955;">$1</span>')
-                                                      // Highlight the attribute containing the broken link
-                                                      .replace(
-                                                        new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
-                                                        '<span style="background-color: rgba(255,0,0,0.2); color: #d20000; font-weight: bold; padding: 0 3px; border-radius: 2px;">$1' + link.url + '$2</span>'
-                                                      )
-                                                      // Highlight tags
-                                                      .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span style="color: #569cd6;">$1</span>$2')
-                                                      // Highlight attributes
-                                                      .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span style="color: #9cdcfe;">$2</span>$3')
-                                                      // Highlight quotes and their content
-                                                      .replace(/(&quot;)(.*?)(&quot;)/g, '<span style="color: #ce9178;">$1$2$3</span>')
-                                                  }} />
-                                                </pre>
-                                              </div>
-                                            );
-                                          })}
-                                          {occurrences > 3 && (
-                                            <p className="text-xs text-muted-foreground">
-                                              {occurrences - 3} more occurrence(s) on this page...
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                </TooltipProvider>
-                              )}
-                            </>
+                            <div className="d-flex gap-2">
+                              <button
+                                className="btn btn-sm btn-outline-secondary border-0 rounded-circle"
+                                onClick={(e) => { e.stopPropagation(); setShowHtmlContext(isShowingHtmlContext === `${page}-${i}` ? null : `${page}-${i}`); }}
+                                title="View HTML Source"
+                              >
+                                <Search size={14} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {isShowingHtmlContext === `${page}-${i}` && (
+                            <div className="mt-3 border-top pt-3 fade-in">
+                              <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="x-small fw-bold text-uppercase text-muted tracking-widest">Source Context</span>
+                              </div>
+                              <div className="max-h-[400px] overflow-auto rounded-3">
+                                {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
+                                  const htmlCode = generateHtmlContext(link.url, page, idx + 1);
+                                  return (
+                                    <div key={idx} className="position-relative mb-2 last:mb-0">
+                                      <button
+                                        className="btn btn-sm btn-dark position-absolute top-2 right-2 opacity-50 hover-opacity-100 z-1"
+                                        onClick={() => handleCopyUrl(htmlCode)}
+                                      >
+                                        <ClipboardCopy size={12} />
+                                      </button>
+                                      <pre className="m-0 p-3 bg-dark text-light x-small font-monospace" style={{ borderRadius: '8px', lineHeight: '1.5' }}>
+                                        <code dangerouslySetInnerHTML={{
+                                          __html: htmlCode
+                                            .replace(/&/g, '&amp;')
+                                            .replace(/</g, '&lt;')
+                                            .replace(/>/g, '&gt;')
+                                            .replace(/"/g, '&quot;')
+                                            .replace(/(&lt;!--.*?--&gt;)/g, '<span class="text-secondary">$1</span>')
+                                            .replace(
+                                              new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
+                                              '<span class="bg-danger bg-opacity-25 text-danger fw-bold px-1 rounded">$1' + link.url + '$2</span>'
+                                            )
+                                            .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span class="text-primary">$1</span>$2')
+                                            .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span class="text-info">$2</span>$3')
+                                            .replace(/(&quot;)(.*?)(&quot;)/g, '<span class="text-warning">$1$2$3</span>')
+                                        }} />
+                                      </pre>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                <p className="text-xs text-muted-foreground italic p-1">
-                  No source pages found. This is likely the starting URL of the scan.
-                </p>
+                <div className="text-center py-4 bg-white dark:bg-dark border border-dashed rounded-3 mt-2">
+                  <Info size={32} className="text-muted opacity-25 mb-2" />
+                  <p className="text-muted small mb-0 fw-semibold">No parent references found (Primary Entry Node)</p>
+                </div>
               )}
             </div>
           </div>
@@ -879,7 +721,15 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   // Render a list of links with collapsible items
   const renderLinksList = (links: SerializedScanResult[]) => {
     if (links.length === 0) {
-      return <p className="text-muted-foreground text-center py-8">No links in this category.</p>;
+      return (
+        <div className="text-center py-5 bg-light rounded-4 border border-dashed my-4">
+          <div className="mb-3 opacity-25">
+            <Search size={48} className="text-muted" />
+          </div>
+          <h5 className="text-muted fw-bold">Zero records found</h5>
+          <p className="text-muted small">No links match the selected filter category.</p>
+        </div>
+      );
     }
 
     // Group links by URL to avoid duplicates
@@ -887,9 +737,9 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     const paginatedItems = uniqueLinks.slice(startIndex, endIndex);
 
     return (
-      <div className="w-full">
+      <div className="w-100">
         {renderPagination()}
-        <div className="border rounded-md">
+        <div className="bg-white dark:bg-dark border rounded-4 overflow-hidden mt-3 shadow-sm">
           {paginatedItems.map((link, index) => renderLinkItem(link, index, paginatedItems.length))}
         </div>
         {renderPagination()}
@@ -929,76 +779,51 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   };
 
   return (
-    <div className="w-full">
-      <div>
-        {/* Filter cards that act as tabs */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div
-            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'problematic' ? 'ring-2 ring-purple-500' : ''}`}
-            onClick={() => handleTabChange('problematic')}
-          >
-            <div className="text-xs text-muted-foreground">Problematic Links</div>
-            <div className="text-2xl font-semibold flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-destructive" />
-              {uniqueProblematicCount}
-            </div>
+    <div className="w-100">
+      <div className="row g-3 mb-5">
+        {[
+          { id: 'problematic', label: 'Broken & Errored', count: uniqueProblematicCount, icon: <XCircle size={20} />, color: 'danger' },
+          { id: 'ok', label: 'Successful Links', count: uniqueOkCount, icon: <CheckCircle2 size={20} />, color: 'success' },
+          { id: 'external', label: 'External Nodes', count: uniqueExternalCount, icon: <ArrowUpRight size={20} />, color: 'primary' },
+          { id: 'skipped', label: 'Exclusion Rules', count: uniqueSkippedCount, icon: <Filter size={20} />, color: 'secondary' },
+          { id: 'all', label: 'Unfiltered Catalog', count: uniqueAllCount, icon: <Activity size={20} />, color: 'dark' },
+        ].map((tab, idx) => (
+          <div key={tab.id} className="col-6 col-md-4 col-lg">
+            <AnimatedCard
+              className={`p-3 h-100 cursor-pointer shadow-sm transition-all hover-translate-y-2 border-2 ${activeTab === tab.id
+                  ? `border-${tab.color} bg-${tab.color} bg-opacity-10`
+                  : `bg-white dark:bg-dark border-transparent hover:border-${tab.color} hover:bg-light dark:hover:bg-opacity-10`
+                }`}
+              onClick={() => handleTabChange(tab.id)}
+            >
+              <div className="d-flex flex-column h-100">
+                <div className={`mb-2 text-${tab.color} d-flex align-items-center justify-content-between`}>
+                  {tab.icon}
+                  {activeTab === tab.id && <div className={`p-1 bg-${tab.color} rounded-circle`}></div>}
+                </div>
+                <div className="text-muted x-small fw-bold text-uppercase tracking-wider mb-1">{tab.label}</div>
+                <div className="h4 fw-black mb-0 text-dark dark:text-light">{tab.count}</div>
+              </div>
+            </AnimatedCard>
           </div>
+        ))}
+      </div>
 
-          <div
-            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'ok' ? 'ring-2 ring-purple-500' : ''}`}
-            onClick={() => handleTabChange('ok')}
-          >
-            <div className="text-xs text-muted-foreground">OK Links</div>
-            <div className="text-2xl font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-              {uniqueOkCount}
-            </div>
-          </div>
-
-          <div
-            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'external' ? 'ring-2 ring-purple-500' : ''}`}
-            onClick={() => handleTabChange('external')}
-          >
-            <div className="text-xs text-muted-foreground">External Links</div>
-            <div className="text-2xl font-semibold flex items-center gap-2">
-              <ArrowUpRight className="w-5 h-5 text-blue-500" />
-              {uniqueExternalCount}
-            </div>
-          </div>
-
-          <div
-            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'skipped' ? 'ring-2 ring-purple-500' : ''}`}
-            onClick={() => handleTabChange('skipped')}
-          >
-            <div className="text-xs text-muted-foreground">Skipped Links</div>
-            <div className="text-2xl font-semibold flex items-center gap-2">
-              {uniqueSkippedCount}
-            </div>
-          </div>
-
-          <div
-            className={`bg-muted/50 p-4 rounded-md cursor-pointer transition hover:bg-muted ${activeTab === 'all' ? 'ring-2 ring-purple-500' : ''}`}
-            onClick={() => handleTabChange('all')}
-          >
-            <div className="text-xs text-muted-foreground">All Links</div>
-            <div className="text-2xl font-semibold flex items-center gap-2">
-              {uniqueAllCount}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">
-            {activeTab === 'problematic' && 'Problematic Links'}
-            {activeTab === 'ok' && 'OK Links'}
-            {activeTab === 'external' && 'External Links'}
-            {activeTab === 'skipped' && 'Skipped Links'}
-            {activeTab === 'all' && 'All Links'}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+          <h3 className="h4 fw-black text-dark dark:text-light mb-1">
+            {activeTab === 'problematic' && 'Critical Breakdown'}
+            {activeTab === 'ok' && 'Operational Integrity'}
+            {activeTab === 'external' && 'Cross-Domain References'}
+            {activeTab === 'skipped' && 'Rulebase Exclusions'}
+            {activeTab === 'all' && 'Comprehensive Dataset'}
           </h3>
-          <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} />
+          <p className="text-muted small mb-0">Review the status and source locations for each identified node.</p>
         </div>
+        <ExportScanButton scanId={scanId} scanUrl={_scanUrl} results={results} />
+      </div>
 
-        {/* Render the appropriate list based on activeTab */}
+      <div className="fade-in-up">
         {activeTab === 'problematic' && renderLinksList(problematicLinks)}
         {activeTab === 'ok' && renderLinksList(okLinks)}
         {activeTab === 'external' && renderLinksList(externalLinks)}

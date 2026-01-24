@@ -1,0 +1,400 @@
+// 1. Theme Configuration (Using Professional Suite Palette)
+:root {
+  // Brand Colors (OKLCH for vividness)
+  --brand-primary: oklch(55% 0.2 260); // Indigo
+  --brand-secondary: oklch(45% 0.05 250); // Slate
+  --brand-success: oklch(60% 0.15 150); // Emerald
+  --brand-danger: oklch(55% 0.2 20); // Crimson
+  --brand-warning: oklch(75% 0.15 70); // Amber
+  --brand-info: oklch(65% 0.15 220); // Sky
+
+  // Light Theme Defaults
+  --bg-app: oklch(98% 0.01 260); // Lightest purple-white
+  --bg-card: oklch(100% 0 0); // White
+  --text-main: oklch(20% 0.02 260); // Dark text
+  --text-muted: oklch(50% 0.02 260); // Muted text
+  --border-subtle: oklch(90% 0.02 260); // Light border
+
+  // Bootstrap Override Maps
+  --bs-primary: var(--brand-primary);
+  --bs-secondary: var(--brand-secondary);
+  --bs-success: var(--brand-success);
+  --bs-danger: var(--brand-danger);
+  --bs-warning: var(--brand-warning);
+  --bs-info: var(--brand-info);
+
+  --bs-body-bg: var(--bg-app);
+  --bs-body-color: var(--text-main);
+
+  // Custom Semantic vars
+  --card-bg: var(--bg-card);
+}
+
+.dark {
+  --bg-app: oklch(15% 0.02 260); // Dark purple-black
+  --bg-card: oklch(20% 0.02 260); // Slightly lighter
+  --text-main: oklch(95% 0.01 260); // White text
+  --text-muted: oklch(70% 0.01 260); // Muted white
+  --border-subtle: oklch(30% 0.02 260); // Dark border
+
+  --bs-body-bg: var(--bg-app);
+  --bs-body-color: var(--text-main);
+
+  --card-bg: var(--bg-card);
+}
+
+// 2. Import Bootstrap
+@import "bootstrap/scss/bootstrap";
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+// 3. Global Overrides & Professional Aesthetics
+html,
+body {
+  height: 100%;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+
+  // Remove blinking cursor on static text clicks
+  caret-color: transparent;
+}
+
+// Restore caret for interactive elements
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: auto;
+}
+
+body {
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// Custom Scrollbar
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+// Professional Card Lift
+.prof-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  overflow: hidden;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Modern Navigation
+.main-nav {
+  // Use CSS variable relative to theme
+  background: rgba(var(--bs-primary-rgb), 0.03);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  z-index: 1030;
+}
+
+.dark .main-nav {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+// Responsive Grid Utilities
+.main-content-wrapper {
+  background: var(--bg-app);
+}
+
+// Animation Classes
+.fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Mobile Font Size Optimization
+@media (max-width: 576px) {
+  html {
+    font-size: 14px; // Shrink slightly to fit more
+  }
+
+  .container-xl {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+// Utility Classes
+.hover-bg-danger:hover {
+  background-color: var(--bs-danger) !important;
+  color: white !important;
+}
+
+.hover-text-white:hover {
+  color: white !important;
+}
+
+.opacity-50 {
+  opacity: 0.5;
+}
+
+.opacity-25 {
+  opacity: 0.25;
+}
+
+.opacity-0 {
+  opacity: 0;
+}
+
+.hover-opacity-100:hover {
+  opacity: 1;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+
+// --- Dark Mode Utility Overrides (Compatibility Layer) ---
+// These classes allow "bg-white dark:bg-dark" pattern to work without Tailwind
+.dark {
+  .dark\:bg-dark {
+    background-color: var(--bg-card) !important;
+  }
+
+  .dark\:bg-secondary {
+    background-color: var(--bg-card) !important; // Map to card bg for consistency
+  }
+
+  .dark\:bg-input {
+    background-color: oklch(25% 0.02 260) !important;
+  }
+
+  .dark\:text-light {
+    color: var(--text-main) !important;
+  }
+
+  .dark\:border-secondary,
+  .dark\:border-opacity-10 {
+    border-color: var(--border-subtle) !important;
+  }
+
+  .dark\:hover-bg-opacity-10:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  // Fix bootstrap utilities in dark mode
+  .bg-light {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main) !important;
+  }
+
+  .bg-white {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main) !important;
+  }
+
+  .text-dark {
+    color: var(--text-main) !important;
+  }
+
+  .border-light {
+    border-color: var(--border-subtle) !important;
+  }
+
+  // Text Contrast Overrides
+  .text-muted,
+  .text-secondary {
+    color: var(--text-muted) !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .h1,
+  .h2,
+  .h3,
+  .h4,
+  .h5,
+  .h6 {
+    color: var(--text-main);
+  }
+
+  // Navigation Links
+  .nav-link {
+    color: var(--text-muted);
+
+    &:hover,
+    &.active {
+      color: var(--brand-primary);
+    }
+  }
+
+  // Button Links
+  .btn-link {
+    color: var(--brand-primary);
+    text-decoration: none;
+
+    &:hover {
+      color: oklch(65% 0.2 260); // Lighter indigo
+      text-decoration: underline;
+    }
+  }
+
+  // Ensure form controls look good
+  .form-control,
+  .form-select {
+    background-color: oklch(25% 0.02 260);
+    border-color: var(--border-subtle);
+    color: var(--text-main);
+
+    &:focus {
+      background-color: oklch(25% 0.02 260);
+      color: var(--text-main);
+      border-color: var(--brand-primary);
+      box-shadow: 0 0 0 0.25rem rgba(var(--brand-primary), 0.25);
+    }
+
+    &::placeholder {
+      color: var(--text-muted);
+    }
+  }
+
+  .input-group-text {
+    background-color: oklch(20% 0.02 260);
+    border-color: var(--border-subtle);
+    color: var(--text-main);
+  }
+
+  .dropdown-menu {
+    background-color: var(--bg-card);
+    border-color: var(--border-subtle);
+
+    .dropdown-item {
+      color: var(--text-main);
+
+      &:hover,
+      &:focus {
+        background-color: var(--border-subtle);
+        color: var(--text-main);
+      }
+    }
+  }
+
+  .card {
+    background-color: var(--bg-card);
+    border-color: var(--border-subtle);
+    color: var(--text-main);
+
+    .card-header,
+    .card-footer {
+      background-color: rgba(255, 255, 255, 0.05);
+      border-color: var(--border-subtle);
+    }
+  }
+
+  .list-group-item {
+    background-color: var(--bg-card);
+    border-color: var(--border-subtle);
+    color: var(--text-main);
+  }
+
+  .modal-content {
+    background-color: var(--bg-card);
+    border-color: var(--border-subtle);
+
+    .modal-header,
+    .modal-footer {
+      border-color: var(--border-subtle);
+    }
+
+    .btn-close {
+      filter: invert(1) grayscale(100%) brightness(200%);
+    }
+  }
+
+  .table {
+    --bs-table-color: var(--text-main);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--border-subtle);
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.05);
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.1);
+
+    color: var(--text-main);
+    border-color: var(--border-subtle);
+
+    th,
+    td {
+      border-color: var(--border-subtle);
+      color: var(--text-main);
+    }
+  }
+
+  // Alerts
+  .alert-primary {
+    --bs-alert-color: var(--brand-primary);
+    --bs-alert-bg: rgba(var(--brand-primary), 0.1);
+    --bs-alert-border-color: rgba(var(--brand-primary), 0.2);
+  }
+
+  .alert-secondary {
+    --bs-alert-color: var(--text-muted);
+    --bs-alert-bg: rgba(var(--text-muted), 0.1);
+    --bs-alert-border-color: rgba(var(--text-muted), 0.2);
+  }
+
+  .alert-success {
+    --bs-alert-color: var(--brand-success);
+    --bs-alert-bg: rgba(var(--brand-success), 0.1);
+    --bs-alert-border-color: rgba(var(--brand-success), 0.2);
+  }
+
+  .alert-danger {
+    --bs-alert-color: var(--brand-danger);
+    --bs-alert-bg: rgba(var(--brand-danger), 0.1);
+    --bs-alert-border-color: rgba(var(--brand-danger), 0.2);
+  }
+
+  .alert-warning {
+    --bs-alert-color: var(--brand-warning);
+    --bs-alert-bg: rgba(var(--brand-warning), 0.1);
+    --bs-alert-border-color: rgba(var(--brand-warning), 0.2);
+  }
+
+  .alert-info {
+    --bs-alert-color: var(--brand-info);
+    --bs-alert-bg: rgba(var(--brand-info), 0.1);
+    --bs-alert-border-color: rgba(var(--brand-info), 0.2);
+  }
+}

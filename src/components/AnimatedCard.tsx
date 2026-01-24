@@ -1,40 +1,36 @@
 "use client";
 
 import { motion, HTMLMotionProps } from "framer-motion";
-import { cn } from "@/lib/utils";
 import React from "react";
 
 interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "transition" | "initial" | "animate" | "whileHover"> {
   delay?: number;
   children: React.ReactNode;
+  noPadding?: boolean;
 }
 
 export function AnimatedCard({
   children,
-  className,
+  className = "",
   delay = 0,
+  noPadding = false,
   ...props
 }: AnimatedCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.3,
+        duration: 0.4,
         delay: delay,
-        ease: "easeOut"
+        ease: [0.22, 1, 0.36, 1]
       }}
-      whileHover={{
-        y: -5,
-        transition: { duration: 0.2 }
-      }}
-      className={cn(
-        "bg-card/40 backdrop-blur-sm text-card-foreground rounded-none border border-primary/20 p-4 md:p-6 transition-all duration-300 hover:border-primary/60 hover:shadow-[0_0_30px_-10px_var(--primary)] hover:bg-card/60 cursor-pointer cyber-border",
-        className
-      )}
+      className={`card prof-card ${className}`}
       {...props}
     >
-      {children}
+      <div className={`card-body ${noPadding ? 'p-0' : 'p-3 p-md-4'}`}>
+        {children}
+      </div>
     </motion.div>
   );
-} 
+}

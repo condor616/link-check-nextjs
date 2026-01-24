@@ -1,10 +1,8 @@
-'use client';
+"use client";
 
 import React, { useState } from 'react';
 import { Copy, Check, Save } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from './ui/textarea';
 
 interface JSONPreviewProps {
   data: any;
@@ -15,10 +13,10 @@ interface JSONPreviewProps {
   onSave?: (data: any) => void;
 }
 
-export function JSONPreview({ 
-  data, 
-  title = "Configuration JSON (Read-only)", 
-  maxHeight = "max-h-60", 
+export function JSONPreview({
+  data,
+  title = "Configuration JSON (Read-only)",
+  maxHeight = "max-h-60",
   className = "",
   editable = false,
   onSave
@@ -34,7 +32,7 @@ export function JSONPreview({
   const copyToClipboard = () => {
     // Copy only the formatted JSON content without line numbers
     navigator.clipboard.writeText(formattedJson);
-    
+
     // Show copied state briefly
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -42,7 +40,7 @@ export function JSONPreview({
 
   const handleSaveClick = () => {
     if (!onSave) return;
-    
+
     try {
       const parsedJson = JSON.parse(jsonContent);
       setParseError(null);
@@ -61,75 +59,72 @@ export function JSONPreview({
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      <div className="flex justify-between items-center">
-        <Label htmlFor="configJson" className="text-base font-medium">
+    <div className={`d-flex flex-column gap-2 ${className}`}>
+      <div className="d-flex justify-content-between align-items-center">
+        <Label htmlFor="configJson" className="h6 fw-bold mb-0">
           {title}
         </Label>
-        <div className="flex gap-2">
+        <div className="d-flex gap-2">
           {editable && onSave && (
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              className="h-8 flex items-center gap-1.5"
+            <button
+              className="btn btn-sm btn-secondary d-flex align-items-center gap-1"
               onClick={handleSaveClick}
             >
-              <Save className="h-3.5 w-3.5" />
-              <span className="text-xs">Save</span>
-            </Button>
+              <Save size={14} />
+              <span className="small">Save</span>
+            </button>
           )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 flex items-center gap-1.5"
+          <button
+            className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
             onClick={copyToClipboard}
           >
             {copied ? (
               <>
-                <Check className="h-3.5 w-3.5 text-green-500" />
-                <span className="text-xs text-green-500">Copied!</span>
+                <Check size={14} className="text-success" />
+                <span className="small text-success">Copied!</span>
               </>
             ) : (
               <>
-                <Copy className="h-3.5 w-3.5" />
-                <span className="text-xs">Copy All</span>
+                <Copy size={14} />
+                <span className="small">Copy All</span>
               </>
             )}
-          </Button>
+          </button>
         </div>
       </div>
-      
+
       {parseError && (
-        <div className="text-sm text-red-500 mt-1">{parseError}</div>
+        <div className="text-danger small">{parseError}</div>
       )}
-      
+
       {editable ? (
-        <Textarea
+        <textarea
           value={jsonContent}
           onChange={handleJsonChange}
-          className={`font-mono text-sm p-4 ${maxHeight}`}
+          className={`form-control font-monospace small bg-light ${maxHeight}`}
           rows={10}
+          style={{ resize: 'vertical' }}
         />
       ) : (
-        <div className={`rounded-md mt-1 overflow-auto ${maxHeight}`}>
-          <pre className="p-4 bg-slate-900 text-slate-50 text-sm flex">
+        <div className={`border rounded bg-dark text-light overflow-auto ${maxHeight}`} style={{ maxHeight: '400px' }}>
+          <div className="d-flex p-3">
             {/* Line numbers column */}
-            <div className="select-none text-right pr-3 border-r border-slate-700 mr-3 text-slate-500 font-mono" style={{ minWidth: '2.5rem' }}>
+            <div className="text-end pe-3 border-end border-secondary me-3 text-muted font-monospace user-select-none opacity-50" style={{ minWidth: '2.5rem' }}>
               {jsonLines.map((_, i) => (
-                <div key={`line-${i}`} className="leading-6">
+                <div key={`line-${i}`} className="lh-base">
                   {i + 1}
                 </div>
               ))}
             </div>
             {/* JSON content */}
-            <code className="font-mono leading-6">
+            <code className="font-monospace lh-base text-light" style={{ whiteSpace: 'pre' }}>
               {jsonLines.map((line, i) => (
                 <div key={`content-${i}`}>
                   {line}
                 </div>
               ))}
             </code>
-          </pre>
+          </div>
         </div>
       )}
     </div>

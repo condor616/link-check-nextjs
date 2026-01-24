@@ -1,57 +1,41 @@
 "use client";
 
 import { motion, HTMLMotionProps } from "framer-motion";
-import { cn } from "@/lib/utils";
-import React, { ButtonHTMLAttributes } from "react";
+import React from "react";
 import { TransitionLink } from "./TransitionLink";
 
 interface AnimatedButtonProps extends Omit<HTMLMotionProps<"button">, "transition" | "whileHover" | "whileTap"> {
   children: React.ReactNode;
-  variant?: "default" | "primary" | "secondary" | "outline" | "ghost" | "destructive";
+  variant?: "primary" | "secondary" | "success" | "danger" | "warning" | "info" | "light" | "dark" | "outline-primary" | "outline-secondary" | "outline-success" | "outline-danger" | "outline-warning" | "outline-info" | "outline-light" | "outline-dark" | "link";
+  size?: "sm" | "lg";
   href?: string;
-  activeClassName?: string;
+  noPadding?: boolean;
 }
 
 export function AnimatedButton({
   children,
-  className,
-  variant = "default",
+  className = "",
+  variant = "primary",
+  size,
   href,
+  noPadding = false,
   ...props
 }: AnimatedButtonProps) {
-  const getVariantClasses = () => {
-    switch (variant) {
-      case "primary":
-        return "bg-primary text-primary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--primary)] border border-primary/50 rounded-none";
-      case "secondary":
-        return "bg-secondary text-secondary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--secondary)] border border-secondary/50 rounded-none";
-      case "outline":
-        return "bg-transparent border border-primary/50 text-primary hover:bg-primary/10 hover:shadow-[0_0_15px_-5px_var(--primary)] rounded-none";
-      case "ghost":
-        return "bg-transparent hover:bg-white/5 hover:text-primary rounded-none";
-      case "destructive":
-        return "bg-destructive text-destructive-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--destructive)] border border-transparent rounded-none";
-      default:
-        return "bg-primary text-primary-foreground hover:brightness-110 hover:shadow-[0_0_20px_-5px_var(--primary)] border border-primary/50 rounded-none";
-    }
-  };
+  const btnClasses = `btn btn-${variant} ${size ? `btn-${size}` : ""} ${className}`.trim();
 
   const buttonContent = (
     <motion.div
       whileHover={props.disabled ? {} : {
-        scale: 1.03,
-        transition: { duration: 0.2 }
+        scale: 1.05,
+        y: -1,
+        transition: { duration: 0.2, ease: "easeOut" }
       }}
       whileTap={props.disabled ? {} : {
-        scale: 0.97,
+        scale: 0.95,
+        y: 0,
         transition: { duration: 0.1 }
       }}
-      className={cn(
-        "inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 w-full h-full",
-        getVariantClasses(),
-        className,
-        props.disabled && "opacity-50 cursor-not-allowed grayscale-[0.5]"
-      )}
+      className="w-100 h-100 d-inline-flex align-items-center justify-content-center"
     >
       {children}
     </motion.div>
@@ -59,29 +43,29 @@ export function AnimatedButton({
 
   if (href && !props.disabled) {
     return (
-      <TransitionLink href={href} className="inline-block no-underline">
-        {buttonContent}
+      <TransitionLink
+        href={href}
+        className={`${btnClasses} text-decoration-none d-inline-flex align-items-center justify-content-center p-0`}
+        style={(noPadding ? { width: props.style?.width, height: props.style?.height } : {}) as React.CSSProperties}
+      >
+        <div className={noPadding ? "w-100 h-100 d-flex align-items-center justify-content-center" : "px-3 py-2"}>
+          {buttonContent}
+        </div>
       </TransitionLink>
     );
   }
 
   return (
     <button
-      className={cn(
-        "appearance-none bg-transparent border-none p-0 m-0 cursor-pointer outline-none",
-        props.disabled ? "cursor-not-allowed" : "cursor-pointer"
-      )}
+      className={`${btnClasses} d-inline-flex align-items-center justify-content-center`}
       {...(props as any)}
-      onClick={(e) => {
-        if (props.disabled) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-        if (props.onClick) props.onClick(e);
-      }}
+      style={{ ...props.style, padding: 0 }}
     >
-      {buttonContent}
+      {noPadding ? buttonContent : (
+        <div className="px-3 py-2 w-100 h-100 d-flex align-items-center justify-content-center">
+          {buttonContent}
+        </div>
+      )}
     </button>
   );
 }

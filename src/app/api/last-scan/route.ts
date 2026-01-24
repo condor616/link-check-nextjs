@@ -30,7 +30,17 @@ export async function GET() {
 async function getLastScanFromPrisma() {
   try {
     const lastScan = await prisma.scanHistory.findFirst({
-      orderBy: { scan_date: 'desc' }
+      orderBy: { scan_date: 'desc' },
+      where: {
+        id: { not: 'temp_setup_id' }
+      },
+      select: {
+        id: true,
+        scan_url: true,
+        scan_date: true,
+        broken_links: true,
+        total_links: true
+      }
     });
 
     if (!lastScan) {
@@ -44,32 +54,12 @@ async function getLastScanFromPrisma() {
       });
     }
 
-    // Parse results to count broken links
-    let results: ScanResult[] = [];
-    try {
-      const parsed = JSON.parse(lastScan.results);
-      if (Array.isArray(parsed)) {
-        results = parsed;
-      } else if (parsed && typeof parsed === 'object') {
-        results = Object.values(parsed);
-      }
-    } catch (e) {
-      console.error(`Error parsing results for scan ${lastScan.id}:`, e);
-    }
-
-    // Count broken links
-    const brokenLinks = results.filter((result: ScanResult) =>
-      result.status === 'broken' ||
-      (result.statusCode !== undefined && result.statusCode >= 400) ||
-      result.status === 'error'
-    ).length;
-
     return NextResponse.json({
       id: lastScan.id,
       url: lastScan.scan_url,
       date: lastScan.scan_date.toISOString(),
-      brokenLinks,
-      totalLinks: results.length,
+      brokenLinks: lastScan.broken_links,
+      totalLinks: lastScan.total_links,
     });
   } catch (error) {
     console.error('Error fetching last scan from Prisma:', error);
@@ -94,7 +84,8 @@ async function getLastScanFromSupabase() {
 
     const { data, error } = await supabase
       .from('scan_history')
-      .select('*')
+      .select('id, scan_url, scan_date, broken_links, total_links')
+      .neq('id', 'temp_setup_id')
       .order('scan_date', { ascending: false })
       .limit(1)
       .single();
@@ -125,39 +116,24 @@ async function getLastScanFromSupabase() {
       });
     }
 
-    // Define interface for Supabase response since we don't have generated types
-    interface ScanHistoryItem {
+    // Define interface for the query result
+    interface ScanHistoryRecord {
       id: string;
       scan_url: string;
       scan_date: string;
-      duration_seconds: number;
-      results: any[];
-      config: any;
+      broken_links: number;
+      total_links: number;
     }
 
-    const scanData = data as unknown as ScanHistoryItem;
-
-    // Count broken links
-    let resultsArr: any[] = [];
-    if (Array.isArray(scanData.results)) {
-      resultsArr = scanData.results;
-    } else if (scanData.results && typeof scanData.results === 'object') {
-      resultsArr = Object.values(scanData.results);
-    }
-
-    const brokenLinks = resultsArr.filter((result: ScanResult) =>
-      result.status === 'broken' ||
-      (result.statusCode !== undefined && result.statusCode >= 400) ||
-      result.status === 'error'
-    ).length;
+    const record = data as unknown as ScanHistoryRecord;
 
     // Return simplified scan data for the homepage
     return NextResponse.json({
-      id: scanData.id,
-      url: scanData.scan_url,
-      date: scanData.scan_date,
-      brokenLinks,
-      totalLinks: resultsArr.length,
+      id: record.id,
+      url: record.scan_url,
+      date: record.scan_date,
+      brokenLinks: record.broken_links || 0,
+      totalLinks: record.total_links || 0,
     });
   } catch (error) {
     console.error('Error fetching last scan from Supabase:', error);

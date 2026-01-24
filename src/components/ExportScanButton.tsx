@@ -1,99 +1,91 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Download, FileJson, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import { Download, FileJson, FileSpreadsheet, FileText, Loader2, ChevronDown } from 'lucide-react';
 import { ScanResult } from '@/lib/scanner';
+import { AnimatedButton } from './AnimatedButton';
 
 // Define SerializedScanResult type to match the one in ScanResults component
 interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
-  foundOn: string[]; // Instead of Set<string>
-  htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
+    foundOn: string[]; // Instead of Set<string>
+    htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
 }
 
 interface ExportScanButtonProps {
-  scanId?: string;
-  scanUrl: string;
-  results: SerializedScanResult[];
-  className?: string;
+    scanId?: string;
+    scanUrl: string;
+    results: SerializedScanResult[];
+    className?: string;
 }
 
 export default function ExportScanButton({ scanId, scanUrl, results, className = '' }: ExportScanButtonProps) {
-  const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [exportFormat, setExportFormat] = useState<string | null>(null);
+    const [isExporting, setIsExporting] = useState<boolean>(false);
+    const [exportFormat, setExportFormat] = useState<string | null>(null);
 
-  const handleExport = async (format: 'json' | 'csv' | 'html') => {
-    try {
-      setIsExporting(true);
-      setExportFormat(format);
+    const handleExport = async (format: 'json' | 'csv' | 'html') => {
+        try {
+            setIsExporting(true);
+            setExportFormat(format);
 
-      // Generate the export data
-      let data: string;
-      let fileName: string;
-      let mimeType: string;
+            // Generate the export data
+            let data: string;
+            let fileName: string;
+            let mimeType: string;
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const baseFileName = `link-scan-${scanUrl.replace(/[^a-z0-9]/gi, '-').substring(0, 30)}-${timestamp}`;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const baseFileName = `link-scan-${scanUrl.replace(/[^a-z0-9]/gi, '-').substring(0, 30)}-${timestamp}`;
 
-      if (format === 'json') {
-        data = JSON.stringify({
-          scanUrl,
-          scanDate: new Date().toISOString(),
-          scanId,
-          results
-        }, null, 2);
-        fileName = `${baseFileName}.json`;
-        mimeType = 'application/json';
-      } else if (format === 'csv') {
-        // CSV header
-        const headers = ['URL', 'Status', 'Status Code', 'Error Message', 'Found On Pages'];
+            if (format === 'json') {
+                data = JSON.stringify({
+                    scanUrl,
+                    scanDate: new Date().toISOString(),
+                    scanId,
+                    results
+                }, null, 2);
+                fileName = `${baseFileName}.json`;
+                mimeType = 'application/json';
+            } else if (format === 'csv') {
+                // CSV header
+                const headers = ['URL', 'Status', 'Status Code', 'Error Message', 'Found On Pages'];
 
-        // CSV rows
-        const rows = results.map(link => [
-          link.url,
-          link.status,
-          link.statusCode || '',
-          link.errorMessage || '',
-          Array.isArray(link.foundOn)
-            ? link.foundOn.join('; ')
-            : Array.from(link.foundOn || []).join('; ')
-        ]);
+                // CSV rows
+                const rows = results.map(link => [
+                    link.url,
+                    link.status,
+                    link.statusCode || '',
+                    link.errorMessage || '',
+                    Array.isArray(link.foundOn)
+                        ? link.foundOn.join('; ')
+                        : Array.from(link.foundOn || []).join('; ')
+                ]);
 
-        // Combine header and rows
-        const csvContent = [
-          headers.join(','),
-          ...rows.map(row => row.map(cell =>
-            // Escape CSV values properly
-            `"${String(cell).replace(/"/g, '""')}"`
-          ).join(','))
-        ].join('\n');
+                // Combine header and rows
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(row => row.map(cell =>
+                        // Escape CSV values properly
+                        `"${String(cell).replace(/"/g, '""')}"`
+                    ).join(','))
+                ].join('\n');
 
-        data = csvContent;
-        fileName = `${baseFileName}.csv`;
-        mimeType = 'text/csv';
-      } else {
-        // HTML export
-        // Create a professional, interactive HTML report with tabs and accordions
-        const brokenLinks = results.filter(r => r.status === 'broken' || r.status === 'error');
-        const okLinks = results.filter(r => r.status === 'ok');
-        const externalLinks = results.filter(r => r.status === 'external');
-        const skippedLinks = results.filter(r => r.status === 'skipped');
+                data = csvContent;
+                fileName = `${baseFileName}.csv`;
+                mimeType = 'text/csv';
+            } else {
+                // HTML export
+                // Create a professional, interactive HTML report with tabs and accordions
+                const brokenLinks = results.filter(r => r.status === 'broken' || r.status === 'error');
+                const okLinks = results.filter(r => r.status === 'ok');
+                const externalLinks = results.filter(r => r.status === 'external');
+                const skippedLinks = results.filter(r => r.status === 'skipped');
 
-        const totalCount = results.length;
-        const brokenCount = brokenLinks.length;
-        const okCount = okLinks.length;
-        const externalCount = externalLinks.length;
-        const skippedCount = skippedLinks.length;
+                const totalCount = results.length;
+                const brokenCount = brokenLinks.length;
+                const okCount = okLinks.length;
+                const externalCount = externalLinks.length;
+                const skippedCount = skippedLinks.length;
 
-        const html = `<!DOCTYPE html>
+                const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -471,11 +463,11 @@ export default function ExportScanButton({ scanId, scanUrl, results, className =
 </body>
 </html>`;
 
-        function renderLinkItem(link: SerializedScanResult, prefix: string, idx: number) {
-          const id = `link-${prefix}-${idx}`;
-          const statusLabel = link.status + (link.statusCode ? ` (${link.statusCode})` : '');
+                function renderLinkItem(link: SerializedScanResult, prefix: string, idx: number) {
+                    const id = `link-${prefix}-${idx}`;
+                    const statusLabel = link.status + (link.statusCode ? ` (${link.statusCode})` : '');
 
-          return `
+                    return `
             <div class="link-item" id="${id}">
                 <div class="link-header" onclick="toggleLink('${id}')">
                     <div class="link-main">
@@ -519,71 +511,98 @@ export default function ExportScanButton({ scanId, scanUrl, results, className =
                     </div>
                 </div>
             </div>`;
+                }
+
+                data = html;
+                fileName = `${baseFileName}.html`;
+                mimeType = 'text/html';
+            }
+
+            // Create download blob
+            const blob = new Blob([data], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+
+            // Create and trigger download link
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+
+        } catch (error) {
+            console.error('Export error:', error);
+        } finally {
+            setIsExporting(false);
+            setExportFormat(null);
         }
+    };
 
-        data = html;
-        fileName = `${baseFileName}.html`;
-        mimeType = 'text/html';
-      }
+    return (
+        <div className={`dropdown ${className}`}>
+            <AnimatedButton
+                className="btn btn-primary d-flex align-items-center gap-2"
+                id="exportDropdown"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                disabled={isExporting}
+            >
+                {isExporting ? (
+                    <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Processing {exportFormat?.toUpperCase()}</span>
+                    </>
+                ) : (
+                    <>
+                        <Download size={16} />
+                        <span>Generate Report</span>
+                        <ChevronDown size={14} className="ms-1 opacity-50" />
+                    </>
+                )}
+            </AnimatedButton>
 
-      // Create download blob
-      const blob = new Blob([data], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-
-      // Create and trigger download link
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-
-      // Clean up
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
-
-    } catch (error) {
-      console.error('Export error:', error);
-    } finally {
-      setIsExporting(false);
-      setExportFormat(null);
-    }
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className={className}>
-          {isExporting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Exporting {exportFormat?.toUpperCase()}...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Export Format</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => handleExport('json')} disabled={isExporting}>
-          <FileJson className="h-4 w-4 mr-2" />
-          <span>JSON</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExport('csv')} disabled={isExporting}>
-          <FileSpreadsheet className="h-4 w-4 mr-2" />
-          <span>CSV</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExport('html')} disabled={isExporting}>
-          <FileText className="h-4 w-4 mr-2" />
-          <span>HTML Report</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-} 
+            <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 mt-2 p-2" aria-labelledby="exportDropdown">
+                <li><h6 className="dropdown-header x-small fw-bold text-uppercase tracking-widest text-muted pb-2">Export Data formats</h6></li>
+                <li>
+                    <button className="dropdown-item rounded-3 d-flex align-items-center py-2" onClick={() => handleExport('json')}>
+                        <div className="p-2 bg-primary bg-opacity-10 text-primary rounded-2 me-3">
+                            <FileJson size={18} />
+                        </div>
+                        <div>
+                            <div className="fw-bold small">JSON Structure</div>
+                            <div className="x-small text-muted">Raw data for API integration</div>
+                        </div>
+                    </button>
+                </li>
+                <li>
+                    <button className="dropdown-item rounded-3 d-flex align-items-center py-2" onClick={() => handleExport('csv')}>
+                        <div className="p-2 bg-success bg-opacity-10 text-success rounded-2 me-3">
+                            <FileSpreadsheet size={18} />
+                        </div>
+                        <div>
+                            <div className="fw-bold small">CSV Spreadsheet</div>
+                            <div className="x-small text-muted">Open in Excel or Google Sheets</div>
+                        </div>
+                    </button>
+                </li>
+                <li className="my-2"><hr className="dropdown-divider opacity-50" /></li>
+                <li>
+                    <button className="dropdown-item rounded-3 d-flex align-items-center py-2" onClick={() => handleExport('html')}>
+                        <div className="p-2 bg-info bg-opacity-10 text-info rounded-2 me-3">
+                            <FileText size={18} />
+                        </div>
+                        <div>
+                            <div className="fw-bold small">Interactive HTML</div>
+                            <div className="x-small text-muted">Self-contained executive report</div>
+                        </div>
+                    </button>
+                </li>
+            </ul>
+        </div>
+    );
+}

@@ -3,34 +3,35 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Trash2, AlertCircle, ExternalLink, FileDown, Clock, Calendar, Database, FileJson, Settings, PlayCircle } from 'lucide-react';
+  Loader2,
+  Trash2,
+  AlertCircle,
+  ExternalLink,
+  FileDown,
+  Clock,
+  Calendar,
+  Database,
+  FileJson,
+  Settings,
+  Activity,
+  LayoutGrid,
+  Search,
+  History as HistoryIcon,
+  Shield,
+  Terminal,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+  Eye,
+  Play,
+  Info,
+  Check,
+  X,
+  Plus
+} from 'lucide-react';
+import { AnimatedCard } from '@/components/AnimatedCard';
+import { AnimatedButton } from '@/components/AnimatedButton';
+import { SimpleModal } from '@/components/SimpleModal';
 import { useNotification } from "@/components/NotificationContext";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -71,6 +72,11 @@ export default function HistoryPage() {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isSupabaseError, setIsSupabaseError] = useState<boolean>(false);
   const [settingsType, setSettingsType] = useState<'file' | 'supabase' | null>(null);
+
+  // Sorting state
+  const [sortField, setSortField] = useState<keyof ScanSummary>('scanDate');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
   const { addNotification } = useNotification();
   const router = useRouter();
 
@@ -249,18 +255,21 @@ export default function HistoryPage() {
       if (forCard) {
         return (
           <>
-            <span className="text-3xl font-extrabold text-green-700">{formattedDate}</span>
-            <span className="text-xs text-muted-foreground mt-1">{timeAgo}</span>
+            <span className="text-xl font-extrabold text-green-700">{formattedDate}</span>
+            <span className="text-xs text-muted-foreground ms-2">{timeAgo}</span>
           </>
         );
       }
 
       return (
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <div className="flex flex-col">
-            <span className="text-sm">{formattedDate}</span>
-            <span className="text-xs text-muted-foreground">{timeAgo}</span>
+        <div className="flex flex-col gap-1 py-1">
+          <div className="flex items-center gap-2 text-dark dark:text-light">
+            <Calendar size={14} className="text-primary opacity-70" />
+            <span className="text-sm font-semibold">{formattedDate.split(' at ')[0]}</span>
+          </div>
+          <div className="flex items-center gap-2 text-muted">
+            <Clock size={14} className="opacity-50" />
+            <span className="x-small fw-medium">{timeAgo}</span>
           </div>
         </div>
       );
@@ -290,331 +299,327 @@ export default function HistoryPage() {
     return `${seconds} second${seconds > 1 ? 's' : ''} ago`;
   };
 
-  // Get the exact time of the last scan
-  const getLastScanDateTime = () => {
-    // Combine scans and completed jobs for this metric
+  // Get the most recent scan
+  const getLastScan = (): ScanSummary | null => {
     const allCompleted = [...scans];
-    // Add completed jobs that aren't already in scans (if any overlap, though usually they are separate sources)
-    // For now just use scans as they represent "History"
-
-    if (allCompleted.length === 0) return '-';
+    if (allCompleted.length === 0) return null;
 
     try {
-      // Simple approach - sort the scans by date and take the most recent
       const sortedScans = [...allCompleted].sort((a, b) => {
         const dateA = new Date(a.scanDate).getTime();
         const dateB = new Date(b.scanDate).getTime();
-
-        // If either date is invalid, consider it lesser (will be sorted to the end)
         if (isNaN(dateA)) return 1;
         if (isNaN(dateB)) return -1;
-
-        return dateB - dateA; // Descending order (newest first)
+        return dateB - dateA;
       });
 
-      // Find the first scan with a valid date
       for (const scan of sortedScans) {
         const date = new Date(scan.scanDate);
         if (!isNaN(date.getTime())) {
-          return formatDate(scan.scanDate, true);
+          return scan;
         }
       }
-
-      // Fallback - try the first scan regardless
-      if (allCompleted.length > 0) {
-        const firstScan = allCompleted[0];
-        return formatDate(firstScan.scanDate, true);
-      }
-
-      return '-';
+      return allCompleted[0] || null;
     } catch (error) {
-      console.error('Error formatting last scan date:', error);
-      return '-';
+      console.error('Error finding last scan:', error);
+      return null;
     }
   };
 
-  // Filter active jobs
-  const activeJobs = jobs.filter(j => j.status === 'queued' || j.status === 'running');
-  // Filter completed/failed jobs to show in list if not already in history (optional, but for now let's show them separately or merge)
-  // Actually, let's just show active jobs in a separate card, and history below.
-  // We can also show completed jobs in the history list if we want, but they might duplicate if we sync them.
-  // For now, let's just show active jobs.
+  const lastScan = getLastScan();
+
+  // Sorting logic
+  const handleSort = (field: keyof ScanSummary) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedScans = [...scans].sort((a, b) => {
+    let valA = a[sortField];
+    let valB = b[sortField];
+
+    if (sortField === 'scanDate') {
+      valA = new Date(valA as string).getTime();
+      valB = new Date(valB as string).getTime();
+    }
+
+    if (valA === undefined || valA === null) return 1;
+    if (valB === undefined || valB === null) return -1;
+
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const SortIcon = ({ field }: { field: keyof ScanSummary }) => {
+    if (sortField !== field) return <ChevronsUpDown size={14} className="ms-1 opacity-20 group-hover:opacity-50 transition-opacity" />;
+
+    return sortDirection === 'asc'
+      ? <ChevronUp size={14} className="ms-1 text-primary" />
+      : <ChevronDown size={14} className="ms-1 text-primary" />;
+  };
 
   return (
-    <div className="container mx-auto p-4 max-w-none">
-      <div className="w-full">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Scan History</h1>
-            <p className="text-muted-foreground">
-              View and manage your previous scans
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="whitespace-nowrap"
-              asChild
-            >
-              <Link href="/scan">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                New Scan
-              </Link>
-            </Button>
-
-            <Button
-              onClick={fetchData}
-              variant="outline"
-              disabled={isLoading}
-              className="whitespace-nowrap"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <FileDown className="h-4 w-4 mr-2" />
-              )}
-              Refresh List
-            </Button>
-          </div>
+    <div className="w-100 py-4 fade-in-up">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-5 mt-3">
+        <div>
+          <h1 className="display-6 fw-bold text-dark dark:text-light mb-1">
+            <HistoryIcon size={32} className="text-primary me-2 mb-1" />
+            Scan <span className="text-primary">History</span>
+          </h1>
         </div>
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Total Scans Card */}
-          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center justify-center h-full space-y-6">
-                <div className="rounded-full bg-purple-50 p-3 group-hover:bg-purple-100 transition-colors">
-                  <Database className="h-8 w-8 text-purple-600" />
-                </div>
-                <div className="flex flex-col items-center justify-center flex-grow">
-                  <span className="text-3xl font-extrabold text-purple-700">{scans.length}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">Total Scans</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Active Jobs Card */}
-          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center justify-center h-full space-y-6">
-                <div className="rounded-full bg-blue-50 p-3 group-hover:bg-blue-100 transition-colors">
-                  <PlayCircle className="h-8 w-8 text-blue-600" />
-                </div>
-                <div className="flex flex-col items-center justify-center flex-grow">
-                  <span className="text-3xl font-extrabold text-blue-700">{activeJobs.length}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">Active Scans</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Last Scan Card */}
-          <Card className="group bg-card border-border shadow-sm hover:border-primary hover:shadow-[0_0_20px_-5px_var(--primary)] transition-all duration-300 rounded-xl cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center justify-center h-full space-y-6">
-                <div className="rounded-full bg-green-50 p-3 group-hover:bg-green-100 transition-colors">
-                  <Clock className="h-8 w-8 text-green-600" />
-                </div>
-                <div className="flex flex-col items-center justify-center flex-grow">
-                  {getLastScanDateTime()}
-                </div>
-                <span className="text-sm text-muted-foreground">Last Scan</span>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="d-flex gap-2">
+          <AnimatedButton onClick={() => router.push('/scan')} variant="outline-primary" className="px-4">
+            <Plus size={18} className="me-2" /> New Scan
+          </AnimatedButton>
+          <AnimatedButton onClick={fetchData} variant="primary" disabled={isLoading} className="px-4">
+            {isLoading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <FileDown size={18} className="me-2" />
+            )}
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </AnimatedButton>
         </div>
+      </div>
 
-        {/* Active Jobs Section */}
-        {activeJobs.length > 0 && (
-          <Card className="bg-card border-border shadow-sm mb-8">
-            <CardHeader>
-              <CardTitle>Active Scans</CardTitle>
-              <CardDescription>Currently running or queued scans</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {activeJobs.map(job => (
-                  <div key={job.id} className="border rounded-lg p-4 flex flex-col gap-4">
-                    <div className="flex justify-between items-start">
+
+
+      {/* Active Operations Section */}
+      {jobs.filter(j => j.status === 'queued' || j.status === 'running').length > 0 && (
+        <div className="mb-5">
+          <div className="d-flex align-items-center gap-2 mb-4">
+            <div className="p-2 bg-warning bg-opacity-10 text-warning rounded-3 border border-warning border-opacity-10">
+              <Terminal size={20} />
+            </div>
+            <h4 className="fw-black m-0">Live <span className="text-warning">Operations</span></h4>
+          </div>
+          <div className="row g-4">
+            {jobs.filter(j => j.status === 'queued' || j.status === 'running').map(job => (
+              <div key={job.id} className="col-12 col-lg-6">
+                <AnimatedCard className="border-0 shadow-sm p-4 bg-white dark:bg-dark border-bottom border-4 border-warning">
+                  <div className="d-flex justify-content-between align-items-start mb-4">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="p-3 bg-light rounded-4 border">
+                        <Activity size={24} className="text-warning animate-pulse" />
+                      </div>
                       <div>
-                        <h3 className="font-semibold truncate max-w-[300px]">{job.scan_url}</h3>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                          <span className={`capitalize px-2 py-0.5 rounded-full text-xs ${job.status === 'running' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                            {job.status}
-                          </span>
-                          <span>•</span>
-                          <span>Started {formatDate(job.created_at)}</span>
+                        <h5 className="fw-black mb-1">{job.scan_url}</h5>
+                        <div className="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2 x-small fw-bold border border-warning border-opacity-10">
+                          {job.status === 'running' ? 'Active Processing' : 'In Queue'}
                         </div>
                       </div>
-                      <Link href={`/history/${job.id}`}>
-                        <Button size="sm" variant="outline">View Progress</Button>
-                      </Link>
                     </div>
-                    {job.status === 'running' && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{job.urls_scanned} URLs scanned</span>
-                          <span>{job.progress_percent}%</span>
-                        </div>
-                        <Progress value={job.progress_percent} className="h-2" />
-                        <p className="text-xs text-muted-foreground truncate">Current: {job.current_url}</p>
-                      </div>
-                    )}
+                    <AnimatedButton
+                      size="sm"
+                      variant="outline-primary"
+                      onClick={() => router.push(`/history/${job.id}`)}
+                    >
+                      Audit View
+                    </AnimatedButton>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* History Section */}
-        <Card className="bg-card border-border shadow-sm">
-          <CardHeader>
-            <CardTitle>Recent Scans</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading && scans.length === 0 ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-              </div>
-            ) : error ? (
-              isSupabaseError && settingsType === 'supabase' ? (
-                <div className="p-6 border rounded-lg bg-amber-50">
-                  <div className="flex items-start gap-4">
-                    <div className="mt-1">
-                      <Database className="h-6 w-6 text-amber-600" />
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-medium text-amber-800">Database Connection Issue</h3>
-                        <p className="mt-1 text-amber-700">
-                          Unable to connect to the Supabase database. Your settings are configured to use Supabase, but the connection failed.
-                        </p>
+                  {job.status === 'running' && (
+                    <div className="space-y-3">
+                      <div className="d-flex justify-content-between align-items-center mb-1">
+                        <span className="small fw-bold text-muted">{job.urls_scanned} Nodes Scanned</span>
+                        <span className="small fw-black text-primary">{job.progress_percent}%</span>
                       </div>
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-amber-800">You have two options:</h4>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Button onClick={switchToFileStorage} variant="outline" className="bg-transparent border-input hover:bg-accent hover:text-accent-foreground">
-                            <FileJson className="mr-2 h-4 w-4" />
-                            Switch to File Storage
-                          </Button>
-                          <Button onClick={goToSettings} variant="default">
-                            <Settings className="mr-2 h-4 w-4" />
-                            Fix Supabase Settings
-                          </Button>
-                        </div>
+                      <div className="progress h-8 px-1 mb-2 rounded-pill bg-light border border-opacity-25" style={{ height: '10px' }}>
+                        <div
+                          className="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill"
+                          role="progressbar"
+                          style={{ width: `${job.progress_percent}%` }}
+                        ></div>
+                      </div>
+                      <p className="x-small text-muted text-truncate opacity-75 m-0 italic">Probing: {job.current_url}</p>
+                    </div>
+                  )}
+                </AnimatedCard>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* History Repository */}
+      <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white dark:bg-dark">
+        <div className="card-body p-0">
+          {isLoading && scans.length === 0 ? (
+            <div className="text-center py-5">
+              <Loader2 size={64} className="text-primary animate-spin mb-3 opacity-25" />
+              <h5 className="text-muted fw-bold">Connecting to repository...</h5>
+            </div>
+          ) : error ? (
+            isSupabaseError && settingsType === 'supabase' ? (
+              <div className="p-5">
+                <div className="alert border-0 bg-warning bg-opacity-10 p-4 rounded-4 shadow-sm border-start border-4 border-warning">
+                  <div className="d-flex align-items-start gap-4">
+                    <div className="p-3 bg-warning bg-opacity-10 rounded-circle text-warning border border-warning border-opacity-25">
+                      <Database size={24} />
+                    </div>
+                    <div>
+                      <h3 className="h5 fw-black text-warning-emphasis mb-1">Cloud Synchronization Offline</h3>
+                      <p className="text-muted small mb-3">
+                        We're unable to connect to your Supabase instance. This prevents access to cloud-stored audits.
+                      </p>
+                      <div className="d-flex flex-wrap gap-2">
+                        <AnimatedButton onClick={switchToFileStorage} variant="outline-dark" size="sm">
+                          <FileJson size={14} className="me-2" /> Offline Mode
+                        </AnimatedButton>
+                        <AnimatedButton onClick={goToSettings} variant="primary" size="sm">
+                          <Settings size={14} className="me-2" /> Sync Engine
+                        </AnimatedButton>
                       </div>
                     </div>
                   </div>
                 </div>
-              ) : (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )
-            ) : scans.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No scan history found</p>
-                <Link href="/">
-                  <Button variant="purple">Start Your First Scan</Button>
-                </Link>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>URL</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Results</TableHead>
-                      <TableHead>Broken Links</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scans.map((scan) => (
-                      <TableRow key={scan.id} className="cursor-pointer">
-                        <TableCell className="font-medium truncate max-w-[200px]" title={scan.scanUrl}>
-                          {scan.scanUrl}
-                        </TableCell>
-                        <TableCell>{formatDate(scan.scanDate)}</TableCell>
-                        <TableCell>{scan.resultsCount}</TableCell>
-                        <TableCell>
-                          <span className={scan.brokenLinksCount > 0 ? 'text-red-500 font-semibold' : 'text-green-500'}>
-                            {scan.brokenLinksCount}
-                          </span>
-                        </TableCell>
-                        <TableCell>{scan.durationSeconds.toFixed(2)}s</TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Link href={`/history/${scan.id}`}>
-                            <Button variant="outline" size="sm">
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </Link>
-
-                          <Link href={`/scan?id=${scan.id}`}>
-                            <Button variant="outline" size="sm" className="text-purple-600 border-purple-200 hover:bg-purple-50">
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              Scan again
-                            </Button>
-                          </Link>
-
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-red-500 border-red-200 hover:bg-red-50"
-                                onClick={() => setDeleteId(scan.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete this scan history record. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteScan(scan.id)}
-                                  className="bg-red-500 hover:bg-red-600 text-white"
-                                  disabled={isDeleting}
-                                >
-                                  {isDeleting && deleteId === scan.id ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Deleting...
-                                    </>
-                                  ) : (
-                                    'Delete'
-                                  )}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="p-5">
+                <div className="alert alert-danger border-0 rounded-4 p-4 d-flex align-items-center shadow-sm">
+                  <AlertCircle size={24} className="me-3" />
+                  <div className="fw-semibold">System Critical: {error}</div>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            )
+          ) : scans.length === 0 ? (
+            <div className="text-center py-5">
+              <div className="mb-4 opacity-25">
+                <HistoryIcon size={80} className="text-muted" />
+              </div>
+              <h4 className="fw-black text-dark dark:text-light mb-2">No Historical Data Found</h4>
+              <p className="text-muted mb-4 max-w-lg mx-auto">Your configuration vault is currently empty. Define your first scan setup to start monitoring site health.</p>
+              <AnimatedButton onClick={() => router.push('/scan')} variant="primary" className="px-4">
+                Launch Initial Setup
+              </AnimatedButton>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="bg-[#eaedf0] dark:bg-[#121417] border-bottom-2 border-primary/20">
+                  <tr>
+                    <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('scanUrl')}>
+                      <div className="d-flex align-items-center">Website <SortIcon field="scanUrl" /></div>
+                    </th>
+                    <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('scanDate')}>
+                      <div className="d-flex align-items-center">Execution Date <SortIcon field="scanDate" /></div>
+                    </th>
+                    <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('resultsCount')}>
+                      <div className="d-flex align-items-center">Links <SortIcon field="resultsCount" /></div>
+                    </th>
+                    <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('durationSeconds')}>
+                      <div className="d-flex align-items-center">Duration <SortIcon field="durationSeconds" /></div>
+                    </th>
+                    <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted text-end bg-[#eaedf0] dark:bg-[#121417]"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedScans.map((scan) => (
+                    <tr key={scan.id} className="border-bottom hover:bg-light/50 dark:hover:bg-dark/50 transition-colors">
+                      <td className="px-4 py-4 font-medium text-truncate max-w-[250px]" title={scan.scanUrl}>
+                        <div className="fw-bold text-dark dark:text-light fs-6">{scan.scanUrl}</div>
+                      </td>
+                      <td className="px-4 py-4 text-muted">
+                        {formatDate(scan.scanDate)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 fw-bold px-3 py-2 rounded-3">{scan.resultsCount}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="d-flex align-items-center gap-2 text-muted small fw-bold">
+                          <Clock size={14} className="opacity-50" />
+                          {scan.durationSeconds.toFixed(1)}s
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-end">
+                        <div className="d-flex gap-2 justify-content-end align-items-center">
+                          <AnimatedButton
+                            noPadding
+                            onClick={() => router.push(`/history/${scan.id}`)}
+                            variant="outline-primary"
+                            className="rounded-circle flex-shrink-0"
+                            style={{ width: '28px', height: '28px', minWidth: '28px' }}
+                            title="View"
+                          >
+                            <Eye size={12} />
+                          </AnimatedButton>
+                          <AnimatedButton
+                            noPadding
+                            onClick={() => router.push(`/scan?id=${scan.id}`)}
+                            variant="outline-dark"
+                            className="rounded-circle flex-shrink-0"
+                            style={{ width: '28px', height: '28px', minWidth: '28px' }}
+                            title="Scan"
+                          >
+                            <Play size={12} />
+                          </AnimatedButton>
+                          <AnimatedButton
+                            noPadding
+                            onClick={() => setDeleteId(scan.id)}
+                            variant="outline-danger"
+                            className="rounded-circle flex-shrink-0"
+                            style={{ width: '28px', height: '28px', minWidth: '28px' }}
+                            title="Delete"
+                          >
+                            <Trash2 size={12} />
+                          </AnimatedButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <SimpleModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Sanitize Archive Node"
+        size="md"
+        footer={
+          <>
+            <AnimatedButton variant="outline-secondary" onClick={() => setDeleteId(null)}>
+              Abort Cleanup
+            </AnimatedButton>
+            <AnimatedButton
+              variant="outline-danger"
+              onClick={() => deleteId && deleteScan(deleteId)}
+              disabled={isDeleting}
+              className="px-4"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin me-2" />
+                  Sanitizing...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={16} className="me-2" />
+                  Execute Deletion
+                </>
+              )}
+            </AnimatedButton>
+          </>
+        }
+      >
+        <div className="text-center py-3">
+          <div className="p-4 bg-danger bg-opacity-10 rounded-circle d-inline-block text-danger mb-4 border border-danger border-opacity-25 shadow-sm">
+            <AlertCircle size={48} />
+          </div>
+          <h4 className="fw-black text-dark dark:text-light mb-2">Irreversible Deletion</h4>
+          <p className="text-muted mb-0">
+            You are about to purge this historical record from the permanent repository. This action cannot be undone and will terminate all audit telemetry for this execution.
+          </p>
+        </div>
+      </SimpleModal>
     </div>
   );
 }

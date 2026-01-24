@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import "./globals.scss";
 import { PageTransition } from "@/components/PageTransition";
 import { NotificationProvider } from "@/components/NotificationContext";
 import { Toaster } from "@/components/ui/sonner";
 import { TopNav } from "@/components/TopNav";
 import { MobileNav } from "@/components/MobileNav";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import BootstrapClient from "@/components/BootstrapClient";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,17 +41,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`antialiased ${geistSans.variable} ${geistMono.variable} font-sans bg-background text-foreground min-h-screen selection:bg-primary/30 selection:text-primary-foreground`}
+        className={`antialiased ${geistSans.variable} ${geistMono.variable} min-vh-100 vh-100 d-flex flex-column overflow-hidden`}
         suppressHydrationWarning
       >
+        <BootstrapClient />
         <ThemeProvider
+
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="light"
           enableSystem
           disableTransitionOnChange
         >
           <NotificationProvider>
-            <div className="flex flex-col h-[100dvh] overflow-hidden">
+            <div className="d-flex flex-column vh-100 overflow-hidden">
               {/* Desktop Top Navigation */}
               <TopNav />
 
@@ -58,10 +61,10 @@ export default function RootLayout({
               <MobileNav />
 
               {/* Main Content Area */}
-              <div className="flex-1 flex flex-col overflow-hidden relative cyber-grid">
+              <div className="flex-grow-1 d-flex flex-column overflow-hidden position-relative main-content-wrapper">
                 {/* Page Content */}
-                <main className="flex-1 overflow-auto p-4 md:p-8 scroll-smooth">
-                  <div className="max-w-7xl mx-auto w-full min-h-full pb-10 md:pb-0">
+                <main className="flex-grow-1 overflow-auto p-3 p-md-4 scroll-smooth">
+                  <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0">
                     <PageTransition>
                       {children}
                     </PageTransition>

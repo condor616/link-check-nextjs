@@ -101,6 +101,12 @@ export async function POST(request: Request) {
         throw new Error(`Error setting up scan_history table: ${historyResult.error.message}`);
       }
 
+      // Delete the temporary record if it was created
+      await supabase
+        .from('scan_history')
+        .delete()
+        .eq('id', 'temp_setup_id');
+
       // 3. Try to create scan_jobs table by UPSERT operation
       const jobsResult = await (supabase
         .from('scan_jobs') as any)
