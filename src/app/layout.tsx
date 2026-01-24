@@ -8,6 +8,7 @@ import { TopNav } from "@/components/TopNav";
 import { MobileNav } from "@/components/MobileNav";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import BootstrapClient from "@/components/BootstrapClient";
+import { Footer } from "@/components/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,12 +69,13 @@ export default function RootLayout({
               {/* Main Content Area */}
               <div className="flex-grow-1 d-flex flex-column overflow-hidden position-relative main-content-wrapper">
                 {/* Page Content */}
-                <main className="flex-grow-1 overflow-auto p-3 p-md-4 scroll-smooth">
-                  <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0">
+                <main className="flex-grow-1 overflow-auto p-3 p-md-4 scroll-smooth d-flex flex-column">
+                  <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0 flex-grow-1">
                     <PageTransition>
                       {children}
                     </PageTransition>
                   </div>
+                  <Footer />
                 </main>
               </div>
             </div>
