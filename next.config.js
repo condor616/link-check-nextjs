@@ -8,6 +8,10 @@ const nextConfig = {
     // Create persistent scrollbars to avoid layout shifts during transitions
     scrollRestoration: true,
   },
+  sassOptions: {
+    quietDeps: true,
+    silenceDeprecations: ['legacy-js-api'],
+  },
 }
 
 module.exports = nextConfig 

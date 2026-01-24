@@ -1,6 +1,4 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ScanResult } from '@/lib/scanner';
 import {
   ExternalLink,
@@ -28,7 +26,7 @@ import {
   ArrowRight,
   Activity
 } from 'lucide-react';
-import * as cheerio from 'cheerio';
+// cheerio removal: using native DOMParser instead
 import { AnimatedCard } from './AnimatedCard';
 import { AnimatedButton } from './AnimatedButton';
 import ExportScanButton from './ExportScanButton';
@@ -68,44 +66,64 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     setLocalResults(results);
   }, [results]);
 
-  // Filter results by status
-  // First, identify skipped links - they take priority over other categories
-  const skippedLinks = localResults.filter(r => r.status === 'skipped');
-  // Extract all skipped URLs to avoid duplicating them in other categories
-  const skippedUrls = new Set(skippedLinks.map(r => r.url));
+  // Memoize filtering results to avoid recalculation on every render
+  const {
+    skippedLinks,
+    brokenLinks,
+    errorLinks,
+    externalLinks,
+    okLinks,
+    problematicLinks,
+    skippedUrls
+  } = useMemo(() => {
+    // First, identify skipped links - they take priority over other categories
+    const skipped = localResults.filter(r => r.status === 'skipped');
+    // Extract all skipped URLs to avoid duplicating them in other categories
+    const sUrls = new Set(skipped.map(r => r.url));
 
-  // Then process broken links, excluding those already in skipped
-  const brokenLinks = localResults.filter(r =>
-    !skippedUrls.has(r.url) &&
-    (r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400))
-  );
+    // Then process broken links, excluding those already in skipped
+    const broken = localResults.filter(r =>
+      !sUrls.has(r.url) &&
+      (r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400))
+    );
 
-  // Error links, excluding skipped
-  const errorLinks = localResults.filter(r =>
-    !skippedUrls.has(r.url) &&
-    r.status === 'error'
-  );
+    // Error links, excluding skipped
+    const error = localResults.filter(r =>
+      !sUrls.has(r.url) &&
+      r.status === 'error'
+    );
 
-  // External links, excluding skipped
-  const externalLinks = localResults.filter(r =>
-    !skippedUrls.has(r.url) &&
-    r.status === 'external'
-  );
+    // External links, excluding skipped
+    const external = localResults.filter(r =>
+      !sUrls.has(r.url) &&
+      r.status === 'external'
+    );
 
-  // OK links, excluding skipped, broken and external
-  const okLinks = localResults.filter(r => {
-    return !skippedUrls.has(r.url) &&
-      r.status === 'ok' &&
-      (r.statusCode === undefined || r.statusCode < 400) &&
-      !brokenLinks.some(link => link.url === r.url) &&
-      !externalLinks.some(link => link.url === r.url);
-  });
+    // OK links, excluding skipped, broken and external
+    const ok = localResults.filter(r => {
+      return !sUrls.has(r.url) &&
+        r.status === 'ok' &&
+        (r.statusCode === undefined || r.statusCode < 400) &&
+        !broken.some(link => link.url === r.url) &&
+        !external.some(link => link.url === r.url);
+    });
 
-  // Combined problematic links (broken + error)
-  const problematicLinks = [...brokenLinks, ...errorLinks.filter(link =>
-    // Avoid duplicates from links that may be in both arrays
-    !brokenLinks.some(broken => broken.url === link.url)
-  )];
+    // Combined problematic links (broken + error)
+    const problematic = [...broken, ...error.filter(link =>
+      // Avoid duplicates from links that may be in both arrays
+      !broken.some(b => b.url === link.url)
+    )];
+
+    return {
+      skippedLinks: skipped,
+      brokenLinks: broken,
+      errorLinks: error,
+      externalLinks: external,
+      okLinks: ok,
+      problematicLinks: problematic,
+      skippedUrls: sUrls
+    };
+  }, [localResults]);
 
   // Group links by URL for pagination calculation
   const getGroupedLinks = (links: SerializedScanResult[]) => {
@@ -249,59 +267,62 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   // Helper to extract and clean the relevant HTML context around the link
   const cleanHtmlContext = (html: string, url: string) => {
     try {
-      // Load the HTML into cheerio
-      const $ = cheerio.load(html);
-
-      // Remove all style tags, script tags, and other unnecessary elements
-      $('style, script, link, meta').remove();
-
-      // Find the anchor tag with the broken link
-      const anchorElement = $(`a[href="${url}"]`);
-
-      if (anchorElement.length) {
-        // First, try to get just the anchor element
-        const anchorHtml = $.html(anchorElement);
-
-        // Get up to 1 parent element for minimal context
-        let parentElement = anchorElement.parent();
-        if (parentElement.length) {
-          // Check if parent provides useful context
-          const parentTag = parentElement.prop('tagName')?.toLowerCase();
-
-          // Only use parent if it's a meaningful HTML element (not body, div, etc.)
-          const usefulParents = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'td', 'figcaption', 'button', 'label'];
-          if (parentTag && usefulParents.includes(parentTag)) {
-            return `<!-- Link with immediate parent -->\n${$.html(parentElement)}`;
-          }
-        }
-
-        // Default to just showing the anchor element
-        return `<!-- Just the link element -->\n${anchorHtml}`;
+      if (typeof window === 'undefined') {
+        return 'Context view available in browser';
       }
 
-      // If we couldn't find the exact link, show a minimal version
-      // Look for any a tag that might contain the URL
-      const possibleAnchors = $('a').filter((_, el) => {
-        const href = $(el).attr('href') || '';
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Remove unwanted elements
+      ['style', 'script', 'link', 'meta'].forEach(tag => {
+        doc.querySelectorAll(tag).forEach(el => el.remove());
+      });
+
+      // Find the anchor tag with the broken link
+      // CSS.escape is needed if url contains special characters, but might not be available in all envs
+      // fallback to attribute selector with manual quoting
+      let anchorElement: Element | null = null;
+      try {
+        anchorElement = doc.querySelector(`a[href="${url.replace(/"/g, '\\"')}"]`);
+      } catch (e) {
+        // fall back to iteration if querySelector fails
+        const anchors = Array.from(doc.querySelectorAll('a'));
+        anchorElement = anchors.find(a => a.getAttribute('href') === url) || null;
+      }
+
+      if (anchorElement) {
+        // Get parent for context if it's significant
+        const parentElement = anchorElement.parentElement;
+        const usefulParents = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TD', 'FIGCAPTION', 'BUTTON', 'LABEL'];
+
+        if (parentElement && usefulParents.includes(parentElement.tagName)) {
+          return `<!-- Link with immediate parent -->\n${parentElement.outerHTML}`;
+        }
+        return `<!-- Just the link element -->\n${anchorElement.outerHTML}`;
+      }
+
+      // If exact match not found, look for partial match in href
+      const possibleAnchors = Array.from(doc.querySelectorAll('a')).filter(a => {
+        const href = a.getAttribute('href') || '';
         return href.includes(url) || url.includes(href);
       });
 
-      if (possibleAnchors.length) {
-        return `<!-- Best matching link -->\n${$.html(possibleAnchors.first())}`;
+      if (possibleAnchors.length > 0) {
+        return `<!-- Best matching link -->\n${possibleAnchors[0].outerHTML}`;
       }
 
-      // Last resort: return a small, cleaned snippet of the HTML
-      const bodyContent = $('body').html() || html;
+      // Last resort: Cleaned body snippet
+      const bodyContent = doc.body.innerHTML || html;
+      // Basic cleanup regex for remaining artifacts if any
       const cleanedHtml = bodyContent
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '') // Remove style tags
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
-        .replace(/<link\b[^>]*>/gi, '') // Remove link tags
-        .replace(/<meta\b[^>]*>/gi, '') // Remove meta tags
-        .substring(0, 300); // Limit to 300 chars
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .substring(0, 300);
 
       return `<!-- Cleaned HTML snippet -->\n${cleanedHtml}${cleanedHtml.length > 300 ? '...' : ''}`;
     } catch (e) {
-      // If parsing fails, return a minimal version of the original HTML
+      // Fallback for parsing errors
       return html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
         .substring(0, 200) + (html.length > 200 ? '...' : '');
@@ -791,8 +812,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
           <div key={tab.id} className="col-6 col-md-4 col-lg">
             <AnimatedCard
               className={`p-3 h-100 cursor-pointer shadow-sm transition-all hover-translate-y-2 border-2 ${activeTab === tab.id
-                  ? `border-${tab.color} bg-${tab.color} bg-opacity-10`
-                  : `bg-white dark:bg-dark border-transparent hover:border-${tab.color} hover:bg-light dark:hover:bg-opacity-10`
+                ? `border-${tab.color} bg-${tab.color} bg-opacity-10`
+                : `bg-white dark:bg-dark border-transparent hover:border-${tab.color} hover:bg-light dark:hover:bg-opacity-10`
                 }`}
               onClick={() => handleTabChange(tab.id)}
             >
