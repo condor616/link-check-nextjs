@@ -90,9 +90,9 @@ export function MobileNav() {
                         <div className="d-flex flex-column">
                             <MobileLink href="/" icon={Home} label="Dashboard" onClick={handleLinkClick} />
                             <MobileLink href="/scan" icon={Search} label="Scan" onClick={handleLinkClick} />
-                            <MobileLink href="/jobs" icon={Activity} label="Status" onClick={handleLinkClick} />
+                            <MobileLink href="/jobs" icon={Activity} label="Active Jobs" onClick={handleLinkClick} />
                             <MobileLink href="/history" icon={History} label="History" onClick={handleLinkClick} />
-                            <MobileLink href="/saved-scans" icon={ShieldCheck} label="Saved" onClick={handleLinkClick} />
+                            <MobileLink href="/saved-scans" icon={ShieldCheck} label="My Scans" onClick={handleLinkClick} />
                             <MobileLink href="/settings" icon={Settings} label="Settings" onClick={handleLinkClick} />
                         </div>
                     </div>

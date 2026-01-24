@@ -59,7 +59,7 @@ export function TopNav() {
                                 activeClassName="text-primary active border-bottom border-primary border-2"
                             >
                                 <Activity size={18} />
-                                <span>Status</span>
+                                <span>Active Jobs</span>
                             </TransitionLink>
                         </li>
                         <li className="nav-item">
@@ -79,7 +79,7 @@ export function TopNav() {
                                 activeClassName="text-primary active border-bottom border-primary border-2"
                             >
                                 <ShieldCheck size={18} />
-                                <span>Saved</span>
+                                <span>My Scans</span>
                             </TransitionLink>
                         </li>
                         <li className="nav-item">
