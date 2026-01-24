@@ -20,7 +20,7 @@ A web application for scanning websites and identifying broken links. This tool 
 
 ### Prerequisites
 
-- Node.js 18.x or later
+- Node.js 20.x or later
 - npm or yarn
 
 ### Installation
@@ -103,7 +103,7 @@ The application can be containerized using Docker for easy deployment.
 ### Building the Docker Image
 
 ```bash
-docker build -t link-checker .
+docker build -t condor616/link-check:latest .
 ```
 
 ### Running the Container
@@ -114,7 +114,7 @@ docker run -p 3000:3000 \
   -v $(pwd)/prisma:/app/prisma \
   -v $(pwd)/.scan_history:/app/.scan_history \
   -v $(pwd)/.app_settings.json:/app/.app_settings.json \
-  link-checker
+  condor616/link-check:latest
 ```
 
 Then access the application at [http://localhost:3000](http://localhost:3000)
@@ -172,14 +172,15 @@ You can switch between storage methods at any time in the Settings page.
 
 ## Technologies Used
 
-- Next.js
-- React
+- Next.js 15+
+- React 19
 - TypeScript
-- TailwindCSS
+- Bootstrap 5 & Sass
 - Prisma (SQLite)
 - Cheerio (for HTML parsing)
-- Radix UI (for accessible components)
 - Supabase (optional, for database storage)
+- Lucide React (for icons)
+- Framer Motion (for animations)
 
 ## Troubleshooting
 

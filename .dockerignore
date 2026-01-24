@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.env
+.app_settings.json
+prisma/dev.db
+.scan_history
+data
+README.md
+LICENSE
