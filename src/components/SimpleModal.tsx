@@ -80,9 +80,9 @@ export function SimpleModal({
                             exit={{ opacity: 0, y: -20, scale: 0.95 }}
                             transition={{ duration: 0.2, ease: "easeOut" }}
                             className="modal-content border-0 shadow-lg rounded-4 overflow-hidden"
-                            style={{ backgroundColor: 'var(--bg-card)' }}
+                            style={{ backgroundColor: 'var(--bg-card)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
                         >
-                            <div className="modal-header border-bottom-0 p-4 pb-0 d-flex align-items-center justify-content-between">
+                            <div className="modal-header border-bottom-0 p-4 pb-0 d-flex align-items-center justify-content-between flex-shrink-0">
                                 <h5 className="modal-title fw-black h4">{title}</h5>
                                 <button
                                     type="button"
@@ -91,7 +91,7 @@ export function SimpleModal({
                                     aria-label="Close"
                                 ></button>
                             </div>
-                            <div className="modal-body p-4 pt-3">
+                            <div className="modal-body p-4 pt-3 overflow-y-auto">
                                 {children}
                             </div>
                             {footer && (

@@ -68,7 +68,7 @@ export default function SavedScansPage() {
   const [editConcurrency, setEditConcurrency] = useState<number>(10);
   const [editRequestTimeout, setEditRequestTimeout] = useState<number>(30);
   const [editScanSameLinkOnce, setEditScanSameLinkOnce] = useState<boolean>(true);
-  const [editShowAdvanced, setEditShowAdvanced] = useState<boolean>(false);
+  const [editShowAdvanced, setEditShowAdvanced] = useState<boolean>(true);
   const [editRegexExclusions, setEditRegexExclusions] = useState<string[]>([""]);
   const [editCssSelectors, setEditCssSelectors] = useState<string[]>([""]);
   const [editCssSelectorsForceExclude, setEditCssSelectorsForceExclude] = useState<boolean>(false);
@@ -546,7 +546,7 @@ export default function SavedScansPage() {
       <SimpleModal
         isOpen={showEditDialog}
         onClose={() => setShowEditDialog(false)}
-        title="Intelligence Audit Configuration"
+        title="Saved Scans"
         size="xl"
         footer={
           <>
@@ -649,7 +649,7 @@ export default function SavedScansPage() {
                   checked={editScanSameLinkOnce}
                   onChange={(e) => setEditScanSameLinkOnce(e.target.checked)}
                 />
-                <label className="form-check-label small" htmlFor="sw-dedupe">Optimal Deduplication Policy</label>
+                <label className="form-check-label small" htmlFor="sw-dedupe">Unique Check Only</label>
               </div>
               <div className="form-check form-switch mb-2">
                 <input
@@ -659,7 +659,7 @@ export default function SavedScansPage() {
                   checked={editSkipExternalDomains}
                   onChange={(e) => setEditSkipExternalDomains(e.target.checked)}
                 />
-                <label className="form-check-label small" htmlFor="sw-external">Isolate Primary Domain Analysis</label>
+                <label className="form-check-label small" htmlFor="sw-external">Skip external</label>
               </div>
               <div className="form-check form-switch">
                 <input
@@ -669,7 +669,7 @@ export default function SavedScansPage() {
                   checked={editExcludeSubdomains}
                   onChange={(e) => setEditExcludeSubdomains(e.target.checked)}
                 />
-                <label className="form-check-label small" htmlFor="sw-subdomain">Enforce Strict Domain Boundary</label>
+                <label className="form-check-label small" htmlFor="sw-subdomain">Exclude subdomains</label>
               </div>
             </div>
           </div>
@@ -686,7 +686,7 @@ export default function SavedScansPage() {
                   onChange={(e) => setEditUseAuth(e.target.checked)}
                 />
                 <label className="form-check-label fw-bold" htmlFor="chk-auth">
-                  Credential-Locked Infrastructure
+                  HTTP Basic Authentication
                 </label>
               </div>
 

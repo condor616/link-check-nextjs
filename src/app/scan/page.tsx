@@ -707,7 +707,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                       onChange={(e) => updateConfigField('scanSameLinkOnce', e.target.checked)}
                     />
                     <label className="form-check-label small" htmlFor="scanSameLinkOnce">
-                      Unique link checking (Recommended)
+                      Unique Check Only
                     </label>
                   </div>
 
@@ -720,7 +720,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                       onChange={(e) => updateConfigField('skipExternalDomains', e.target.checked)}
                     />
                     <label className="form-check-label small" htmlFor="skipExternalDomains">
-                      Skip external domains
+                      Skip external
                     </label>
                   </div>
 
@@ -733,7 +733,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                       onChange={(e) => updateConfigField('excludeSubdomains', e.target.checked)}
                     />
                     <label className="form-check-label small" htmlFor="excludeSubdomains">
-                      Strict subdomain enforcement
+                      Exclude subdomains
                     </label>
                   </div>
                 </div>
