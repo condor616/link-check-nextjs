@@ -8,6 +8,7 @@ import { TopNav } from "@/components/TopNav";
 import { MobileNav } from "@/components/MobileNav";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import BootstrapClient from "@/components/BootstrapClient";
+import { getAppUrl } from "@/lib/settings";
 import { Footer } from "@/components/Footer";
 
 const geistSans = Geist({
@@ -20,15 +21,55 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Link Checker Pro",
-  description: "Scan websites for broken links",
-  icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
-  },
-  manifest: "/manifest.json",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const baseUrl = await getAppUrl();
+  return {
+    title: {
+      default: "Link Checker Pro | Professional Broken Link Scanner",
+      template: "%s | Link Checker Pro",
+    },
+    description: "Advanced website link analysis tool. Scan for broken links, identify 404 errors, and improve your site's SEO and user experience in minutes.",
+    keywords: ["broken link checker", "404 error scanner", "website audit tool", "SEO optimization", "link health monitor", "dead link finder"],
+    authors: [{ name: "Link Checker Pro Team" }],
+    creator: "Link Checker Pro",
+    publisher: "Link Checker Pro",
+    formatDetection: {
+      email: false,
+      address: false,
+      telephone: false,
+    },
+    icons: {
+      icon: "/icon.svg",
+      apple: "/icon.svg",
+    },
+    manifest: "/manifest.json",
+    openGraph: {
+      type: "website",
+      locale: "en_US",
+      url: baseUrl,
+      siteName: "Link Checker Pro",
+      title: "Link Checker Pro | Professional Broken Link Scanner",
+      description: "Hunt down 404s like they owe us money. Keeping your site's reputation alive, one link at a time.",
+      images: [
+        {
+          url: "/og-image.png",
+          width: 1200,
+          height: 630,
+          alt: "Link Checker Pro - Professional Broken Link Scanner",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Link Checker Pro | Professional Broken Link Scanner",
+      description: "Advanced website link analysis tool. Scan for broken links and improve your site's SEO.",
+      images: ["/og-image.png"],
+      creator: "@linkcheckerpro",
+    },
+    metadataBase: new URL(baseUrl),
+  };
+}
+
 
 export const viewport: Viewport = {
   width: "device-width",

@@ -7,6 +7,7 @@ export interface AppSettings {
   storageType: 'file' | 'sqlite' | 'supabase';
   supabaseUrl?: string;
   supabaseKey?: string;
+  appUrl?: string;
 }
 
 const SETTINGS_FILE = '.app_settings.json';
@@ -21,7 +22,8 @@ async function ensureSettingsFile() {
     } catch (_) {
       // If settings file doesn't exist, create it with default settings
       const defaultSettings: AppSettings = {
-        storageType: 'file'
+        storageType: 'file',
+        appUrl: 'http://localhost:3000'
       };
 
       await fs.writeFile(
