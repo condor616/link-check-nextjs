@@ -33,13 +33,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "black" },
-  ],
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({
@@ -78,7 +73,7 @@ export default function RootLayout({
               </div>
 
               {/* Mobile Header & Nav (Sticky) */}
-              <div className="sticky-top z-3 d-md-none">
+              <div className="sticky-top z-3 d-lg-none">
                 <MobileNav />
               </div>
 

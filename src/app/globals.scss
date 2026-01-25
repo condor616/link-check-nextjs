@@ -48,8 +48,16 @@
 @import "bootstrap-icons/font/bootstrap-icons.css";
 
 // 3. Global Overrides & Professional Aesthetics
+html {
+  background-color: #0f172a !important;
+  color-scheme: dark;
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
+  width: 100%;
+  margin: 0;
   min-height: 100dvh;
   /* Fallback for browsers that don't support dvh */
   height: 100dvh;
@@ -58,13 +66,49 @@ body {
   -webkit-text-size-adjust: 100%;
   /* overflow: hidden; Removed to allow natural document flow on iOS */
 
-  // Safe area insets for notched devices
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  // IMMERSIVE MODE: Allow background to extend behind notch/home indicator
+  padding-left: 0;
+  padding-right: 0;
 
   // Remove blinking cursor on static text clicks
   caret-color: transparent;
+}
 
+// IMMERSIVE MODE: Content Safety Strategy
+// Instead of padding the entire app wrapper (which clips backgrounds),
+// we pad the specific containers that hold content. This allows
+// their backgrounds (like the navbar) to extend behind safe areas.
+
+.navbar {
+  // px-4 is 1.5rem. We enforce this + safe area.
+  padding-left: calc(1.5rem + env(safe-area-inset-left)) !important;
+  padding-right: calc(1.5rem + env(safe-area-inset-right)) !important;
+}
+
+.container-fluid,
+.container,
+.container-xl,
+.container-lg,
+.container-md,
+.container-sm {
+  // Apply safe area globally to content containers
+  padding-left: calc(var(--bs-gutter-x, 0.75rem) + env(safe-area-inset-left)) !important;
+  padding-right: calc(var(--bs-gutter-x, 0.75rem) + env(safe-area-inset-right)) !important;
+}
+
+// Prevent double padding: Reset container padding inside navbar
+// because navbar already has safe-area padding.
+.navbar .container-fluid,
+.navbar .container {
+  padding-left: var(--bs-gutter-x, 0.75rem) !important;
+  padding-right: var(--bs-gutter-x, 0.75rem) !important;
+}
+
+// Handle Offcanvas (Mobile Menu)
+.offcanvas-header,
+.offcanvas-body {
+  padding-left: calc(1rem + env(safe-area-inset-left)) !important;
+  padding-right: calc(1rem + env(safe-area-inset-right)) !important;
 }
 
 // Restore caret for interactive elements
