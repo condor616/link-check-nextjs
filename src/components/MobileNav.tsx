@@ -31,7 +31,7 @@ export function MobileNav() {
 
     return (
         <>
-            <nav className="navbar navbar-light bg-white dark:bg-dark border-bottom d-md-none sticky-top px-3 py-2 main-nav">
+            <nav className="navbar navbar-light bg-white dark:bg-dark border-bottom d-lg-none sticky-top px-3 py-2 main-nav">
                 <div className="container-fluid p-0">
                     {/* Logo */}
                     {/* Logo (Inline Style) */}

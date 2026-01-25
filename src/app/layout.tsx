@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.scss";
 import { PageTransition } from "@/components/PageTransition";
@@ -30,6 +30,18 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "white" },
+    { media: "(prefers-color-scheme: dark)", color: "black" },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -47,29 +59,33 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`antialiased ${geistSans.variable} ${geistMono.variable} min-vh-100 vh-100 d-flex flex-column overflow-hidden`}
+        className={`antialiased ${geistSans.variable} ${geistMono.variable} min-vh-100 d-flex flex-column`}
         suppressHydrationWarning
       >
         <BootstrapClient />
         <ThemeProvider
-
           attribute="class"
           defaultTheme="light"
           enableSystem
           disableTransitionOnChange
         >
           <NotificationProvider>
-            <div className="d-flex flex-column vh-100 overflow-hidden">
-              {/* Desktop Top Navigation */}
-              <TopNav />
+            {/* App Shell Wrapper - Natural Flow */}
+            <div className="d-flex flex-column flex-grow-1 w-100">
+              {/* Desktop Top Navigation (Sticky) */}
+              <div className="sticky-top z-3">
+                <TopNav />
+              </div>
 
-              {/* Mobile Header & Nav */}
-              <MobileNav />
+              {/* Mobile Header & Nav (Sticky) */}
+              <div className="sticky-top z-3 d-md-none">
+                <MobileNav />
+              </div>
 
               {/* Main Content Area */}
-              <div className="flex-grow-1 d-flex flex-column overflow-hidden position-relative main-content-wrapper">
+              <div className="flex-grow-1 d-flex flex-column main-content-wrapper">
                 {/* Page Content */}
-                <main className="flex-grow-1 overflow-auto p-3 p-md-4 scroll-smooth d-flex flex-column">
+                <main className="flex-grow-1 d-flex flex-column">
                   <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0 flex-grow-1">
                     <PageTransition>
                       {children}

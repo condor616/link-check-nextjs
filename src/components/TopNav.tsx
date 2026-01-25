@@ -14,7 +14,7 @@ import { Logo } from "@/components/Logo";
 
 export function TopNav() {
     return (
-        <nav className="navbar navbar-expand-md main-nav px-4 bg-white dark:bg-dark d-none d-md-flex">
+        <nav className="navbar navbar-expand-lg main-nav px-4 bg-white dark:bg-dark d-none d-lg-flex">
             <div className="container-fluid">
                 {/* Logo integrated into text */}
                 <TransitionLink href="/" className="navbar-brand d-flex align-items-center">

@@ -17,12 +17,12 @@ export default function HomePage() {
     <div className="w-100 py-4 fade-in-up">
       {/* Header Section */}
       <div className="text-center mb-5 mt-3">
-        <h1 className="display-4 fw-bold text-dark dark:text-light d-flex align-items-center justify-content-center">
+        <h1 className="hero-title fw-bold text-dark dark:text-light d-flex align-items-center justify-content-center flex-wrap">
           LinkChecker
           <span className="text-primary d-flex align-items-center ms-0">
             Pr
             <span className="d-inline-flex align-items-center" style={{ marginTop: '0.2em' }}>
-              <Logo size={48} />
+              <Logo size={undefined} className="hero-logo" />
             </span>
           </span>
         </h1>

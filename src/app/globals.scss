@@ -50,13 +50,21 @@
 // 3. Global Overrides & Professional Aesthetics
 html,
 body {
-  height: 100%;
+  min-height: 100dvh;
+  /* Fallback for browsers that don't support dvh */
+  height: 100dvh;
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  /* overflow: hidden; Removed to allow natural document flow on iOS */
+
+  // Safe area insets for notched devices
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 
   // Remove blinking cursor on static text clicks
   caret-color: transparent;
+
 }
 
 // Restore caret for interactive elements
@@ -180,6 +188,18 @@ body {
 
 .cursor-pointer {
   cursor: pointer;
+}
+
+// Fluid Typography
+.hero-title {
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1.2;
+
+  .hero-logo {
+    width: 1em;
+    height: 1em;
+    margin-top: -0.1em;
+  }
 }
 
 
