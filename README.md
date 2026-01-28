@@ -74,27 +74,20 @@ The application uses a background worker to process scan jobs.
 - **Development**: When running `npm run dev`, the worker starts automatically alongside the web app.
 - **Production**: You must run the worker separately.
 
-#### Running in Production
+#### Running in Production (LXC / VPS / Docker)
 
-1. Build the application for production:
+1. Build the application:
 ```bash
-npm run build:prod
+npm run build
 ```
-This command generates a standalone build in `.next/standalone`, including the bundled worker script.
 
-2. Initialize the production database (required for the first run or after updates):
+2. Start everything (Server + Worker + Migrations):
 ```bash
-npm run db:deploy
+# Ensure DATABASE_URL is set in your environment
+npm start
 ```
-This applies any pending database migrations to your production database.
 
-3. Start the application (Server + Worker):
-```bash
-npm run prod
-```
-This command concurrently starts the Next.js server and the background worker from the standalone build.
-
-**Note**: The worker is essential for processing scans. If the worker is not running, scan jobs will remain in a "Queued" state indefinitely.
+**Note**: The simplified `npm start` command will automatically apply database migrations and start both the Next.js server and the background worker.
 
 ## Docker Deployment
 
@@ -212,6 +205,41 @@ The database schema hasn't been pushed to your local database. Run the following
 ```bash
 npx prisma db push
 ```
+
+## Vercel Deployment
+
+To deploy this application to Vercel, follow these steps:
+
+1. **Prerequisite**: Set up a Supabase project and obtain your `DATABASE_URL` (PostgreSQL).
+2. **Environment Variables**: Add the following to your Vercel project:
+   - `DATABASE_URL`: Your Supabase connection string.
+   - `NEXT_PUBLIC_SUPABASE_URL`: (Optional, if using Supabase client).
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: (Optional, if using Supabase client).
+3. **Build Command**: `npm run build`
+4. **Worker Configuration**:
+   - **Persistence (Non-Serverless)**: Host the worker using `node .next/standalone/worker.js` on a platform like Render, Railway, or a VPS.
+   - **Serverless (Vercel)**: 
+     - Use the provided API route: `/api/worker`.
+     - Set up a **Vercel Cron Job** in your `vercel.json` to call this endpoint periodically.
+     - Example `vercel.json`:
+       ```json
+       {
+         "crons": [
+           {
+             "path": "/api/worker",
+             "schedule": "*/5 * * * *"
+           }
+         ]
+       }
+       ```
+
+## Optimizations
+
+- **Build Pipeline**: Consolidated `package.json` scripts into a single `npm run build` command that handles Prisma generation, Next.js build, and worker bundling.
+- **Database Performance**: Added indexes to `Job.status` and `Job.created_at` for efficient polling.
+- **Shared Logic**: Extracted worker processing into a shared core, enabling the same logic to run in either a persistent loop or a serverless request.
+
+
 
 ## License
 

@@ -24,6 +24,9 @@ model Job {
   error           String?
   results         String?  // JSON string (serialized ScanResult[])
   state           String?  // Serialized state
+
+  @@index([status])
+  @@index([created_at])
 }
 
 model ScanHistory {
