@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import BootstrapClient from "@/components/BootstrapClient";
 import { getAppUrl } from "@/lib/settings";
 import { Footer } from "@/components/Footer";
+import SetupWrapper from "@/components/SetupWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -107,30 +108,32 @@ export default function RootLayout({
         >
           <NotificationProvider>
             {/* App Shell Wrapper - Natural Flow */}
-            <div className="d-flex flex-column flex-grow-1 w-100">
-              {/* Desktop Top Navigation (Sticky) */}
-              <div className="sticky-top z-3">
-                <TopNav />
-              </div>
+            <SetupWrapper>
+              <div className="d-flex flex-column flex-grow-1 w-100">
+                {/* Desktop Top Navigation (Sticky) */}
+                <div className="sticky-top z-3">
+                  <TopNav />
+                </div>
 
-              {/* Mobile Header & Nav (Sticky) */}
-              <div className="sticky-top z-3 d-lg-none">
-                <MobileNav />
-              </div>
+                {/* Mobile Header & Nav (Sticky) */}
+                <div className="sticky-top z-3 d-lg-none">
+                  <MobileNav />
+                </div>
 
-              {/* Main Content Area */}
-              <div className="flex-grow-1 d-flex flex-column main-content-wrapper">
-                {/* Page Content */}
-                <main className="flex-grow-1 d-flex flex-column">
-                  <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0 flex-grow-1">
-                    <PageTransition>
-                      {children}
-                    </PageTransition>
-                  </div>
-                  <Footer />
-                </main>
+                {/* Main Content Area */}
+                <div className="flex-grow-1 d-flex flex-column main-content-wrapper">
+                  {/* Page Content */}
+                  <main className="flex-grow-1 d-flex flex-column">
+                    <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0 flex-grow-1">
+                      <PageTransition>
+                        {children}
+                      </PageTransition>
+                    </div>
+                    <Footer />
+                  </main>
+                </div>
               </div>
-            </div>
+            </SetupWrapper>
             <Toaster />
           </NotificationProvider>
         </ThemeProvider>

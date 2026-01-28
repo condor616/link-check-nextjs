@@ -51,9 +51,12 @@ export async function getSupabaseClient() {
     const settings = await getSettings();
 
     // Determine if we should use Supabase and get credentials
-    const useSupabase = settings?.storageType === 'supabase';
-    const supabaseUrl = useSupabase && settings?.supabaseUrl ? settings.supabaseUrl : DEFAULT_SUPABASE_URL;
-    const supabaseKey = useSupabase && settings?.supabaseKey ? settings.supabaseKey : DEFAULT_SUPABASE_ANON_KEY;
+    const envStorageType = process.env.STORAGE_TYPE;
+    const useSupabase = (envStorageType === 'supabase') || (settings?.storageType === 'supabase');
+
+    // Credentials priority: env var > settings field > fallback default (which is env var anyway)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || (useSupabase && settings?.supabaseUrl ? settings.supabaseUrl : DEFAULT_SUPABASE_URL);
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || (useSupabase && settings?.supabaseKey ? settings.supabaseKey : DEFAULT_SUPABASE_ANON_KEY);
 
     // Return null if Supabase is not enabled or credentials are missing
     if (!useSupabase || !supabaseUrl || !supabaseKey) {
@@ -90,6 +93,7 @@ export async function getSupabaseClient() {
 
 // Check if the application is using Supabase storage
 export async function isUsingSupabase(): Promise<boolean> {
+  if (process.env.STORAGE_TYPE === 'supabase') return true;
   const settings = await getSettings();
   return settings?.storageType === 'supabase';
-} 
+}

@@ -12,7 +12,9 @@ export async function getAppSettings(): Promise<AppSettings> {
     } catch (error) {
         // Return default settings if file doesn't exist or is corrupted
         return {
-            storageType: 'file',
+            storageType: (process.env.STORAGE_TYPE as any) || 'sqlite',
+            supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+            supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
             appUrl: 'http://localhost:3000'
         };
     }

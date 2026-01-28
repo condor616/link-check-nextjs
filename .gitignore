@@ -31,7 +31,8 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+# .env*
+!.env
 !.env.example
 
 # vercel
@@ -57,6 +58,8 @@ next-env.d.ts
 # Database
 prisma/*.db
 prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal
 
 # Scan Output
 scan_output.json

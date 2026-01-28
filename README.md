@@ -38,30 +38,22 @@ npm install
 yarn install
 ```
 
-3. Set up environment and database
-   - Copy the template configuration file:
-   ```bash
-   cp .app_settings.template.json .app_settings.json
-   ```
-   - Create a `.env` file (required for database connection):
+3. Set up environment
+   - Create a `.env` file from the example:
    ```bash
    cp .env.example .env
    ```
-   - Initialize the SQLite database:
-   ```bash
-   npx prisma generate
-   npx prisma migrate dev
-   ```
+   - (Optional) Configure your preferred storage in `.env`:
+     - Set `STORAGE_TYPE="sqlite"` (default) or `STORAGE_TYPE="supabase"`.
+     - If using Supabase, provide `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
 4. Start the application (Development)
    This command starts both the Next.js web application and the background worker concurrently.
 ```bash
 npm run dev
-# or
-yarn dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. **First-Run Setup**: Open [http://localhost:3000](http://localhost:3000). The **Setup Wizard** will automatically launch to guide you through database initialization and configuration.
 
 ### Stopping the Application
 
@@ -106,7 +98,6 @@ docker build -t condor616/link-check:latest .
 docker run -p 3000:3000 \
   -v $(pwd)/prisma:/app/prisma \
   -v $(pwd)/.scan_history:/app/.scan_history \
-  -v $(pwd)/.app_settings.json:/app/.app_settings.json \
   condor616/link-check:latest
 ```
 
@@ -114,41 +105,31 @@ Then access the application at [http://localhost:3000](http://localhost:3000)
 
 ## Storage Options
 
-The application supports two storage methods:
+The application supports a **Hybrid Storage** system:
 
-### SQLite Storage (Default)
+### SQLite Storage (Default & Zero-Config)
 
-By default, the application uses a local SQLite database (via Prisma) to store:
-- Scan configurations
-- Scan history and results
-- Job status and progress
+By default, the application uses a local SQLite database (via Prisma). This requires no external setup and is optimized for speed and simplicity.
+- **Location**: `prisma/dev.db`
+- **Setup**: Handled automatically by the Setup Wizard on first run.
 
-The database file is located at `prisma/dev.db`.
+### Supabase Storage (Cloud)
 
-### Supabase Storage
-
-You can configure the application to use Supabase for data storage:
-
-1. Create a Supabase project at [https://supabase.io](https://supabase.io)
-2. Get your project URL and anon key from the Supabase dashboard
-3. Configure these credentials either:
-   - In the Settings page of the application
-   - Via environment variables (`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
-4. After configuring Supabase, initialize the schema by clicking "Initialize/Reset Supabase Schema" in the Settings page
-
-You can switch between storage methods at any time in the Settings page.
+For multi-device access and cloud persistence, you can use Supabase:
+1. **Automated Setup**: Choose "Supabase" during the first-run Setup Wizard.
+2. **Schema Control**: The wizard can automatically initialize the required tables (`scan_history`, `scan_jobs`, `scan_configs`) for you.
+3. **Environment Sync**: You can also pre-configure Supabase credentials in your `.env` file to skip manual entry.
 
 ## Usage
 
-1. Enter a website URL in the input field
-2. Set the scan depth (how many clicks from the starting URL to follow)
-3. Optionally configure advanced settings:
-   - Set concurrency (number of simultaneous requests)
-   - Add regex patterns to exclude matching URLs from scanning
-   - Add CSS selectors to skip links contained within matching elements
-4. Click "Start Scan" to begin the scan
-5. View results, filter by link status (broken, ok, external, skipped)
-6. Export or save results as needed
+1. **Setup**: Follow the on-screen wizard to configure your storage provider.
+2. **Scan**: Enter a website URL and set the scan depth.
+3. **Advanced**: 
+   - Configure concurrency for speed.
+   - Use Regex patterns to exclude specific sections.
+   - Use CSS selectors to skip navigation menus or footers.
+4. **Analysis**: Deep dive into broken links, seeing exactly which pages they appear on.
+5. **Export**: Save your results as CSV, JSON, or a professional HTML report.
 
 ### Regex Exclusion Examples
 

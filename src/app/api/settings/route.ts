@@ -22,7 +22,7 @@ async function ensureSettingsFile() {
     } catch (_) {
       // If settings file doesn't exist, create it with default settings
       const defaultSettings: AppSettings = {
-        storageType: 'file',
+        storageType: 'sqlite',
         appUrl: 'http://localhost:3000'
       };
 
