@@ -24,8 +24,28 @@ export async function GET(
         }
 
         // Serialize results if present to ensure Sets/Maps are converted for JSON
-        if (job.results) {
+        if (job.results && job.results.length > 0) {
             job.results = serializeResults(job.results);
+        } else if (job.status === 'completed' || job.status === 'failed' || job.status === 'stopped') {
+            // If job is completed/final but has no results in the jobs table,
+            // try to fetch them from the history table to maintain UI compatibility
+            try {
+                console.log(`Fetching results from history for completed job ${id}`);
+                const historyResponse = await fetch(`${request.nextUrl.origin}/api/history/${id}`);
+                if (historyResponse.ok) {
+                    const historyData = await historyResponse.json();
+                    if (historyData && historyData.results) {
+                        job.results = historyData.results;
+                        // Also sync other metadata if missing
+                        if (!job.scan_config || Object.keys(job.scan_config).length === 0) {
+                            job.scan_config = historyData.config;
+                        }
+                    }
+                }
+            } catch (historyError) {
+                console.error(`Failed to bridge results from history for job ${id}:`, historyError);
+                // Non-critical, UI will just show empty results
+            }
         }
 
         return NextResponse.json(job);

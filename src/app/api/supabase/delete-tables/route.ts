@@ -51,21 +51,3 @@ export async function POST() {
   }
 }
 
-// Helper function to read settings file
-async function readSettingsFile() {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const settingsPath = path.join(process.cwd(), '.app_settings.json');
-
-    if (!fs.existsSync(settingsPath)) {
-      return null;
-    }
-
-    const settingsContent = fs.readFileSync(settingsPath, 'utf8');
-    return JSON.parse(settingsContent);
-  } catch (error) {
-    console.error('Error reading settings file:', error);
-    return null;
-  }
-} 

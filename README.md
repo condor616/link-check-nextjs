@@ -113,6 +113,12 @@ By default, the application uses a local SQLite database (via Prisma). This requ
 - **Location**: `prisma/dev.db`
 - **Setup**: Handled automatically by the Setup Wizard on first run.
 
+### Configuration Persistence
+
+The application's runtime settings (like storage type and Supabase credentials) are stored in `.app_settings.json` in the project root.
+- **Persistence**: This file is kept outside of the build artifacts (`.next`), ensuring that your settings persist even if you rebuild or update the application.
+- **Template**: The `.app_settings.template.json` file serves as a reference and a baseline. If no `.app_settings.json` is found, the application will use the template values.
+
 ### Supabase Storage (Cloud)
 
 For multi-device access and cloud persistence, you can use Supabase:

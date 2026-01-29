@@ -278,13 +278,24 @@ export class JobService {
             // Serialize results for database storage
             const serializedResults = this.serializeScanResults(updateData.results);
 
-            // For Supabase, we send the serialized object/array directly (PostgREST handles JSONB)
-            updateData.results = serializedResults;
-
             // For Prisma, we also update the fields and stringify
             prismaUpdate.broken_links = brokenCount;
             prismaUpdate.total_links = updateData.results.length;
-            prismaUpdate.results = JSON.stringify(serializedResults);
+
+            // IMPORTANT: If status is 'completed' or 'failed' (final states), 
+            // we DON'T save the full results to the jobs table to avoid timeouts.
+            // We keep them in the updateData object so historyService.saveScan can use them below.
+            if (status === 'completed' || status === 'failed') {
+                // results will be saved to history table anyway
+                // We clear them from the updateData/prismaUpdate to avoid DB bloat/timeouts
+                delete updateData.results;
+                prismaUpdate.results = null; // Or empty string/array if preferred
+            } else {
+                // For intermediate states (like pausing), we might still want them if needed,
+                // but usually results are only finalized at the end.
+                updateData.results = serializedResults;
+                prismaUpdate.results = JSON.stringify(serializedResults);
+            }
         }
 
         const useSupabase = await isUsingSupabase();
@@ -313,24 +324,26 @@ export class JobService {
         // If the job is completed, save it to history
         if (status === 'completed') {
             try {
-                // Fetch the fully updated job to get all fields including results
-                const job = await this.getJob(id);
+                // Fetch the fully updated job to get all fields
+                // Note: We might have cleared results from updateData, so we need the original results
+                // provided to this function call.
+                const finalResults = updates.results;
 
-                if (job && job.results) {
+                if (finalResults) {
                     const payload: SaveScanPayload = {
-                        scanUrl: job.scan_url,
-                        scanDate: job.created_at,
-                        durationSeconds: job.completed_at && job.started_at
-                            ? (new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000
+                        scanUrl: updates.scan_url || (await this.getJob(id))?.scan_url || '',
+                        scanDate: new Date().toISOString(), // Use current time as scan date
+                        durationSeconds: updateData.completed_at && updateData.started_at
+                            ? (new Date(updateData.completed_at).getTime() - new Date(updateData.started_at).getTime()) / 1000
                             : 0,
-                        config: job.scan_config,
-                        results: job.results,
-                        brokenLinksCount: job.broken_links,
-                        totalLinksCount: job.total_links
+                        config: updates.scan_config || (await this.getJob(id))?.scan_config || {} as any,
+                        results: finalResults,
+                        brokenLinksCount: updateData.broken_links,
+                        totalLinksCount: updateData.total_links
                     };
 
                     // Save to history using the same ID
-                    await historyService.saveScan(payload, job.id);
+                    await historyService.saveScan(payload, id);
                     console.log(`Job ${id} automatically saved to history.`);
                 }
             } catch (error) {

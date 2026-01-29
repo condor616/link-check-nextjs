@@ -1,5 +1,6 @@
 {
   "storageType": "sqlite",
+  "appUrl": "http://localhost:3000",
   "supabaseUrl": "",
   "supabaseKey": ""
 }

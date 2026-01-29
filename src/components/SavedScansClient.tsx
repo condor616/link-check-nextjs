@@ -27,8 +27,15 @@ import {
   ExternalLink,
   Lock as LockIcon,
   ChevronDown,
-  LayoutGrid
+  LayoutGrid,
+
+  HelpCircle
 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { AnimatedCard } from '@/components/AnimatedCard';
 import { AnimatedButton } from '@/components/AnimatedButton';
 import { SimpleModal } from '@/components/SimpleModal';
@@ -75,6 +82,10 @@ export function SavedScansClient() {
   const [editWildcardExclusions, setEditWildcardExclusions] = useState<string[]>([""]);
   const [editSkipExternalDomains, setEditSkipExternalDomains] = useState<boolean>(true);
   const [editExcludeSubdomains, setEditExcludeSubdomains] = useState<boolean>(true);
+
+  // Help tooltip states and refs removed
+
+  // Click outside handler removed
 
   const router = useRouter();
   const { addNotification } = useNotification();
@@ -740,35 +751,87 @@ export function SavedScansClient() {
 
             {editShowAdvanced ? (
               <div className="space-y-4">
-                <div className="p-3 rounded-4 bg-white border shadow-sm">
-                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
-                    <span>Regex Filter rules</span>
-                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditRegexExclusion}><Plus size={14} /></button>
-                  </label>
+                <div className="p-3 rounded-4 bg-white border shadow-sm" style={{ position: 'relative', zIndex: 1 }}>
+                  <div className="form-label x-small fw-bold opacity-50 d-flex align-items-center mb-2">
+                    <span className="me-2">Regex Filter rules</span>
+                    <div className="position-relative">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <HelpCircle
+                            size={14}
+                            className="text-muted cursor-pointer hover:text-primary transition-colors"
+                          />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-3" side="right" align="start">
+                          <div className="fw-bold small mb-2 text-primary border-bottom pb-1">JavaScript Regex</div>
+                          <div className="text-secondary opacity-75 small space-y-2" style={{ fontSize: '0.75rem' }}>
+                            <p className="mb-2">Full regularity matching for precise exclusion control.</p>
+                            <div className="alert alert-warning p-2 small mb-2 border-0 bg-warning bg-opacity-10 text-warning-emphasis" style={{ fontSize: '0.7rem' }}>
+                              <strong>Note:</strong> <code>*</code> matches the <em>previous</em> character. Use <code>.*</code> for any sequence.
+                            </div>
+                            <div className="mb-1"><strong>Regex Patterns:</strong></div>
+                            <ul className="ps-3 mb-0">
+                              <li><code>\/page\/\d+</code> - Paged URLs</li>
+                              <li><code>\.(jpg|png)$</code> - Image files</li>
+                              <li><code>\?.*sid=</code> - Tracking params</li>
+                            </ul>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none ms-auto" onClick={addEditRegexExclusion}><Plus size={14} /></button>
+                  </div>
                   {editRegexExclusions.map((regex, idx) => (
                     <div key={idx} className="input-group input-group-sm mb-2">
                       <input
                         type="text"
-                        className="form-control bg-light border-0"
+                        className={`form-control bg-light border-0 font-monospace ${regex.includes('*') && !regex.includes('\\*') && !regex.includes('.*') ? 'is-invalid' : ''}`}
                         value={regex}
                         onChange={(e) => updateEditRegexExclusion(idx, e.target.value)}
                         placeholder="e.g. \.pdf$"
                       />
                       <button className="btn btn-outline-light text-muted border-0 shadow-none" onClick={() => removeEditRegexExclusion(idx)}><X size={14} /></button>
+                      {regex.includes('*') && !regex.includes('\\*') && !regex.includes('.*') && (
+                        <div className="invalid-feedback x-small">
+                          Likely error: Did you mean <code>.*</code> or should this be a Wildcard?
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
 
-                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3">
-                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
-                    <span>CSS Selectors to skip</span>
-                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditCssSelector}><Plus size={14} /></button>
-                  </label>
+                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3" style={{ position: 'relative', zIndex: 1 }}>
+                  <div className="form-label x-small fw-bold opacity-50 d-flex align-items-center mb-2">
+                    <span className="me-2">CSS Selectors to skip</span>
+                    <div className="position-relative">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <HelpCircle
+                            size={14}
+                            className="text-muted cursor-pointer hover:text-primary transition-colors"
+                          />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-3" side="right" align="start">
+                          <div className="fw-bold small mb-2 text-primary border-bottom pb-1">CSS Selectors</div>
+                          <div className="text-secondary opacity-75 small space-y-2" style={{ fontSize: '0.75rem' }}>
+                            <p className="mb-2">Links found inside these elements will be completely ignored.</p>
+                            <div className="mb-1"><strong>Query Selectors:</strong></div>
+                            <ul className="ps-3 mb-0">
+                              <li><code>.footer</code> - Page footers</li>
+                              <li><code>#sidebar nav</code> - Navigation bars</li>
+                              <li><code>[data-noscan]</code> - Custom attributes</li>
+                            </ul>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none ms-auto" onClick={addEditCssSelector}><Plus size={14} /></button>
+                  </div>
                   {editCssSelectors.map((selector, idx) => (
                     <div key={idx} className="input-group input-group-sm mb-2">
                       <input
                         type="text"
-                        className="form-control bg-light border-0"
+                        className="form-control bg-light border-0 font-monospace"
                         value={selector}
                         onChange={(e) => updateEditCssSelector(idx, e.target.value)}
                         placeholder="e.g. .footer"
@@ -778,16 +841,38 @@ export function SavedScansClient() {
                   ))}
                 </div>
 
-                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3">
-                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
-                    <span>Wildcard Exclusions</span>
-                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditWildcardExclusion}><Plus size={14} /></button>
-                  </label>
+                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3" style={{ position: 'relative', zIndex: 1 }}>
+                  <div className="form-label x-small fw-bold opacity-50 d-flex align-items-center mb-2">
+                    <span className="me-2">Wildcard Exclusions</span>
+                    <div className="position-relative">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <HelpCircle
+                            size={14}
+                            className="text-muted cursor-pointer hover:text-primary transition-colors"
+                          />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-3" side="right" align="start">
+                          <div className="fw-bold small mb-2 text-primary border-bottom pb-1">Wildcard Logic</div>
+                          <div className="text-secondary opacity-75 small space-y-2" style={{ fontSize: '0.75rem' }}>
+                            <p className="mb-2">Simple pattern matching using <code>*</code> (multi-char) and <code>?</code> (single-char).</p>
+                            <div className="mb-1"><strong>Tactical Examples:</strong></div>
+                            <ul className="ps-3 mb-0">
+                              <li><code>/blog/*</code> - All blog paths</li>
+                              <li><code>*.pdf</code> - All PDF assets</li>
+                              <li><code>domain.com/admin/*</code> - Admin sub-paths</li>
+                            </ul>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none ms-auto" onClick={addEditWildcardExclusion}><Plus size={14} /></button>
+                  </div>
                   {editWildcardExclusions.map((pattern, idx) => (
                     <div key={idx} className="input-group input-group-sm mb-2">
                       <input
                         type="text"
-                        className="form-control bg-light border-0"
+                        className="form-control bg-light border-0 font-monospace"
                         value={pattern}
                         onChange={(e) => updateEditWildcardExclusion(idx, e.target.value)}
                         placeholder="e.g. /private/*"

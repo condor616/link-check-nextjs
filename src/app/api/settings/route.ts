@@ -12,10 +12,24 @@ export interface AppSettings {
 
 const SETTINGS_FILE = '.app_settings.json';
 
+/**
+ * Finds the project root directory.
+ * When running in standalone mode, process.cwd() might be inside .next/standalone.
+ */
+function getProjectRoot(): string {
+  const cwd = process.cwd();
+  // If we are in .next/standalone, the root is the parent directory
+  if (cwd.endsWith(path.join('.next', 'standalone'))) {
+    return path.dirname(path.dirname(cwd));
+  }
+  return cwd;
+}
+
 // Helper to ensure settings file exists
 async function getSettingsPath(createIfMissing = false) {
   try {
-    const settingsFilePath = path.join(process.cwd(), SETTINGS_FILE);
+    const root = getProjectRoot();
+    const settingsFilePath = path.join(root, SETTINGS_FILE);
 
     try {
       await fs.access(settingsFilePath);
@@ -41,6 +55,7 @@ async function getSettingsPath(createIfMissing = false) {
     throw error;
   }
 }
+
 
 // GET to retrieve settings
 export async function GET() {

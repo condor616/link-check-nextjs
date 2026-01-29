@@ -1,68 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
-import { AppSettings } from '@/app/api/settings/route';
-import fs from 'fs/promises';
-import path from 'path';
-
-// Environment variables are used as fallback if no custom settings are provided
-const DEFAULT_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const DEFAULT_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+import { getAppSettings } from './settings';
 
 // Cache for the Supabase client instance
 let supabaseInstance: ReturnType<typeof createClient> | null = null;
 let lastSettings: { url: string; key: string } | null = null;
 
-// Cache for settings to avoid excessive disk reads
-let cachedSettings: AppSettings | null = null;
-let lastSettingsRead = 0;
-const SETTINGS_CACHE_TTL = 1000; // 1 second
-
-const SETTINGS_FILE = '.app_settings.json';
-
-// Get settings from settings file
-async function getSettings(): Promise<AppSettings | null> {
-  const now = Date.now();
-  if (cachedSettings && (now - lastSettingsRead < SETTINGS_CACHE_TTL)) {
-    return cachedSettings;
-  }
-
-  const cwd = process.cwd();
-  const possiblePaths = [
-    path.join(cwd, SETTINGS_FILE),
-    path.join(cwd, '.next', 'standalone', SETTINGS_FILE),
-    path.join(cwd, '..', SETTINGS_FILE)
-  ];
-
-  for (const settingsFilePath of possiblePaths) {
-    try {
-      const settingsData = await fs.readFile(settingsFilePath, 'utf-8');
-      cachedSettings = JSON.parse(settingsData) as AppSettings;
-      lastSettingsRead = now;
-      return cachedSettings;
-    } catch (error) {
-      // Continue to next path
-    }
-  }
-
-  return null;
-}
-
 // Initialize Supabase client with current settings
 export async function getSupabaseClient() {
   try {
-    // Get current settings
-    const settings = await getSettings();
+    // Get current settings (uses standardized root-detection logic)
+    const settings = await getAppSettings();
 
     // Determine if we should use Supabase
-    let useSupabase = false;
-    if (settings && settings.storageType) {
-      useSupabase = settings.storageType === 'supabase';
-    } else {
-      useSupabase = process.env.STORAGE_TYPE === 'supabase';
-    }
+    const useSupabase = settings.storageType === 'supabase';
 
-    // Credentials priority: env var > settings field > fallback default (which is env var anyway)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || (useSupabase && settings?.supabaseUrl ? settings.supabaseUrl : DEFAULT_SUPABASE_URL);
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || (useSupabase && settings?.supabaseKey ? settings.supabaseKey : DEFAULT_SUPABASE_ANON_KEY);
+    // Credentials priority: settings field > env var fallback
+    const supabaseUrl = settings.supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = settings.supabaseKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
 
     // Return null if Supabase is not enabled or credentials are missing
     if (!useSupabase || !supabaseUrl || !supabaseKey) {
@@ -99,7 +53,7 @@ export async function getSupabaseClient() {
 
 // Check if the application is using Supabase storage
 export async function isUsingSupabase(): Promise<boolean> {
-  const settings = await getSettings();
+  const settings = await getAppSettings();
   if (settings && settings.storageType) {
     return settings.storageType === 'supabase';
   }

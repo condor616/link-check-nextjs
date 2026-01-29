@@ -582,8 +582,14 @@ class Scanner {
                 const domainPart = parts[0];
                 try {
                     const urlObj = new URL(text);
-                    if (!urlObj.hostname.endsWith(domainPart) &&
-                        !urlObj.hostname.replace('www.', '').endsWith(domainPart)) {
+                    const hostname = urlObj.hostname;
+                    const normalizedHostname = hostname.replace('www.', '');
+                    const normalizedDomainPart = domainPart.replace('www.', '');
+
+                    const isExactMatch = hostname === domainPart || normalizedHostname === normalizedDomainPart;
+                    const isSubdomainMatch = hostname.endsWith('.' + domainPart) || normalizedHostname.endsWith('.' + normalizedDomainPart);
+
+                    if (!isExactMatch && !isSubdomainMatch) {
                         return false;
                     }
                     const pathPattern = pattern.substring(domainPart.length);
@@ -599,8 +605,14 @@ class Scanner {
             } else {
                 try {
                     const urlObj = new URL(text);
-                    return urlObj.hostname.endsWith(pattern) ||
-                        urlObj.hostname.replace('www.', '').endsWith(pattern);
+                    const hostname = urlObj.hostname;
+                    const normalizedHostname = hostname.replace('www.', '');
+                    const normalizedPattern = pattern.replace('www.', '');
+
+                    return hostname === pattern ||
+                        normalizedHostname === normalizedPattern ||
+                        hostname.endsWith('.' + pattern) ||
+                        normalizedHostname.endsWith('.' + normalizedPattern);
                 } catch (e) { }
             }
         }

@@ -23,8 +23,14 @@ import {
   CheckCircle2,
   FileUp,
   FileCode,
+
   XCircle
 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import ScanResults from '@/components/ScanResults';
 import { JSONPreview } from '@/components/JSONPreview';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -103,14 +109,9 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
   // Add confirmation state to prevent automatic scan on page refresh
   const [scanConfirmed, setScanConfirmed] = useState<boolean>(false);
 
-  // Add states for the help popups
-  const [showUrlExclusionHelp, setShowUrlExclusionHelp] = useState<boolean>(false);
-  const [showCssSelectorsHelp, setShowCssSelectorsHelp] = useState<boolean>(false);
-  const [showRegexExclusionHelp, setShowRegexExclusionHelp] = useState<boolean>(false);
 
-  const urlExclusionHelpRef = useRef<HTMLDivElement>(null);
-  const cssSelectorsHelpRef = useRef<HTMLDivElement>(null);
-  const regexExclusionHelpRef = useRef<HTMLDivElement>(null);
+
+  // Refs removed as they are no longer needed with Popover
 
   const [scanStatus, setScanStatus] = useState<ScanStatus>({
     status: 'initializing',
@@ -347,30 +348,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
     hasAttemptedAutoSave.current = false;
   }, [paramUrl, paramConfigString]);
 
-  // Add click outside handlers for all popups
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (urlExclusionHelpRef.current && !urlExclusionHelpRef.current.contains(event.target as Node)) {
-        setShowUrlExclusionHelp(false);
-      }
 
-      if (cssSelectorsHelpRef.current && !cssSelectorsHelpRef.current.contains(event.target as Node)) {
-        setShowCssSelectorsHelp(false);
-      }
-
-      if (regexExclusionHelpRef.current && !regexExclusionHelpRef.current.contains(event.target as Node)) {
-        setShowRegexExclusionHelp(false);
-      }
-    };
-
-    if (showUrlExclusionHelp || showCssSelectorsHelp || showRegexExclusionHelp) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showUrlExclusionHelp, showCssSelectorsHelp, showRegexExclusionHelp]);
 
   // Modify the save scan function to be more reliable
   const handleSaveScan = async () => {
@@ -749,39 +727,83 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
 
                   {showAdvancedEdit && (
                     <div className="mt-3 p-3 bg-light dark:bg-dark rounded-3 border">
-                      <div className="row g-4">
+                      <div className="row g-4 text-start">
+                        {/* Wildcard Exclusions - FIRST */}
                         <div className="col-lg-4">
-                          <div className="d-flex align-items-center mb-2">
-                            <span className="fw-bold small me-2">Regex Filter rules</span>
-                            <HelpCircle size={14} className="text-muted cursor-help" />
+                          <div className="d-flex align-items-center mb-2 position-relative">
+                            <span className="fw-bold small me-2">Wildcard Exclusions</span>
+                            <div className="position-relative">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <HelpCircle
+                                    size={14}
+                                    className="text-muted cursor-pointer"
+                                  />
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[280px] p-3" side="right" align="start">
+                                  <div className="fw-bold small mb-2 text-primary">Wildcard Usage</div>
+                                  <div className="text-secondary opacity-75 small space-y-2" style={{ fontSize: '0.75rem' }}>
+                                    <p className="mb-2">Simple pattern matching using <code>*</code> for multiple characters and <code>?</code> for one.</p>
+                                    <div className="mb-1"><strong>Examples:</strong></div>
+                                    <ul className="ps-3 mb-0">
+                                      <li><code>/blog/*</code> - All blog posts</li>
+                                      <li><code>*.pdf</code> - All PDF files</li>
+                                      <li><code>domain.com/admin/*</code> - Specific domain path</li>
+                                    </ul>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
                           </div>
-                          {regexExclusions.map((regex, index) => (
-                            <div key={`regex-${index}`} className="input-group mb-2">
+                          {wildcardExclusions.map((pattern, index) => (
+                            <div key={`wildcard-${index}`} className="input-group mb-2">
                               <input
                                 type="text"
                                 className="form-control form-control-sm font-monospace"
-                                value={regex}
-                                onChange={(e) => updateRegexExclusion(index, e.target.value)}
-                                placeholder="e.g. \.pdf$"
+                                value={pattern}
+                                onChange={(e) => updateWildcardExclusion(index, e.target.value)}
+                                placeholder="e.g. /careers/*"
                               />
                               <button
                                 className="btn btn-outline-danger btn-sm"
-                                onClick={() => removeRegexExclusion(index)}
-                                disabled={regexExclusions.length <= 1}
+                                onClick={() => removeWildcardExclusion(index)}
+                                disabled={wildcardExclusions.length <= 1}
                               >
                                 <X size={14} />
                               </button>
                             </div>
                           ))}
-                          <button className="btn btn-sm btn-outline-primary mt-1" onClick={addRegexExclusion}>
+                          <button className="btn btn-sm btn-outline-primary mt-1" onClick={addWildcardExclusion}>
                             <Plus size={14} className="me-1" /> Add Rule
                           </button>
                         </div>
 
+                        {/* CSS Selectors */}
                         <div className="col-lg-4">
-                          <div className="d-flex align-items-center mb-2">
+                          <div className="d-flex align-items-center mb-2 position-relative">
                             <span className="fw-bold small me-2">CSS Selectors to skip</span>
-                            <HelpCircle size={14} className="text-muted cursor-help" />
+                            <div className="position-relative">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <HelpCircle
+                                    size={14}
+                                    className="text-muted cursor-pointer"
+                                  />
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[280px] p-3" side="right" align="start">
+                                  <div className="fw-bold small mb-2 text-primary">CSS Exclusion</div>
+                                  <div className="text-secondary opacity-75 small" style={{ fontSize: '0.75rem' }}>
+                                    <p className="mb-2">Links inside elements matching these selectors will be ignored.</p>
+                                    <div className="mb-1"><strong>Examples:</strong></div>
+                                    <ul className="ps-3 mb-0">
+                                      <li><code>.footer</code> - Ignore navigation in footer</li>
+                                      <li><code>#sidebar nav</code> - Ignore sidebar links</li>
+                                      <li><code>[aria-hidden="true"]</code> - Ignore hidden links</li>
+                                    </ul>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
                           </div>
                           {cssSelectors.map((selector, index) => (
                             <div key={`selector-${index}`} className="input-group mb-2">
@@ -806,30 +828,63 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                           </button>
                         </div>
 
+                        {/* Regex Filters - LAST */}
                         <div className="col-lg-4">
-                          <div className="d-flex align-items-center mb-2">
-                            <span className="fw-bold small me-2">Wildcard Exclusions</span>
-                            <HelpCircle size={14} className="text-muted cursor-help" />
+                          <div className="d-flex align-items-center mb-2 position-relative">
+                            <span className="fw-bold small me-2">Regex Filter rules</span>
+                            <div className="position-relative">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <HelpCircle
+                                    size={14}
+                                    className="text-muted cursor-pointer"
+                                  />
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[280px] p-3" side="left" align="start">
+                                  <div className="fw-bold small mb-2 text-primary">Advanced Regex</div>
+                                  <div className="text-secondary opacity-75 small" style={{ fontSize: '0.75rem' }}>
+                                    <p className="mb-2">Full JavaScript Regular Expression matching against the entire URL.</p>
+                                    <div className="alert alert-warning p-2 small mb-2 border-0 bg-warning bg-opacity-10 text-warning-emphasis" style={{ fontSize: '0.7rem' }}>
+                                      <div className="fw-bold d-flex align-items-center mb-1">
+                                        <Activity size={12} className="me-1" /> Heads up!
+                                      </div>
+                                      Using <code>*</code> here means "zero or more of the previous character". For path patterns like <code>/blog/*</code>, use <strong>Wildcard Exclusions</strong> instead.
+                                    </div>
+                                    <div className="mb-1"><strong>Regex Examples:</strong></div>
+                                    <ul className="ps-3 mb-0">
+                                      <li><code>\/page\/\d+</code> - Numeric pages</li>
+                                      <li><code>\.(jpg|png|gif)$</code> - Image files</li>
+                                      <li><code>\?.*session=</code> - URLs with session params</li>
+                                    </ul>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
                           </div>
-                          {wildcardExclusions.map((pattern, index) => (
-                            <div key={`wildcard-${index}`} className="input-group mb-2">
+                          {regexExclusions.map((regex, index) => (
+                            <div key={`regex-${index}`} className="input-group mb-2">
                               <input
                                 type="text"
-                                className="form-control form-control-sm font-monospace"
-                                value={pattern}
-                                onChange={(e) => updateWildcardExclusion(index, e.target.value)}
-                                placeholder="e.g. /blog/*"
+                                className={`form-control form-control-sm font-monospace ${regex.includes('*') && !regex.includes('\\*') && !regex.includes('.*') ? 'is-invalid' : ''}`}
+                                value={regex}
+                                onChange={(e) => updateRegexExclusion(index, e.target.value)}
+                                placeholder="e.g. \.pdf$"
                               />
                               <button
                                 className="btn btn-outline-danger btn-sm"
-                                onClick={() => removeWildcardExclusion(index)}
-                                disabled={wildcardExclusions.length <= 1}
+                                onClick={() => removeRegexExclusion(index)}
+                                disabled={regexExclusions.length <= 1}
                               >
                                 <X size={14} />
                               </button>
+                              {regex.includes('*') && !regex.includes('\\*') && !regex.includes('.*') && (
+                                <div className="invalid-feedback x-small">
+                                  Likely error: Did you mean <code>.*</code> or should this be a Wildcard?
+                                </div>
+                              )}
                             </div>
                           ))}
-                          <button className="btn btn-sm btn-outline-primary mt-1" onClick={addWildcardExclusion}>
+                          <button className="btn btn-sm btn-outline-primary mt-1" onClick={addRegexExclusion}>
                             <Plus size={14} className="me-1" /> Add Rule
                           </button>
                         </div>
@@ -1679,10 +1734,12 @@ function ScanForm() {
   const [showUrlExclusionHelp, setShowUrlExclusionHelp] = useState<boolean>(false);
   const [showCssSelectorsHelp, setShowCssSelectorsHelp] = useState<boolean>(false);
   const [showRegexExclusionHelp, setShowRegexExclusionHelp] = useState<boolean>(false);
+  const [showWildcardHelp, setShowWildcardHelp] = useState<boolean>(false);
 
   const urlExclusionHelpRef = useRef<HTMLDivElement>(null);
   const cssSelectorsHelpRef = useRef<HTMLDivElement>(null);
   const regexExclusionHelpRef = useRef<HTMLDivElement>(null);
+  const wildcardHelpRef = useRef<HTMLDivElement>(null);
 
   // Add click outside handlers for all popups
   useEffect(() => {
@@ -1698,16 +1755,20 @@ function ScanForm() {
       if (regexExclusionHelpRef.current && !regexExclusionHelpRef.current.contains(event.target as Node)) {
         setShowRegexExclusionHelp(false);
       }
+
+      if (wildcardHelpRef.current && !wildcardHelpRef.current.contains(event.target as Node)) {
+        setShowWildcardHelp(false);
+      }
     };
 
-    if (showUrlExclusionHelp || showCssSelectorsHelp || showRegexExclusionHelp) {
+    if (showUrlExclusionHelp || showCssSelectorsHelp || showRegexExclusionHelp || showWildcardHelp) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showUrlExclusionHelp, showCssSelectorsHelp, showRegexExclusionHelp]);
+  }, [showUrlExclusionHelp, showCssSelectorsHelp, showRegexExclusionHelp, showWildcardHelp]);
 
   return (
     <div className="w-100 py-5 fade-in-up">
@@ -1910,34 +1971,92 @@ function ScanForm() {
             {showAdvanced && (
               <div className="p-3 bg-light dark:bg-dark border rounded-3 text-start mb-4 fade-in">
                 <div className="row g-4">
+                  {/* Wildcard Exclusions - FIRST */}
                   <div className="col-lg-4">
-                    <div className="d-flex align-items-center mb-2">
-                      <span className="fw-bold small me-2">Regex Filter rules</span>
-                      <HelpCircle size={14} className="text-muted cursor-help" />
+                    <div className="d-flex align-items-center mb-2 position-relative">
+                      <span className="fw-bold small me-2">Wildcard Exclusions</span>
+                      <div className="position-relative">
+                        <HelpCircle
+                          size={14}
+                          className="text-muted cursor-pointer"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowWildcardHelp(!showWildcardHelp);
+                          }}
+                        />
+                        {showWildcardHelp && (
+                          <div
+                            ref={wildcardHelpRef}
+                            className="position-absolute bg-white dark:bg-dark border rounded shadow-lg p-3 z-index-popover"
+                            style={{ width: '280px', top: '24px', left: '0', zIndex: 1060 }}
+                          >
+                            <div className="fw-bold small mb-2 text-primary">Wildcard Usage</div>
+                            <div className="x-small text-muted space-y-2">
+                              <p>Simple pattern matching using <code>*</code> for multiple characters and <code>?</code> for one.</p>
+                              <div><strong>Examples:</strong></div>
+                              <ul className="ps-3 mb-0">
+                                <li><code>/blog/*</code> - All blog posts</li>
+                                <li><code>*.pdf</code> - All PDF files</li>
+                                <li><code>domain.com/admin/*</code> - Specific domain path</li>
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {regexExclusions.map((regex, index) => (
-                      <div key={`regex-${index}`} className="input-group mb-2">
+                    {wildcardExclusions.map((pattern, index) => (
+                      <div key={`wildcard-${index}`} className="input-group mb-2">
                         <input
                           type="text"
                           className="form-control form-control-sm font-monospace"
-                          value={regex}
-                          onChange={(e) => updateRegexExclusion(index, e.target.value)}
-                          placeholder="e.g. \/ignore\/.*"
+                          value={pattern}
+                          onChange={(e) => updateWildcardExclusion(index, e.target.value)}
+                          placeholder="e.g. /careers/*"
                         />
-                        <button className="btn btn-outline-danger btn-sm" onClick={() => removeRegexExclusion(index)} disabled={regexExclusions.length <= 1}>
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => removeWildcardExclusion(index)} disabled={wildcardExclusions.length <= 1}>
                           <X size={14} />
                         </button>
                       </div>
                     ))}
-                    <button className="btn btn-sm btn-outline-primary mt-1" onClick={addRegexExclusion}>
+                    <button className="btn btn-sm btn-outline-primary mt-1" onClick={addWildcardExclusion}>
                       <Plus size={14} className="me-1" /> Add Rule
                     </button>
                   </div>
 
+                  {/* CSS Selectors */}
                   <div className="col-lg-4">
-                    <div className="d-flex align-items-center mb-2">
+                    <div className="d-flex align-items-center mb-2 position-relative">
                       <span className="fw-bold small me-2">CSS Selectors to skip</span>
-                      <HelpCircle size={14} className="text-muted cursor-help" />
+                      <div className="position-relative">
+                        <HelpCircle
+                          size={14}
+                          className="text-muted cursor-pointer"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowCssSelectorsHelp(!showCssSelectorsHelp);
+                          }}
+                        />
+                        {showCssSelectorsHelp && (
+                          <div
+                            ref={cssSelectorsHelpRef}
+                            className="position-absolute bg-white dark:bg-dark border rounded shadow-lg p-3 z-index-popover"
+                            style={{ width: '280px', top: '24px', left: '0', zIndex: 1060 }}
+                          >
+                            <div className="fw-bold small mb-2 text-primary">CSS Exclusion</div>
+                            <div className="x-small text-muted">
+                              <p>Links inside elements matching these selectors will be ignored.</p>
+                              <div><strong>Examples:</strong></div>
+                              <ul className="ps-3 mb-0">
+                                <li><code>.footer</code> - Ignore navigation in footer</li>
+                                <li><code>#sidebar nav</code> - Ignore sidebar links</li>
+                                <li><code>[aria-hidden="true"]</code> - Ignore hidden links</li>
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {cssSelectors.map((selector, index) => (
                       <div key={`selector-${index}`} className="input-group mb-2">
@@ -1946,7 +2065,7 @@ function ScanForm() {
                           className="form-control form-control-sm font-monospace"
                           value={selector}
                           onChange={(e) => updateCssSelector(index, e.target.value)}
-                          placeholder="e.g. .ad-container"
+                          placeholder="e.g. .footer"
                         />
                         <button className="btn btn-outline-danger btn-sm" onClick={() => removeCssSelector(index)} disabled={cssSelectors.length <= 1}>
                           <X size={14} />
@@ -1958,26 +2077,66 @@ function ScanForm() {
                     </button>
                   </div>
 
+                  {/* Regex Filters - LAST */}
                   <div className="col-lg-4">
-                    <div className="d-flex align-items-center mb-2">
-                      <span className="fw-bold small me-2">Wildcard Exclusions</span>
-                      <HelpCircle size={14} className="text-muted cursor-help" />
+                    <div className="d-flex align-items-center mb-2 position-relative">
+                      <span className="fw-bold small me-2">Regex Filter rules</span>
+                      <div className="position-relative">
+                        <HelpCircle
+                          size={14}
+                          className="text-muted cursor-pointer"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowRegexExclusionHelp(!showRegexExclusionHelp);
+                          }}
+                        />
+                        {showRegexExclusionHelp && (
+                          <div
+                            ref={regexExclusionHelpRef}
+                            className="position-absolute bg-white dark:bg-dark border rounded shadow-lg p-3 z-index-popover"
+                            style={{ width: '280px', top: '24px', left: 'auto', right: '0', zIndex: 1060 }}
+                          >
+                            <div className="fw-bold small mb-2 text-primary">Advanced Regex</div>
+                            <div className="x-small text-muted">
+                              <p>Full JavaScript Regular Expression matching against the entire URL.</p>
+                              <div className="alert alert-warning p-2 x-small mb-2 border-0 bg-warning bg-opacity-10 text-warning-emphasis">
+                                <div className="fw-bold d-flex align-items-center mb-1">
+                                  <Activity size={12} className="me-1" /> Heads up!
+                                </div>
+                                Using <code>*</code> here means "zero or more of the previous character". For path patterns like <code>/blog/*</code>, use <strong>Wildcard Exclusions</strong> instead.
+                              </div>
+                              <div><strong>Regex Examples:</strong></div>
+                              <ul className="ps-3 mb-0">
+                                <li><code>\/page\/\d+</code> - Numeric pages</li>
+                                <li><code>\.(jpg|png|gif)$</code> - Image files</li>
+                                <li><code>\?.*session=</code> - URLs with session params</li>
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {wildcardExclusions.map((pattern, index) => (
-                      <div key={`wildcard-${index}`} className="input-group mb-2">
+                    {regexExclusions.map((regex, index) => (
+                      <div key={`regex-${index}`} className="input-group mb-2">
                         <input
                           type="text"
-                          className="form-control form-control-sm font-monospace"
-                          value={pattern}
-                          onChange={(e) => updateWildcardExclusion(index, e.target.value)}
-                          placeholder="e.g. /archive/*"
+                          className={`form-control form-control-sm font-monospace ${regex.includes('*') && !regex.includes('\\*') && !regex.includes('.*') ? 'is-invalid' : ''}`}
+                          value={regex}
+                          onChange={(e) => updateRegexExclusion(index, e.target.value)}
+                          placeholder="e.g. \.pdf$"
                         />
-                        <button className="btn btn-outline-danger btn-sm" onClick={() => removeWildcardExclusion(index)} disabled={wildcardExclusions.length <= 1}>
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => removeRegexExclusion(index)} disabled={regexExclusions.length <= 1}>
                           <X size={14} />
                         </button>
+                        {regex.includes('*') && !regex.includes('\\*') && !regex.includes('.*') && (
+                          <div className="invalid-feedback x-small">
+                            Likely error: Did you mean <code>.*</code> or should this be a Wildcard?
+                          </div>
+                        )}
                       </div>
                     ))}
-                    <button className="btn btn-sm btn-outline-primary mt-1" onClick={addWildcardExclusion}>
+                    <button className="btn btn-sm btn-outline-primary mt-1" onClick={addRegexExclusion}>
                       <Plus size={14} className="me-1" /> Add Rule
                     </button>
                   </div>

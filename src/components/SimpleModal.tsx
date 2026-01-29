@@ -79,7 +79,7 @@ export function SimpleModal({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -20, scale: 0.95 }}
                             transition={{ duration: 0.2, ease: "easeOut" }}
-                            className="modal-content border-0 shadow-lg rounded-4 overflow-hidden"
+                            className="modal-content border-0 shadow-lg rounded-4"
                             style={{ backgroundColor: 'var(--bg-card)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
                         >
                             <div className="modal-header border-bottom-0 p-4 pb-0 d-flex align-items-center justify-content-between flex-shrink-0">
