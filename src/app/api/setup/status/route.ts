@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs/promises';
+import path from 'path';
 import { prisma } from '@/lib/prisma';
 import { isUsingSupabase, getSupabaseClient } from '@/lib/supabase';
 import { getAppSettings } from '@/lib/settings';
@@ -8,13 +10,20 @@ export async function GET() {
         const useSupabase = await isUsingSupabase();
         const settings = await getAppSettings();
 
+        const envDefaults = {
+            storageType: process.env.STORAGE_TYPE || 'sqlite',
+            supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
+            supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || ''
+        };
+
         if (useSupabase) {
             const supabase = await getSupabaseClient();
             if (!supabase) {
                 return NextResponse.json({
                     isSetup: false,
                     reason: 'Supabase credentials missing',
-                    storageType: 'supabase'
+                    storageType: 'supabase',
+                    defaults: envDefaults
                 });
             }
 
@@ -24,7 +33,8 @@ export async function GET() {
                 return NextResponse.json({
                     isSetup: false,
                     reason: 'Supabase tables not initialized',
-                    storageType: 'supabase'
+                    storageType: 'supabase',
+                    defaults: envDefaults
                 });
             }
 
@@ -32,22 +42,25 @@ export async function GET() {
                 return NextResponse.json({
                     isSetup: false,
                     reason: `Supabase connection error: ${error.message}`,
-                    storageType: 'supabase'
+                    storageType: 'supabase',
+                    defaults: envDefaults
                 });
             }
 
-            return NextResponse.json({ isSetup: true, storageType: 'supabase' });
+            return NextResponse.json({ isSetup: true, storageType: 'supabase', defaults: envDefaults });
         } else {
             // Local SQLite check
             try {
+                // If we can count, it's definitely setup
                 await prisma.scanHistory.count();
-                return NextResponse.json({ isSetup: true, storageType: 'sqlite' });
+                return NextResponse.json({ isSetup: true, storageType: 'sqlite', defaults: envDefaults });
             } catch (error: any) {
-                // If table doesn't exist, it's not setup
+                // If tables don't exist, it's NOT setup
                 return NextResponse.json({
                     isSetup: false,
                     reason: 'Local database tables not initialized',
-                    storageType: 'sqlite'
+                    storageType: 'sqlite',
+                    defaults: envDefaults
                 });
             }
         }

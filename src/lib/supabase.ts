@@ -25,23 +25,25 @@ async function getSettings(): Promise<AppSettings | null> {
     return cachedSettings;
   }
 
-  try {
-    const settingsFilePath = path.join(process.cwd(), SETTINGS_FILE);
+  const cwd = process.cwd();
+  const possiblePaths = [
+    path.join(cwd, SETTINGS_FILE),
+    path.join(cwd, '.next', 'standalone', SETTINGS_FILE),
+    path.join(cwd, '..', SETTINGS_FILE)
+  ];
 
+  for (const settingsFilePath of possiblePaths) {
     try {
-      await fs.access(settingsFilePath);
       const settingsData = await fs.readFile(settingsFilePath, 'utf-8');
       cachedSettings = JSON.parse(settingsData) as AppSettings;
       lastSettingsRead = now;
       return cachedSettings;
     } catch (error) {
-      // Don't log if file doesn't exist, it's a valid state (defaults will be used)
-      return null;
+      // Continue to next path
     }
-  } catch (error) {
-    console.error('Error getting settings:', error);
-    return null;
   }
+
+  return null;
 }
 
 // Initialize Supabase client with current settings
@@ -50,9 +52,13 @@ export async function getSupabaseClient() {
     // Get current settings
     const settings = await getSettings();
 
-    // Determine if we should use Supabase and get credentials
-    const envStorageType = process.env.STORAGE_TYPE;
-    const useSupabase = (envStorageType === 'supabase') || (settings?.storageType === 'supabase');
+    // Determine if we should use Supabase
+    let useSupabase = false;
+    if (settings && settings.storageType) {
+      useSupabase = settings.storageType === 'supabase';
+    } else {
+      useSupabase = process.env.STORAGE_TYPE === 'supabase';
+    }
 
     // Credentials priority: env var > settings field > fallback default (which is env var anyway)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || (useSupabase && settings?.supabaseUrl ? settings.supabaseUrl : DEFAULT_SUPABASE_URL);
@@ -93,7 +99,9 @@ export async function getSupabaseClient() {
 
 // Check if the application is using Supabase storage
 export async function isUsingSupabase(): Promise<boolean> {
-  if (process.env.STORAGE_TYPE === 'supabase') return true;
   const settings = await getSettings();
-  return settings?.storageType === 'supabase';
+  if (settings && settings.storageType) {
+    return settings.storageType === 'supabase';
+  }
+  return process.env.STORAGE_TYPE === 'supabase';
 }

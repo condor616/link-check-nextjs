@@ -13,14 +13,17 @@ export interface AppSettings {
 const SETTINGS_FILE = '.app_settings.json';
 
 // Helper to ensure settings file exists
-async function ensureSettingsFile() {
+async function getSettingsPath(createIfMissing = false) {
   try {
     const settingsFilePath = path.join(process.cwd(), SETTINGS_FILE);
 
     try {
       await fs.access(settingsFilePath);
     } catch (_) {
-      // If settings file doesn't exist, create it with default settings
+      if (!createIfMissing) {
+        return null;
+      }
+      // Create it with default settings if requested
       const defaultSettings: AppSettings = {
         storageType: 'sqlite',
         appUrl: 'http://localhost:3000'
@@ -34,7 +37,7 @@ async function ensureSettingsFile() {
 
     return settingsFilePath;
   } catch (error) {
-    console.error('Error ensuring settings file:', error);
+    console.error('Error getting settings path:', error);
     throw error;
   }
 }
@@ -42,7 +45,15 @@ async function ensureSettingsFile() {
 // GET to retrieve settings
 export async function GET() {
   try {
-    const settingsFilePath = await ensureSettingsFile();
+    const settingsFilePath = await getSettingsPath();
+
+    if (!settingsFilePath) {
+      // Return default settings if none exist
+      return NextResponse.json({
+        storageType: (process.env.STORAGE_TYPE as any) || 'sqlite',
+        appUrl: 'http://localhost:3000'
+      });
+    }
 
     // Read settings from file
     const settingsData = await fs.readFile(settingsFilePath, 'utf-8');
@@ -61,10 +72,10 @@ export async function GET() {
 // POST to update settings
 export async function POST(request: NextRequest) {
   try {
-    const settingsFilePath = await ensureSettingsFile();
+    const settingsFilePath = await getSettingsPath(true); // Create if missing on save
 
-    // Get current settings
-    const currentSettingsData = await fs.readFile(settingsFilePath, 'utf-8');
+    // Path definitely exists now due to true flag
+    const currentSettingsData = await fs.readFile(settingsFilePath!, 'utf-8');
     const currentSettings = JSON.parse(currentSettingsData) as AppSettings;
 
     // Get new settings from request
@@ -97,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     // Save updated settings
     await fs.writeFile(
-      settingsFilePath,
+      settingsFilePath as string,
       JSON.stringify(updatedSettings, null, 2)
     );
 

@@ -35,13 +35,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check for any settings errors on mount
     const checkSupabaseSettings = async () => {
+      // Don't show this warning if we're already on the settings page
+      if (typeof window !== 'undefined' && window.location.pathname === '/settings') {
+        return;
+      }
+
       try {
         const response = await fetch('/api/settings');
+        //...
         const data = await response.json();
-        
+
         if (data.storageType === 'supabase' && (!data.supabaseUrl || !data.supabaseKey)) {
           addNotification(
-            'warning', 
+            'warning',
             'You have selected Supabase storage but your credentials are incomplete. Please update your settings.',
             10000
           );
@@ -50,7 +56,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         console.error('Error checking settings:', error);
       }
     };
-    
+
     checkSupabaseSettings();
   }, []);
 
@@ -70,25 +76,25 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function NotificationToast({ 
-  notification, 
-  onClose 
-}: { 
-  notification: Notification, 
-  onClose: () => void 
+function NotificationToast({
+  notification,
+  onClose
+}: {
+  notification: Notification,
+  onClose: () => void
 }) {
   useEffect(() => {
     if (notification.duration) {
       const timer = setTimeout(() => {
         onClose();
       }, notification.duration);
-      
+
       return () => clearTimeout(timer);
     }
   }, [notification, onClose]);
 
   const { type, message } = notification;
-  
+
   const getIcon = () => {
     switch (type) {
       case 'success':
@@ -102,7 +108,7 @@ function NotificationToast({
         return <Info className="h-5 w-5 text-blue-500" />;
     }
   };
-  
+
   const getBackgroundColor = () => {
     switch (type) {
       case 'success':
@@ -116,7 +122,7 @@ function NotificationToast({
         return 'bg-blue-50 border-blue-200';
     }
   };
-  
+
   const getTextColor = () => {
     switch (type) {
       case 'success':
@@ -148,10 +154,10 @@ function NotificationToast({
 
 export function useNotification() {
   const context = useContext(NotificationContext);
-  
+
   if (context === undefined) {
     throw new Error('useNotification must be used within a NotificationProvider');
   }
-  
+
   return context;
 } 

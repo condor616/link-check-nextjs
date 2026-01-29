@@ -7,10 +7,10 @@
     "dev": "concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"npm run dev:next\" \"npm run worker\"",
     "build": "npx prisma generate && next build && npm run build:worker && npm run build:static",
     "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --external:@prisma/client --outfile=.next/standalone/worker.js",
-    "build:static": "cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static",
+    "build:static": "cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && mkdir -p .next/standalone/node_modules && cp -r node_modules/prisma .next/standalone/node_modules/",
     "db:push": "prisma db push",
     "db:deploy": "prisma migrate deploy",
-    "start": "npm run db:deploy && concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"node .next/standalone/server.js\" \"node .next/standalone/worker.js\"",
+    "start": "npm run db:deploy && cd .next/standalone && concurrently -n \"NEXT,WORKER\" -c \"cyan,magenta\" \"node server.js\" \"node worker.js\"",
     "lint": "next lint",
     "worker": "tsx --watch scripts/worker.ts"
   },

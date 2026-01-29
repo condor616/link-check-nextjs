@@ -19,6 +19,8 @@ export function SettingsClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isResettingDB, setIsResettingDB] = useState(false);
+  const [showConfirmResetDB, setShowConfirmResetDB] = useState(false);
   const [sqlCommands, setSqlCommands] = useState<string[] | null>(null);
   const [showSqlCommands, setShowSqlCommands] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
@@ -31,6 +33,7 @@ export function SettingsClient() {
   const [isInitializing, setIsInitializing] = useState(false);
   const [showConfirmClearDialog, setShowConfirmClearDialog] = useState(false);
   const [showConnectionSuccessDialog, setShowConnectionSuccessDialog] = useState(false);
+  const [envDefaults, setEnvDefaults] = useState<{ supabaseUrl?: string, supabaseKey?: string } | null>(null);
 
   // Get notification context to show global notifications
   const { addNotification } = useNotification();
@@ -50,17 +53,27 @@ export function SettingsClient() {
   const fetchSettings = async () => {
     try {
       const response = await fetch('/api/settings');
+      const statusRes = await fetch('/api/setup/status');
+      const statusData = await statusRes.json();
+
+      if (statusData.defaults) {
+        setEnvDefaults(statusData.defaults);
+      }
 
       if (response.ok) {
         const data = await response.json();
         const type = data.storageType || 'sqlite';
         setStorageType(type === 'file' ? 'sqlite' : type);
-        setSupabaseUrl(data.supabaseUrl || '');
-        setSupabaseKey(data.supabaseKey || '');
+
+        // Use saved settings if they exist, otherwise fallback to env defaults if we're in that mode
+        setSupabaseUrl(data.supabaseUrl || (type === 'supabase' ? statusData.defaults?.supabaseUrl : '') || '');
+        setSupabaseKey(data.supabaseKey || (type === 'supabase' ? statusData.defaults?.supabaseKey : '') || '');
         setAppUrl(data.appUrl || 'http://localhost:3000');
       } else {
         // If settings don't exist yet, we'll use defaults
         console.log('Using default settings');
+        if (statusData.defaults?.supabaseUrl) setSupabaseUrl(statusData.defaults.supabaseUrl);
+        if (statusData.defaults?.supabaseKey) setSupabaseKey(statusData.defaults.supabaseKey);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -108,8 +121,16 @@ export function SettingsClient() {
 
       addNotification('success', 'Settings saved successfully');
 
-      // After saving, check if tables exist
-      if (storageType === 'supabase') {
+      // After saving, check if initialization is needed for the chosen storage
+      if (storageType === 'sqlite') {
+        const initRes = await fetch('/api/setup/sqlite', { method: 'POST' });
+        if (!initRes.ok) {
+          const initData = await initRes.json();
+          addNotification('warning', `Settings saved, but SQLite initialization failed: ${initData.details || 'Unknown error'}. You might need to check your logs.`);
+        } else {
+          addNotification('success', 'Local database initialized successfully.');
+        }
+      } else if (storageType === 'supabase') {
         checkTablesExist();
       } else {
         // If using file storage, reset the tablesExist state
@@ -471,6 +492,38 @@ export function SettingsClient() {
     setShowConfirmClearDialog(true);
   };
 
+  const resetLocalDatabase = async () => {
+    setShowConfirmResetDB(true);
+  };
+
+  const confirmResetDatabase = async () => {
+    setShowConfirmResetDB(false);
+    setIsResettingDB(true);
+
+    try {
+      const response = await fetch('/api/setup/reset-db', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to reset database');
+      }
+
+      addNotification('success', 'Database reset successfully. Redirecting to setup...');
+
+      // Reload the page after a short delay to trigger the Setup Wizard
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    } catch (error) {
+      console.error('Error resetting database:', error);
+      addNotification('error', error instanceof Error ? error.message : 'Unknown error occurred');
+    } finally {
+      setIsResettingDB(false);
+    }
+  };
+
   const confirmClearData = async () => {
     setShowConfirmClearDialog(false);
     setIsClearing(true);
@@ -599,12 +652,31 @@ export function SettingsClient() {
               </div>
 
               <div className="mb-4">
-                <label htmlFor="storage-type" className="form-label fw-medium">Storage Type</label>
+                <label htmlFor="storage-type" className="form-label fw-medium d-flex justify-content-between align-items-center">
+                  <span>Storage Type</span>
+                </label>
                 <select
                   id="storage-type"
                   className="form-select form-select-lg"
                   value={storageType}
-                  onChange={(e) => setStorageType(e.target.value as StorageType)}
+                  onChange={(e) => {
+                    const newType = e.target.value as StorageType;
+                    setStorageType(newType);
+
+                    if (newType === 'supabase') {
+                      const urlToUse = supabaseUrl || envDefaults?.supabaseUrl;
+                      const keyToUse = supabaseKey || envDefaults?.supabaseKey;
+
+                      if (urlToUse && urlToUse !== supabaseUrl) {
+                        setSupabaseUrl(urlToUse);
+                        addNotification('info', 'Supabase URL pre-populated from .env');
+                      }
+                      if (keyToUse && keyToUse !== supabaseKey) {
+                        setSupabaseKey(keyToUse);
+                        addNotification('info', 'Supabase Key pre-populated from .env');
+                      }
+                    }
+                  }}
                 >
                   <option value="sqlite">Local Database (SQLite)</option>
                   <option value="supabase">Supabase Database</option>
@@ -622,7 +694,12 @@ export function SettingsClient() {
                     <h5 className="mb-3">Supabase Initialization</h5>
                     <div className="mb-3">
                       <label htmlFor="supabase-url" className="form-label d-flex justify-content-between">
-                        <span>Supabase URL <span className="text-danger">*</span></span>
+                        <div className="d-flex align-items-center gap-2">
+                          <span>Supabase URL <span className="text-danger">*</span></span>
+                          {envDefaults?.supabaseUrl && supabaseUrl === envDefaults.supabaseUrl && (
+                            <span className="badge bg-success-subtle text-success small border border-success-subtle">Detected from .env</span>
+                          )}
+                        </div>
                         {(!supabaseUrl || !supabaseKey) && (
                           <button
                             className="btn btn-link btn-sm p-0 text-decoration-none d-flex align-items-center gap-1"
@@ -645,7 +722,14 @@ export function SettingsClient() {
                     </div>
 
                     <div className="mb-4">
-                      <label htmlFor="supabase-key" className="form-label">Supabase Anon Key <span className="text-danger">*</span></label>
+                      <label htmlFor="supabase-key" className="form-label d-flex justify-content-between">
+                        <div className="d-flex align-items-center gap-2">
+                          <span>Supabase Anon Key <span className="text-danger">*</span></span>
+                          {envDefaults?.supabaseKey && supabaseKey === envDefaults.supabaseKey && (
+                            <span className="badge bg-success-subtle text-success small border border-success-subtle">Detected from .env</span>
+                          )}
+                        </div>
+                      </label>
                       <input
                         id="supabase-key"
                         type="password"
@@ -724,7 +808,35 @@ export function SettingsClient() {
                 </div>
               )}
 
-              <div className="d-flex justify-content-end">
+              <div className="border-top pt-4 mt-4">
+                <h5 className="text-danger mb-3 d-flex align-items-center gap-2">
+                  <AlertCircle size={20} /> Danger Zone
+                </h5>
+                <div className="card border-danger border-opacity-25 rounded bg-danger bg-opacity-10 shadow-sm">
+                  <div className="card-body">
+                    <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                      <div>
+                        <h6 className="fw-bold mb-1">Reset Application Database</h6>
+                        <p className="small text-muted mb-0">
+                          This will delete all local scan history, configurations, and settings.
+                          You will be redirected to the Setup Wizard to start fresh.
+                        </p>
+                      </div>
+                      <AnimatedButton
+                        variant="danger"
+                        onClick={resetLocalDatabase}
+                        disabled={isResettingDB}
+                        className="flex-shrink-0"
+                      >
+                        <Trash className="h-4 w-4 me-2" />
+                        {isResettingDB ? "Resetting..." : "Reset Everything"}
+                      </AnimatedButton>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="d-flex justify-content-end mt-4">
                 <AnimatedButton
                   onClick={saveSettings}
                   disabled={isSaving}
@@ -889,6 +1001,31 @@ export function SettingsClient() {
             <span className="fw-bold">Your Supabase connection is working correctly!</span>
           </div>
           <p className="mb-0">However, you still need to initialize the database schema to start using Supabase storage.</p>
+        </div>
+      </SimpleModal>
+
+      {/* Confirm Reset DB Dialog */}
+      <SimpleModal
+        isOpen={showConfirmResetDB}
+        onClose={() => setShowConfirmResetDB(false)}
+        title="CRITICAL: Reset Database?"
+        footer={
+          <div className="d-flex justify-content-end gap-2">
+            <AnimatedButton variant="secondary" onClick={() => setShowConfirmResetDB(false)}>
+              Cancel
+            </AnimatedButton>
+            <AnimatedButton variant="danger" onClick={confirmResetDatabase}>
+              Yes, Delete Everything
+            </AnimatedButton>
+          </div>
+        }
+      >
+        <div className="d-flex align-items-center gap-3">
+          <AlertCircle className="h-10 w-10 text-danger" />
+          <div>
+            <p className="fw-bold text-danger mb-1">This action is irreversible!</p>
+            <p className="mb-0">This will delete ALL scans, configs, and application settings. The app will restart in "fresh installation" mode.</p>
+          </div>
         </div>
       </SimpleModal>
     </div>
