@@ -45,9 +45,10 @@ interface ScanResultsProps {
   itemsPerPage?: number;
   scanId?: string;
   scanConfig?: any; // Add scanConfig to receive the original scan configuration
+  searchQuery?: string;
 }
 
-export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId, scanConfig }: ScanResultsProps) {
+export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage = 10, scanId, scanConfig, searchQuery = '' }: ScanResultsProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -66,6 +67,22 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     setLocalResults(results);
   }, [results]);
 
+  // Reset current page when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setExpandedItems(new Set());
+  }, [searchQuery]);
+
+  // Filter results based on search query
+  const filteredResults = useMemo(() => {
+    if (!searchQuery) return localResults;
+    const query = searchQuery.toLowerCase();
+    return localResults.filter(r =>
+      r.url.toLowerCase().includes(query) ||
+      (r.errorMessage && r.errorMessage.toLowerCase().includes(query))
+    );
+  }, [localResults, searchQuery]);
+
   // Memoize filtering results to avoid recalculation on every render
   const {
     skippedLinks,
@@ -77,30 +94,30 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     skippedUrls
   } = useMemo(() => {
     // First, identify skipped links - they take priority over other categories
-    const skipped = localResults.filter(r => r.status === 'skipped');
+    const skipped = filteredResults.filter(r => r.status === 'skipped');
     // Extract all skipped URLs to avoid duplicating them in other categories
     const sUrls = new Set(skipped.map(r => r.url));
 
     // Then process broken links, excluding those already in skipped
-    const broken = localResults.filter(r =>
+    const broken = filteredResults.filter(r =>
       !sUrls.has(r.url) &&
       (r.status === 'broken' || (r.statusCode !== undefined && r.statusCode >= 400))
     );
 
     // Error links, excluding skipped
-    const error = localResults.filter(r =>
+    const error = filteredResults.filter(r =>
       !sUrls.has(r.url) &&
       r.status === 'error'
     );
 
     // External links, excluding skipped
-    const external = localResults.filter(r =>
+    const external = filteredResults.filter(r =>
       !sUrls.has(r.url) &&
       r.status === 'external'
     );
 
     // OK links, excluding skipped, broken and external
-    const ok = localResults.filter(r => {
+    const ok = filteredResults.filter(r => {
       return !sUrls.has(r.url) &&
         r.status === 'ok' &&
         (r.statusCode === undefined || r.statusCode < 400) &&
@@ -123,7 +140,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       problematicLinks: problematic,
       skippedUrls: sUrls
     };
-  }, [localResults]);
+  }, [filteredResults]);
 
   // Group links by URL for pagination calculation
   const getGroupedLinks = (links: SerializedScanResult[]) => {
@@ -169,7 +186,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
   const uniqueOkCount = getUniqueCount(okLinks);
   const uniqueExternalCount = getUniqueCount(externalLinks);
   const uniqueSkippedCount = getUniqueCount(skippedLinks);
-  const uniqueAllCount = getUniqueCount(results);
+  const uniqueAllCount = getUniqueCount(filteredResults);
 
   // Pagination state and handlers
 
@@ -180,7 +197,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
       case "ok": return okLinks;
       case "external": return externalLinks;
       case "skipped": return skippedLinks;
-      case "all": return results;
+      case "all": return filteredResults;
       default: return problematicLinks;
     }
   };

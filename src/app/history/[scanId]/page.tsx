@@ -25,7 +25,8 @@ import {
   LayoutGrid,
   Info,
   Check,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import { AnimatedCard } from '@/components/AnimatedCard';
 import { AnimatedButton } from '@/components/AnimatedButton';
@@ -108,6 +109,7 @@ function ScanDetailsContent() {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isControlling, setIsControlling] = useState<boolean>(false);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
@@ -495,6 +497,30 @@ function ScanDetailsContent() {
                     <span className="fw-bold">{scan.config.concurrency}</span>
                   </div>
                 </div>
+
+                <div className="col-12 col-lg-auto ms-lg-auto">
+                  <div className="position-relative">
+                    <div className="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
+                      <Search size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm ps-5 pe-5 py-2 rounded-pill border shadow-sm bg-white"
+                      placeholder="Search links..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{ minWidth: '250px' }}
+                    />
+                    {searchQuery && (
+                      <button
+                        className="btn btn-link position-absolute top-50 end-0 translate-middle-y pe-3 text-muted p-0 border-0"
+                        onClick={() => setSearchQuery('')}
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
 
@@ -504,7 +530,7 @@ function ScanDetailsContent() {
                   <LayoutGrid size={20} className="text-primary" />
                   <h3 className="fs-4 fw-bold mb-0">Intel Pattern Results</h3>
                 </div>
-                <ScanResults results={scan.results} scanUrl={scan.scanUrl} scanId={scanId} scanConfig={scan.config} />
+                <ScanResults results={scan.results} scanUrl={scan.scanUrl} scanId={scanId} scanConfig={scan.config} searchQuery={searchQuery} />
               </div>
             </div>
           ) : (
