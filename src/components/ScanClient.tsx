@@ -750,9 +750,9 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                   {showAdvancedEdit && (
                     <div className="mt-3 p-3 bg-light dark:bg-dark rounded-3 border">
                       <div className="row g-4">
-                        <div className="col-lg-6">
+                        <div className="col-lg-4">
                           <div className="d-flex align-items-center mb-2">
-                            <span className="fw-bold small me-2">Regex Exclusion Rules</span>
+                            <span className="fw-bold small me-2">Regex Filter rules</span>
                             <HelpCircle size={14} className="text-muted cursor-help" />
                           </div>
                           {regexExclusions.map((regex, index) => (
@@ -778,9 +778,9 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                           </button>
                         </div>
 
-                        <div className="col-lg-6">
+                        <div className="col-lg-4">
                           <div className="d-flex align-items-center mb-2">
-                            <span className="fw-bold small me-2">CSS Selector Exclusions</span>
+                            <span className="fw-bold small me-2">CSS Selectors to skip</span>
                             <HelpCircle size={14} className="text-muted cursor-help" />
                           </div>
                           {cssSelectors.map((selector, index) => (
@@ -802,6 +802,34 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                             </div>
                           ))}
                           <button className="btn btn-sm btn-outline-primary mt-1" onClick={addCssSelector}>
+                            <Plus size={14} className="me-1" /> Add Rule
+                          </button>
+                        </div>
+
+                        <div className="col-lg-4">
+                          <div className="d-flex align-items-center mb-2">
+                            <span className="fw-bold small me-2">Wildcard Exclusions</span>
+                            <HelpCircle size={14} className="text-muted cursor-help" />
+                          </div>
+                          {wildcardExclusions.map((pattern, index) => (
+                            <div key={`wildcard-${index}`} className="input-group mb-2">
+                              <input
+                                type="text"
+                                className="form-control form-control-sm font-monospace"
+                                value={pattern}
+                                onChange={(e) => updateWildcardExclusion(index, e.target.value)}
+                                placeholder="e.g. /blog/*"
+                              />
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => removeWildcardExclusion(index)}
+                                disabled={wildcardExclusions.length <= 1}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                          <button className="btn btn-sm btn-outline-primary mt-1" onClick={addWildcardExclusion}>
                             <Plus size={14} className="me-1" /> Add Rule
                           </button>
                         </div>
@@ -1882,7 +1910,7 @@ function ScanForm() {
             {showAdvanced && (
               <div className="p-3 bg-light dark:bg-dark border rounded-3 text-start mb-4 fade-in">
                 <div className="row g-4">
-                  <div className="col-lg-6">
+                  <div className="col-lg-4">
                     <div className="d-flex align-items-center mb-2">
                       <span className="fw-bold small me-2">Regex Filter rules</span>
                       <HelpCircle size={14} className="text-muted cursor-help" />
@@ -1906,7 +1934,7 @@ function ScanForm() {
                     </button>
                   </div>
 
-                  <div className="col-lg-6">
+                  <div className="col-lg-4">
                     <div className="d-flex align-items-center mb-2">
                       <span className="fw-bold small me-2">CSS Selectors to skip</span>
                       <HelpCircle size={14} className="text-muted cursor-help" />
@@ -1926,6 +1954,30 @@ function ScanForm() {
                       </div>
                     ))}
                     <button className="btn btn-sm btn-outline-primary mt-1" onClick={addCssSelector}>
+                      <Plus size={14} className="me-1" /> Add Rule
+                    </button>
+                  </div>
+
+                  <div className="col-lg-4">
+                    <div className="d-flex align-items-center mb-2">
+                      <span className="fw-bold small me-2">Wildcard Exclusions</span>
+                      <HelpCircle size={14} className="text-muted cursor-help" />
+                    </div>
+                    {wildcardExclusions.map((pattern, index) => (
+                      <div key={`wildcard-${index}`} className="input-group mb-2">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm font-monospace"
+                          value={pattern}
+                          onChange={(e) => updateWildcardExclusion(index, e.target.value)}
+                          placeholder="e.g. /archive/*"
+                        />
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => removeWildcardExclusion(index)} disabled={wildcardExclusions.length <= 1}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <button className="btn btn-sm btn-outline-primary mt-1" onClick={addWildcardExclusion}>
                       <Plus size={14} className="me-1" /> Add Rule
                     </button>
                   </div>

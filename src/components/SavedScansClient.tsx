@@ -742,7 +742,45 @@ export function SavedScansClient() {
               <div className="space-y-4">
                 <div className="p-3 rounded-4 bg-white border shadow-sm">
                   <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
-                    <span>Exclusion Patterns (Wildcard)</span>
+                    <span>Regex Filter rules</span>
+                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditRegexExclusion}><Plus size={14} /></button>
+                  </label>
+                  {editRegexExclusions.map((regex, idx) => (
+                    <div key={idx} className="input-group input-group-sm mb-2">
+                      <input
+                        type="text"
+                        className="form-control bg-light border-0"
+                        value={regex}
+                        onChange={(e) => updateEditRegexExclusion(idx, e.target.value)}
+                        placeholder="e.g. \.pdf$"
+                      />
+                      <button className="btn btn-outline-light text-muted border-0 shadow-none" onClick={() => removeEditRegexExclusion(idx)}><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3">
+                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
+                    <span>CSS Selectors to skip</span>
+                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditCssSelector}><Plus size={14} /></button>
+                  </label>
+                  {editCssSelectors.map((selector, idx) => (
+                    <div key={idx} className="input-group input-group-sm mb-2">
+                      <input
+                        type="text"
+                        className="form-control bg-light border-0"
+                        value={selector}
+                        onChange={(e) => updateEditCssSelector(idx, e.target.value)}
+                        placeholder="e.g. .footer"
+                      />
+                      <button className="btn btn-outline-light text-muted border-0 shadow-none" onClick={() => removeEditCssSelector(idx)}><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3">
+                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
+                    <span>Wildcard Exclusions</span>
                     <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditWildcardExclusion}><Plus size={14} /></button>
                   </label>
                   {editWildcardExclusions.map((pattern, idx) => (
@@ -755,25 +793,6 @@ export function SavedScansClient() {
                         placeholder="e.g. /private/*"
                       />
                       <button className="btn btn-outline-light text-muted border-0 shadow-none" onClick={() => removeEditWildcardExclusion(idx)}><X size={14} /></button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="p-3 rounded-4 bg-white border shadow-sm mt-3">
-                  <label className="form-label x-small fw-bold opacity-50 d-flex justify-content-between align-items-center mb-2">
-                    <span>DOM Selectors (Exclude)</span>
-                    <button className="btn btn-link btn-sm p-0 text-primary border-0 shadow-none" onClick={addEditCssSelector}><Plus size={14} /></button>
-                  </label>
-                  {editCssSelectors.map((selector, idx) => (
-                    <div key={idx} className="input-group input-group-sm mb-2">
-                      <input
-                        type="text"
-                        className="form-control bg-light border-0"
-                        value={selector}
-                        onChange={(e) => updateEditCssSelector(idx, e.target.value)}
-                        placeholder=".nav-internal"
-                      />
-                      <button className="btn btn-outline-light text-muted border-0 shadow-none" onClick={() => removeEditCssSelector(idx)}><X size={14} /></button>
                     </div>
                   ))}
                 </div>
