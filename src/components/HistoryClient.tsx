@@ -23,7 +23,6 @@ import { AnimatedCard } from '@/components/AnimatedCard';
 import { AnimatedButton } from '@/components/AnimatedButton';
 import { SimpleModal } from '@/components/SimpleModal';
 import { useNotification } from "@/components/NotificationContext";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 // Define the scan summary structure (from API response)
@@ -211,10 +210,10 @@ export function HistoryClient() {
             setScans(scans.filter(scan => scan.id !== id));
 
             // Show success notification
-            toast.success("The scan has been successfully deleted.");
+            addNotification("success", "The scan has been successfully deleted.");
         } catch (err) {
             console.error('Failed to delete scan:', err);
-            toast.error(err instanceof Error ? err.message : 'Failed to delete scan');
+            addNotification("error", err instanceof Error ? err.message : 'Failed to delete scan');
         } finally {
             setDeleteId(null);
             setIsDeleting(false);

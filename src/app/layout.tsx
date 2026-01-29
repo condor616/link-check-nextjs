@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.scss";
 import { PageTransition } from "@/components/PageTransition";
 import { NotificationProvider } from "@/components/NotificationContext";
-import { Toaster } from "@/components/ui/sonner";
 import { TopNav } from "@/components/TopNav";
 import { MobileNav } from "@/components/MobileNav";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -134,7 +133,6 @@ export default function RootLayout({
                 </div>
               </div>
             </SetupWrapper>
-            <Toaster />
           </NotificationProvider>
         </ThemeProvider>
       </body>

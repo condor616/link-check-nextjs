@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Server, Database, ArrowRight, Shield, AlertCircle, Loader2, RefreshCcw, Copy } from 'lucide-react';
-import { toast } from 'sonner';
+import { useNotification } from "@/components/NotificationContext";
 
 interface SetupStatus {
     isSetup: boolean;
@@ -20,6 +20,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
     const [setupError, setSetupError] = useState<string | null>(null);
     const [sqlCommands, setSqlCommands] = useState<string[]>([]);
     const [hasDefaults, setHasDefaults] = useState(false);
+    const { addNotification } = useNotification();
 
     const handleNext = () => setStep(step + 1);
     const handleBack = () => setStep(step - 1);
@@ -104,11 +105,11 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 throw new Error(initData.error || 'Failed to initialize Supabase tables');
             }
 
-            toast.success('Supabase configured and tables initialized!');
+            addNotification('success', 'Supabase configured and tables initialized!');
             setStep(4);
         } catch (error: any) {
             setSetupError(error.message);
-            toast.error(error.message);
+            addNotification('error', error.message);
         } finally {
             setIsInitializing(false);
         }
@@ -137,12 +138,12 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 throw new Error(data.error || 'Failed to initialize database');
             }
 
-            toast.success('Local storage configured and database initialized!');
+            addNotification('success', 'Local storage configured and database initialized!');
             setStep(4);
         } catch (error: any) {
             console.error('SQLite Setup Error:', error);
             setSetupError(error.message);
-            toast.error(error.message || 'Failed to configure SQLite');
+            addNotification('error', error.message || 'Failed to configure SQLite');
         } finally {
             setIsInitializing(false);
         }
@@ -297,7 +298,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                                             <button
                                                 onClick={() => {
                                                     navigator.clipboard.writeText(sqlCommands.join('\n\n'));
-                                                    toast.success('SQL commands copied to clipboard');
+                                                    addNotification('success', 'SQL commands copied to clipboard');
                                                 }}
                                                 className="btn btn-sm btn-link p-0 text-decoration-none d-flex align-items-center gap-1"
                                             >

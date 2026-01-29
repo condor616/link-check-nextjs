@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, X, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
@@ -63,14 +64,31 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   return (
     <NotificationContext.Provider value={{ notifications, addNotification, removeNotification }}>
       {children}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-md">
-        {notifications.map(notification => (
-          <NotificationToast
-            key={notification.id}
-            notification={notification}
-            onClose={() => removeNotification(notification.id)}
-          />
-        ))}
+      <div
+        style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          width: '100%',
+          maxWidth: '500px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '10px'
+        }}
+      >
+        <AnimatePresence mode="popLayout">
+          {notifications.map(notification => (
+            <NotificationToast
+              key={notification.id}
+              notification={notification}
+              onClose={() => removeNotification(notification.id)}
+            />
+          ))}
+        </AnimatePresence>
       </div>
     </NotificationContext.Provider>
   );
@@ -98,57 +116,82 @@ function NotificationToast({
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <CheckCircle className="h-5 w-5 text-success" />;
       case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
+        return <AlertCircle className="h-5 w-5 text-danger" />;
       case 'warning':
-        return <AlertCircle className="h-5 w-5 text-amber-500" />;
+        return <AlertTriangle className="h-5 w-5 text-warning" />;
       case 'info':
       default:
-        return <Info className="h-5 w-5 text-blue-500" />;
+        return <Info className="h-5 w-5 text-info" />;
     }
   };
 
-  const getBackgroundColor = () => {
+  const getStyle = () => {
     switch (type) {
       case 'success':
-        return 'bg-green-50 border-green-200';
+        return {
+          backgroundColor: '#ecfdf5', // light green
+          borderColor: '#10b981',
+          color: '#065f46'
+        };
       case 'error':
-        return 'bg-red-50 border-red-200';
+        return {
+          backgroundColor: '#fef2f2', // light red
+          borderColor: '#ef4444',
+          color: '#991b1b'
+        };
       case 'warning':
-        return 'bg-amber-50 border-amber-200';
+        return {
+          backgroundColor: '#fffbeb', // light amber
+          borderColor: '#f59e0b',
+          color: '#92400e'
+        };
       case 'info':
       default:
-        return 'bg-blue-50 border-blue-200';
+        return {
+          backgroundColor: '#eff6ff', // light blue
+          borderColor: '#3b82f6',
+          color: '#1e40af'
+        };
     }
   };
 
-  const getTextColor = () => {
-    switch (type) {
-      case 'success':
-        return 'text-green-800';
-      case 'error':
-        return 'text-red-800';
-      case 'warning':
-        return 'text-amber-800';
-      case 'info':
-      default:
-        return 'text-blue-800';
-    }
-  };
+  const style = getStyle();
 
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-lg shadow-md border ${getBackgroundColor()} ${getTextColor()} animate-in slide-in-from-right-5`}>
-      <div className="flex-shrink-0 mt-0.5">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+      transition={{
+        type: "spring",
+        stiffness: 400,
+        damping: 30
+      }}
+      className="card d-flex flex-row align-items-center gap-3 p-3 shadow-lg border-2"
+      style={{
+        ...style,
+        pointerEvents: 'auto',
+        minWidth: '320px',
+        maxWidth: '100%',
+        borderRadius: '12px'
+      }}
+    >
+      <div className="flex-shrink-0 d-flex align-items-center">
         {getIcon()}
       </div>
-      <div className="flex-1 text-sm">
+      <div className="flex-grow-1 small fw-medium">
         {message}
       </div>
-      <button onClick={onClose} className="flex-shrink-0">
-        <X className="h-5 w-5 opacity-70 hover:opacity-100" />
-      </button>
-    </div>
+      <button
+        onClick={onClose}
+        className="btn-close btn-close-dark ms-2"
+        aria-label="Close"
+        style={{ fontSize: '0.75rem' }}
+      ></button>
+    </motion.div>
   );
 }
 
