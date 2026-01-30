@@ -564,8 +564,7 @@ export class JobService {
     private serializeScanResults(results: ScanResult[]): any[] {
         return results.map(r => ({
             ...r,
-            foundOn: Array.from(r.foundOn || []),
-            htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
+            foundOn: Array.from(r.foundOn || [])
         }));
     }
 
@@ -577,8 +576,7 @@ export class JobService {
                 const parsed = typeof row.results === 'string' ? JSON.parse(row.results) : row.results;
                 results = parsed.map((r: any) => ({
                     ...r,
-                    foundOn: new Set(r.foundOn || []),
-                    htmlContexts: r.htmlContexts ? new Map(Object.entries(r.htmlContexts)) : undefined
+                    foundOn: new Set(r.foundOn || [])
                 }));
             } catch (e) {
                 console.error('Error parsing results JSON:', e);

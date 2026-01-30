@@ -76,7 +76,6 @@ async function checkUrl(url: string, config?: ScanConfig & { originalScanUrl?: s
       statusCode: status,
       contentType,
       foundOn: new Set<string>(), // Will be preserved from original scan
-      htmlContexts: new Map<string, string[]>(), // Will be preserved from original scan
       usedAuth: shouldUseAuth, // Add flag to indicate if auth was used
       authDecision // Return the auth decision reason
     };
@@ -89,7 +88,6 @@ async function checkUrl(url: string, config?: ScanConfig & { originalScanUrl?: s
         status: 'broken',
         errorMessage: `Request timed out after ${(config?.requestTimeout ?? 30000) / 1000} seconds`,
         foundOn: new Set<string>(),
-        htmlContexts: new Map<string, string[]>(),
         usedAuth: false,
         authDecision: "request_timeout"
       };
@@ -100,17 +98,10 @@ async function checkUrl(url: string, config?: ScanConfig & { originalScanUrl?: s
       status: 'error',
       errorMessage: error.message || 'Unknown error occurred',
       foundOn: new Set<string>(),
-      htmlContexts: new Map<string, string[]>(),
       usedAuth: false,
       authDecision: "request_error"
     };
   }
-}
-
-// Helper function to convert Map<string, string[]> to a plain object
-function htmlContextsToObject(htmlContexts: Map<string, string[]> | undefined): Record<string, string[]> {
-  if (!htmlContexts) return {};
-  return Object.fromEntries(htmlContexts);
 }
 
 // Helper function to get a descriptive auth message
@@ -302,17 +293,15 @@ export async function POST(request: NextRequest) {
       // Find and update the URL result in the scan data
       const urlIndex = scanData.results.findIndex((r: any) => r.url === url);
       if (urlIndex !== -1) {
-        // Preserve the foundOn and htmlContexts from the original scan
+        // Preserve the foundOn from the original scan
         const originalResult = scanData.results[urlIndex];
         // Ensure foundOn is iterable before creating a Set
         result.foundOn = new Set(Array.isArray(originalResult.foundOn) ? originalResult.foundOn : []);
-        result.htmlContexts = new Map(Object.entries(originalResult.htmlContexts || {}));
 
         // Update the result in the scan data
         scanData.results[urlIndex] = {
           ...result,
           foundOn: Array.from(result.foundOn),
-          htmlContexts: htmlContextsToObject(result.htmlContexts),
           usedAuth: result.usedAuth
         };
       }
@@ -331,8 +320,7 @@ export async function POST(request: NextRequest) {
         authMessage,
         result: {
           ...result,
-          foundOn: Array.from(result.foundOn),
-          htmlContexts: htmlContextsToObject(result.htmlContexts)
+          foundOn: Array.from(result.foundOn)
         }
       });
 

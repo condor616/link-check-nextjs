@@ -72,9 +72,8 @@ interface ScanStatus {
 }
 
 // Define SerializedScanResult for JSON storage
-interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
+interface SerializedScanResult extends Omit<ScanResult, 'foundOn'> {
   foundOn: string[]; // Instead of Set<string>
-  htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
 }
 
 // The main scanner component that uses useSearchParams
@@ -1773,7 +1772,7 @@ function ScanForm() {
   return (
     <div className="w-100 py-5 fade-in-up">
       <div className="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 className="h3 mb-0 fw-bold text-dark dark:text-light">Initiate Link Analysis</h1>
+        <h1 className="h3 mb-0 fw-bold text-dark dark:text-light">New Scan</h1>
         <div className="mt-2 mt-sm-0 d-flex gap-2">
           <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={toggleImportDialog}>
             <FileCode size={14} className="me-1" /> Import JSON
@@ -1785,8 +1784,8 @@ function ScanForm() {
         <div className="card-header bg-transparent border-0 pt-4 px-4 pb-0">
           <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
             <div>
-              <h2 className="h5 fw-bold mb-1">New Audit Configuration</h2>
-              <p className="text-muted small mb-0">Define your target and adjust inspection depth.</p>
+              <h2 className="h5 fw-bold mb-1">New scan configuration</h2>
+              <p className="text-muted small mb-0">Define your target and adjust scan depth.</p>
             </div>
 
             <div className="d-flex align-items-center gap-2">
@@ -2177,7 +2176,7 @@ function ScanForm() {
             onClick={toggleSaveDialog}
             disabled={!url}
           >
-            <Save size={18} className="me-2" /> Archive Configuration
+            <Save size={18} className="me-2" /> Save to My Scans
           </AnimatedButton>
 
           <AnimatedButton
@@ -2189,7 +2188,7 @@ function ScanForm() {
             {isCreatingScan ? (
               <><span className="spinner-border spinner-border-sm me-2" /> Building...</>
             ) : (
-              <><Rocket size={18} className="me-2" /> Launch Full Inspection</>
+              <><Rocket size={18} className="me-2" /> Start Scan</>
             )}
           </AnimatedButton>
         </div>
@@ -2211,12 +2210,12 @@ function ScanForm() {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow-lg rounded-4">
               <div className="modal-header border-0 pb-0">
-                <h5 className="modal-title fw-bold">Enterprise Authentication</h5>
+                <h5 className="modal-title fw-bold">HTTP Basic Authentication</h5>
                 <button type="button" className="btn-close" onClick={() => setShowAuthDialog(false)}></button>
               </div>
               <div className="modal-body py-4">
                 <div className="mb-3">
-                  <label className="form-label small fw-bold">Identity / Username</label>
+                  <label className="form-label small fw-bold">Username</label>
                   <input
                     type="text"
                     className="form-control"
@@ -2226,7 +2225,7 @@ function ScanForm() {
                   />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label small fw-bold">Credential / Password</label>
+                  <label className="form-label small fw-bold">Password</label>
                   <input
                     type="password"
                     className="form-control"
@@ -2244,7 +2243,7 @@ function ScanForm() {
                     onChange={(e) => setUseAuthForAllDomains(e.target.checked)}
                   />
                   <label className="form-check-label small" htmlFor="useAuthForAllDomains">
-                    Broadcast credentials to all sub-requests
+                    Apply recursively to all links
                   </label>
                 </div>
               </div>
@@ -2252,7 +2251,7 @@ function ScanForm() {
                 <button type="button" className="btn btn-link text-danger p-0 text-decoration-none small" onClick={clearAuthCredentials}>Purge Credentials</button>
                 <div className="d-flex gap-2">
                   <button type="button" className="btn btn-light" onClick={() => setShowAuthDialog(false)}>Discard</button>
-                  <button type="button" className="btn btn-primary" onClick={saveAuthCredentials}>Apply Identity</button>
+                  <button type="button" className="btn btn-primary" onClick={saveAuthCredentials}>Save</button>
                 </div>
               </div>
             </div>
@@ -2266,7 +2265,7 @@ function ScanForm() {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
               <div className="modal-header border-0 pb-0">
-                <h5 className="modal-title fw-bold">Archive Configuration</h5>
+                <h5 className="modal-title fw-bold">Save to My Scans</h5>
                 <button type="button" className="btn-close" onClick={() => setShowSaveDialog(false)}></button>
               </div>
               <div className="modal-body py-4">

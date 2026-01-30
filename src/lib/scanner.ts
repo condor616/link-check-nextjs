@@ -35,8 +35,6 @@ export interface ScanResult {
     contentType?: string;
     foundOn: Set<string>; // Set of page URLs where this link was found
     errorMessage?: string;
-    // Map of page URLs to arrays of HTML snippets containing this link
-    htmlContexts?: Map<string, string[]>;
     // Flag to indicate if HTTP Basic Auth was used for this URL
     usedAuth?: boolean;
 }
@@ -150,20 +148,15 @@ class Scanner {
             if (initialState.results) {
                 initialState.results.forEach((r: any) => {
                     const foundOn = new Set<string>(Array.isArray(r.foundOn) ? r.foundOn : []);
-                    let htmlContexts: Map<string, string[]> | undefined;
-                    if (r.htmlContexts) {
-                        if (Array.isArray(r.htmlContexts)) {
-                            htmlContexts = new Map(r.htmlContexts);
-                        } else if (typeof r.htmlContexts === 'object') {
-                            htmlContexts = new Map(Object.entries(r.htmlContexts));
-                        }
-                    }
 
                     const result: ScanResult = {
                         ...r,
-                        foundOn,
-                        htmlContexts
+                        foundOn
                     };
+                    // Ensure unnecessary fields are removed if they sneak in from older serialized state
+                    // @ts-ignore
+                    delete result.htmlContexts;
+
                     this.results.set(result.url, result);
                 });
             }
@@ -267,44 +260,16 @@ class Scanner {
         this._brokenLinksCount = count;
     }
 
-    // Helper to add or update link results with HTML context
-    protected addOrUpdateResultWithContext(linkUrl: string, sourceUrl: string, htmlContext: string, partialResult: Partial<Omit<ScanResult, 'url' | 'foundOn' | 'htmlContexts'>> = {}) {
+    // Helper to add or update link results
+    protected addOrUpdateResultWithContext(linkUrl: string, sourceUrl: string, _htmlContext: string, partialResult: Partial<Omit<ScanResult, 'url' | 'foundOn'>> = {}) {
         let entry = this.results.get(linkUrl);
 
         // Track if status changed from/to problematic
         const wasProblematic = entry ? this.isProblematic(entry.status, entry.statusCode) : false;
 
-        // Determine if we should store the HTML context
-        // Only store for problematic links or if status is not yet determined
-        const isProblematicStatus = (status?: string) => status === 'broken' || status === 'error';
-        const shouldStoreContext = sourceUrl !== 'initial' && (
-            !entry ||
-            isProblematicStatus(entry.status) ||
-            entry.status === undefined ||
-            isProblematicStatus(partialResult.status)
-        );
-
         if (entry) {
             if (sourceUrl !== 'initial') {
                 entry.foundOn.add(sourceUrl);
-
-                // Add HTML context only if necessary
-                if (shouldStoreContext) {
-                    if (!entry.htmlContexts) {
-                        entry.htmlContexts = new Map<string, string[]>();
-                    }
-
-                    if (!entry.htmlContexts.has(sourceUrl)) {
-                        entry.htmlContexts.set(sourceUrl, [htmlContext]);
-                    } else {
-                        entry.htmlContexts.get(sourceUrl)?.push(htmlContext);
-                    }
-                } else if (entry.htmlContexts) {
-                    // Purge contexts if we now know it's not problematic
-                    if (partialResult.status && !isProblematicStatus(partialResult.status)) {
-                        entry.htmlContexts = undefined;
-                    }
-                }
             }
 
             // Logic to prevent overwriting definitive status with less definitive one
@@ -324,19 +289,13 @@ class Scanner {
                 this.callbacks.onResult(entry);
             }
         } else {
-            const htmlContexts = new Map<string, string[]>();
-            if (shouldStoreContext) {
-                htmlContexts.set(sourceUrl, [htmlContext]);
-            }
-
             entry = {
                 url: linkUrl,
                 status: partialResult.status ?? 'external',
                 statusCode: partialResult.statusCode,
                 contentType: partialResult.contentType,
                 errorMessage: partialResult.errorMessage,
-                foundOn: new Set(sourceUrl === 'initial' ? [] : [sourceUrl]),
-                htmlContexts: htmlContexts.size > 0 ? htmlContexts : undefined
+                foundOn: new Set(sourceUrl === 'initial' ? [] : [sourceUrl])
             };
             this.results.set(linkUrl, entry);
 
@@ -423,10 +382,6 @@ class Scanner {
             currentResult.statusCode = status;
             currentResult.contentType = contentType;
 
-            // Purge HTML contexts if the link is OK to save space
-            if (!isBroken) {
-                currentResult.htmlContexts = undefined;
-            }
 
             // Parse HTML and queue new links if applicable
             if (!isBroken && contentType.includes('text/html') && this.config.processHtml) {
@@ -477,7 +432,7 @@ class Scanner {
                                 this.addOrUpdateResultWithContext(
                                     nextUrl,
                                     pageUrl,
-                                    $.html(el),
+                                    '',
                                     {
                                         status: 'skipped',
                                         errorMessage: 'Excluded by CSS selector'
@@ -515,7 +470,7 @@ class Scanner {
             const isExternal = !this.isSameDomain(nextUrl);
             if (isExternal) {
                 // Always create a basic result entry for external links
-                this.addOrUpdateResultWithContext(nextUrl, pageUrl, $.html(element), { status: 'external' });
+                this.addOrUpdateResultWithContext(nextUrl, pageUrl, '', { status: 'external' });
 
                 // If skipExternalDomains is true, don't queue external links for processing
                 if (this.config.skipExternalDomains) {
@@ -523,19 +478,8 @@ class Scanner {
                 }
             }
 
-            // Capture the HTML context
-            let htmlContext = '';
-            try {
-                const parent = $(element).parent();
-                htmlContext = parent.length ?
-                    $.html(parent).substring(0, 200) :
-                    $.html(element);
-            } catch (e) {
-                htmlContext = $.html(element);
-            }
-
             // Add to batch
-            linkBatch.push({ url: nextUrl, context: htmlContext });
+            linkBatch.push({ url: nextUrl, context: '' });
         });
 
         // Process the batch of links all at once 
@@ -716,8 +660,7 @@ class Scanner {
         const serializedResults = Array.from(this.results.values()).map(r => {
             return {
                 ...r,
-                foundOn: Array.from(r.foundOn),
-                htmlContexts: r.htmlContexts ? Array.from(r.htmlContexts.entries()) : undefined
+                foundOn: Array.from(r.foundOn)
             };
         });
 

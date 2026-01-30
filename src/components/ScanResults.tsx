@@ -33,9 +33,8 @@ import ExportScanButton from './ExportScanButton';
 import { ExpandableUrl } from './ExpandableUrl';
 
 // Update the ScanResult interface for serialized HTML contexts
-interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
+interface SerializedScanResult extends Omit<ScanResult, 'foundOn'> {
   foundOn: string[]; // Instead of Set<string>
-  htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
   usedAuth?: boolean; // Include the usedAuth flag from ScanResult
 }
 
@@ -60,7 +59,6 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
 
   // Use 'all' as the default tab 
   const [activeTab, setActiveTab] = useState<string>("all");
-  const [isShowingHtmlContext, setShowHtmlContext] = useState<string | null>(null);
 
   // Update local results when props change
   useEffect(() => {
@@ -158,25 +156,9 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
           }
         });
 
-        // Merge htmlContexts objects if they exist
-        if (link.htmlContexts) {
-          if (!existingLink.htmlContexts) {
-            existingLink.htmlContexts = {};
-          }
-
-          Object.entries(link.htmlContexts).forEach(([page, contexts]) => {
-            if (!existingLink.htmlContexts![page]) {
-              existingLink.htmlContexts![page] = [...contexts];
-            } else {
-              existingLink.htmlContexts![page] = [
-                ...existingLink.htmlContexts![page],
-                ...contexts
-              ];
-            }
-          });
-        }
       }
     });
+
     return Array.from(groupedLinks.values());
   };
 
@@ -281,88 +263,7 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     return pageMap;
   };
 
-  // Helper to extract and clean the relevant HTML context around the link
-  const cleanHtmlContext = (html: string, url: string) => {
-    try {
-      if (typeof window === 'undefined') {
-        return 'Context view available in browser';
-      }
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      // Remove unwanted elements
-      ['style', 'script', 'link', 'meta'].forEach(tag => {
-        doc.querySelectorAll(tag).forEach(el => el.remove());
-      });
-
-      // Find the anchor tag with the broken link
-      // CSS.escape is needed if url contains special characters, but might not be available in all envs
-      // fallback to attribute selector with manual quoting
-      let anchorElement: Element | null = null;
-      try {
-        anchorElement = doc.querySelector(`a[href="${url.replace(/"/g, '\\"')}"]`);
-      } catch (e) {
-        // fall back to iteration if querySelector fails
-        const anchors = Array.from(doc.querySelectorAll('a'));
-        anchorElement = anchors.find(a => a.getAttribute('href') === url) || null;
-      }
-
-      if (anchorElement) {
-        // Get parent for context if it's significant
-        const parentElement = anchorElement.parentElement;
-        const usefulParents = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TD', 'FIGCAPTION', 'BUTTON', 'LABEL'];
-
-        if (parentElement && usefulParents.includes(parentElement.tagName)) {
-          return `<!-- Link with immediate parent -->\n${parentElement.outerHTML}`;
-        }
-        return `<!-- Just the link element -->\n${anchorElement.outerHTML}`;
-      }
-
-      // If exact match not found, look for partial match in href
-      const possibleAnchors = Array.from(doc.querySelectorAll('a')).filter(a => {
-        const href = a.getAttribute('href') || '';
-        return href.includes(url) || url.includes(href);
-      });
-
-      if (possibleAnchors.length > 0) {
-        return `<!-- Best matching link -->\n${possibleAnchors[0].outerHTML}`;
-      }
-
-      // Last resort: Cleaned body snippet
-      const bodyContent = doc.body.innerHTML || html;
-      // Basic cleanup regex for remaining artifacts if any
-      const cleanedHtml = bodyContent
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .substring(0, 300);
-
-      return `<!-- Cleaned HTML snippet -->\n${cleanedHtml}${cleanedHtml.length > 300 ? '...' : ''}`;
-    } catch (e) {
-      // Fallback for parsing errors
-      return html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .substring(0, 200) + (html.length > 200 ? '...' : '');
-    }
-  };
-
-  // Generate a snippet of HTML context for display
-  const generateHtmlContext = (url: string, page: string, occurrence: number) => {
-    // Get the actual HTML context from the scan results
-    const link = results.find(r => r.url === url);
-
-    if (link && link.htmlContexts && link.htmlContexts[page]) {
-      const contexts = link.htmlContexts[page];
-      if (contexts && contexts.length > 0) {
-        // Return the actual HTML context if available, or a default if the index doesn't exist
-        const htmlContext = contexts[occurrence - 1] || contexts[0];
-        return cleanHtmlContext(htmlContext, url);
-      }
-    }
-
-    // Fallback if no HTML context is available
-    return `<a href="${url}">Link not found in HTML context</a>`;
-  };
+  // Status badge component
 
   // Status badge component
   const StatusBadge = ({ status, code, usedAuth }: { status: string, code?: number, usedAuth?: boolean }) => {
@@ -527,7 +428,6 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
           newResults[index] = {
             ...data.result,
             foundOn: newResults[index].foundOn, // Preserve foundOn from original scan
-            htmlContexts: newResults[index].htmlContexts, // Preserve htmlContexts from original scan
             usedAuth: data.result.usedAuth // Use the usedAuth value from the re-check result
           };
         }
@@ -689,55 +589,8 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
                             </div>
 
                             <div className="d-flex gap-2">
-                              <button
-                                className="btn btn-sm btn-outline-secondary border-0 rounded-circle"
-                                onClick={(e) => { e.stopPropagation(); setShowHtmlContext(isShowingHtmlContext === `${page}-${i}` ? null : `${page}-${i}`); }}
-                                title="View HTML Source"
-                              >
-                                <Search size={14} />
-                              </button>
                             </div>
                           </div>
-
-                          {isShowingHtmlContext === `${page}-${i}` && (
-                            <div className="mt-3 border-top pt-3 fade-in">
-                              <div className="d-flex justify-content-between align-items-center mb-2">
-                                <span className="x-small fw-bold text-uppercase text-muted tracking-widest">Source Context</span>
-                              </div>
-                              <div className="max-h-[400px] overflow-auto rounded-3">
-                                {Array.from({ length: Math.min(3, occurrences) }, (_, idx) => {
-                                  const htmlCode = generateHtmlContext(link.url, page, idx + 1);
-                                  return (
-                                    <div key={idx} className="position-relative mb-2 last:mb-0">
-                                      <button
-                                        className="btn btn-sm btn-dark position-absolute top-2 right-2 opacity-50 hover-opacity-100 z-1"
-                                        onClick={() => handleCopyUrl(htmlCode)}
-                                      >
-                                        <ClipboardCopy size={12} />
-                                      </button>
-                                      <pre className="m-0 p-3 bg-dark text-light x-small font-monospace" style={{ borderRadius: '8px', lineHeight: '1.5' }}>
-                                        <code dangerouslySetInnerHTML={{
-                                          __html: htmlCode
-                                            .replace(/&/g, '&amp;')
-                                            .replace(/</g, '&lt;')
-                                            .replace(/>/g, '&gt;')
-                                            .replace(/"/g, '&quot;')
-                                            .replace(/(&lt;!--.*?--&gt;)/g, '<span class="text-secondary">$1</span>')
-                                            .replace(
-                                              new RegExp(`(href=["'])${link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(["'])`, 'g'),
-                                              '<span class="bg-danger bg-opacity-25 text-danger fw-bold px-1 rounded">$1' + link.url + '$2</span>'
-                                            )
-                                            .replace(/(&lt;[\/]?[a-zA-Z0-9-]+)(\s|&gt;)/g, '<span class="text-primary">$1</span>$2')
-                                            .replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span class="text-info">$2</span>$3')
-                                            .replace(/(&quot;)(.*?)(&quot;)/g, '<span class="text-warning">$1$2$3</span>')
-                                        }} />
-                                      </pre>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
@@ -820,11 +673,11 @@ export default function ScanResults({ results, scanUrl: _scanUrl, itemsPerPage =
     <div className="w-100">
       <div className="row g-3 mb-5">
         {[
-          { id: 'problematic', label: 'Broken & Errored', count: uniqueProblematicCount, icon: <XCircle size={20} />, color: 'danger' },
-          { id: 'ok', label: 'Successful Links', count: uniqueOkCount, icon: <CheckCircle2 size={20} />, color: 'success' },
-          { id: 'external', label: 'External Nodes', count: uniqueExternalCount, icon: <ArrowUpRight size={20} />, color: 'primary' },
-          { id: 'skipped', label: 'Exclusion Rules', count: uniqueSkippedCount, icon: <Filter size={20} />, color: 'secondary' },
-          { id: 'all', label: 'Unfiltered Catalog', count: uniqueAllCount, icon: <Activity size={20} />, color: 'dark' },
+          { id: 'problematic', label: 'Broken', count: uniqueProblematicCount, icon: <XCircle size={20} />, color: 'danger' },
+          { id: 'ok', label: 'Successful', count: uniqueOkCount, icon: <CheckCircle2 size={20} />, color: 'success' },
+          { id: 'external', label: 'External', count: uniqueExternalCount, icon: <ArrowUpRight size={20} />, color: 'primary' },
+          { id: 'skipped', label: 'Excluded', count: uniqueSkippedCount, icon: <Filter size={20} />, color: 'secondary' },
+          { id: 'all', label: 'All links', count: uniqueAllCount, icon: <Activity size={20} />, color: 'dark' },
         ].map((tab, idx) => (
           <div key={tab.id} className="col-6 col-md-4 col-lg">
             <AnimatedCard

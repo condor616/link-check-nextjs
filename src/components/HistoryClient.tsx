@@ -241,14 +241,14 @@ export function HistoryClient() {
             const timeAgo = calculateTimeAgo(date);
 
             return (
-                <div className="flex flex-col gap-1 py-1">
-                    <div className="flex items-center gap-2 text-dark dark:text-light">
-                        <Calendar size={14} className="text-primary opacity-70" />
-                        <span className="text-sm font-semibold">{formattedDate.split(' at ')[0]}</span>
+                <div className="d-flex flex-column gap-1 py-1">
+                    <div className="d-flex align-items-center gap-2 text-dark dark:text-light">
+                        <Calendar size={14} className="text-primary opacity-75" />
+                        <span className="text-sm fw-bold">{formattedDate.split(' at ')[0]}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-muted">
-                        <Clock size={14} className="opacity-50" />
-                        <span className="x-small fw-medium">{timeAgo}</span>
+                    <div className="d-flex align-items-center gap-2 text-muted opacity-75">
+                        <Clock size={14} />
+                        <span className="small fw-medium">{timeAgo}</span>
                     </div>
                 </div>
             );
@@ -446,82 +446,132 @@ export function HistoryClient() {
                             </AnimatedButton>
                         </div>
                     ) : (
-                        <div className="table-responsive">
-                            <table className="table table-hover align-middle mb-0">
-                                <thead className="bg-[#eaedf0] dark:bg-[#121417] border-bottom-2 border-primary/20">
-                                    <tr>
-                                        <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('scanUrl')}>
-                                            <div className="d-flex align-items-center">Website <SortIcon field="scanUrl" /></div>
-                                        </th>
-                                        <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('scanDate')}>
-                                            <div className="d-flex align-items-center">Execution Date <SortIcon field="scanDate" /></div>
-                                        </th>
-                                        <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('resultsCount')}>
-                                            <div className="d-flex align-items-center">Links <SortIcon field="resultsCount" /></div>
-                                        </th>
-                                        <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('durationSeconds')}>
-                                            <div className="d-flex align-items-center">Duration <SortIcon field="durationSeconds" /></div>
-                                        </th>
-                                        <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted text-end bg-[#eaedf0] dark:bg-[#121417]"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sortedScans.map((scan) => (
-                                        <tr key={scan.id} className="border-bottom hover:bg-light/50 dark:hover:bg-dark/50 transition-colors">
-                                            <td className="px-4 py-4 font-medium text-truncate max-w-[250px]" title={scan.scanUrl}>
-                                                <div className="fw-bold text-dark dark:text-light fs-6">{scan.scanUrl}</div>
-                                            </td>
-                                            <td className="px-4 py-4 text-muted">
-                                                {formatDate(scan.scanDate)}
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 fw-bold px-3 py-2 rounded-3">{scan.resultsCount}</span>
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <div className="d-flex align-items-center gap-2 text-muted small fw-bold">
-                                                    <Activity size={14} className="opacity-50" />
-                                                    {scan.durationSeconds.toFixed(1)}s
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 text-end">
-                                                <div className="d-flex gap-2 justify-content-end align-items-center">
-                                                    <AnimatedButton
-                                                        noPadding
-                                                        onClick={() => router.push(`/history/${scan.id}`)}
-                                                        variant="outline-primary"
-                                                        className="rounded-circle flex-shrink-0"
-                                                        style={{ width: '28px', height: '28px', minWidth: '28px' }}
-                                                        title="View"
-                                                    >
-                                                        <Eye size={12} />
-                                                    </AnimatedButton>
-                                                    <AnimatedButton
-                                                        noPadding
-                                                        onClick={() => router.push(`/scan?id=${scan.id}`)}
-                                                        variant="outline-dark"
-                                                        className="rounded-circle flex-shrink-0"
-                                                        style={{ width: '28px', height: '28px', minWidth: '28px' }}
-                                                        title="Scan"
-                                                    >
-                                                        <Play size={12} />
-                                                    </AnimatedButton>
-                                                    <AnimatedButton
-                                                        noPadding
-                                                        onClick={() => setDeleteId(scan.id)}
-                                                        variant="outline-danger"
-                                                        className="rounded-circle flex-shrink-0"
-                                                        style={{ width: '28px', height: '28px', minWidth: '28px' }}
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </AnimatedButton>
-                                                </div>
-                                            </td>
+                        <>
+                            <div className="table-responsive d-none d-md-block">
+                                <table className="table table-hover align-middle mb-0">
+                                    <thead className="bg-[#eaedf0] dark:bg-[#121417] border-bottom-2 border-primary/20">
+                                        <tr>
+                                            <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('scanUrl')}>
+                                                <div className="d-flex align-items-center">Website <SortIcon field="scanUrl" /></div>
+                                            </th>
+                                            <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('scanDate')}>
+                                                <div className="d-flex align-items-center">Execution Date <SortIcon field="scanDate" /></div>
+                                            </th>
+                                            <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('resultsCount')}>
+                                                <div className="d-flex align-items-center">Links <SortIcon field="resultsCount" /></div>
+                                            </th>
+                                            <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all group" onClick={() => handleSort('durationSeconds')}>
+                                                <div className="d-flex align-items-center">Duration <SortIcon field="durationSeconds" /></div>
+                                            </th>
+                                            <th className="px-4 py-3 border-0 x-small fw-black text-uppercase text-muted text-end bg-[#eaedf0] dark:bg-[#121417]"></th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        {sortedScans.map((scan) => (
+                                            <tr key={scan.id} className="border-bottom hover:bg-light/50 dark:hover:bg-dark/50 transition-colors">
+                                                <td className="px-4 py-4 font-medium text-truncate max-w-[250px]" title={scan.scanUrl}>
+                                                    <div className="fw-bold text-dark dark:text-light fs-6">{scan.scanUrl}</div>
+                                                </td>
+                                                <td className="px-4 py-4 text-muted">
+                                                    {formatDate(scan.scanDate)}
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 fw-bold px-3 py-2 rounded-3">{scan.resultsCount}</span>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <div className="d-flex align-items-center gap-2 text-muted small fw-bold">
+                                                        <Activity size={14} className="opacity-50" />
+                                                        {scan.durationSeconds.toFixed(1)}s
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-4 text-end">
+                                                    <div className="d-flex gap-2 justify-content-end align-items-center">
+                                                        <AnimatedButton
+                                                            onClick={() => router.push(`/history/${scan.id}`)}
+                                                            variant="outline-primary"
+                                                            size="sm"
+                                                            className="px-3"
+                                                            title="View Scan Report"
+                                                        >
+                                                            <Eye size={14} className="me-2" /> View
+                                                        </AnimatedButton>
+                                                        <AnimatedButton
+                                                            onClick={() => router.push(`/scan?id=${scan.id}`)}
+                                                            variant="outline-dark"
+                                                            size="sm"
+                                                            className="px-3"
+                                                            title="Execute Scan"
+                                                        >
+                                                            <Play size={14} className="me-2" /> Execute
+                                                        </AnimatedButton>
+                                                        <AnimatedButton
+                                                            onClick={() => setDeleteId(scan.id)}
+                                                            variant="outline-danger"
+                                                            size="sm"
+                                                            className="px-3"
+                                                            title="Delete Scan"
+                                                        >
+                                                            <Trash2 size={14} className="me-2" /> Delete
+                                                        </AnimatedButton>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile View (Cards) */}
+                            <div className="d-md-none">
+                                {sortedScans.map((scan) => (
+                                    <div key={scan.id} className="border-bottom p-4">
+                                        <div className="d-flex justify-content-between align-items-start mb-3">
+                                            <div className="flex-grow-1 min-w-0 me-3">
+                                                <div className="fw-bold text-dark dark:text-light fs-6 text-break mb-1">{scan.scanUrl}</div>
+                                                <div className="d-flex align-items-center gap-2">
+                                                    <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 fw-bold px-2 py-1 rounded-2 x-small">
+                                                        {scan.resultsCount} links
+                                                    </span>
+                                                    <span className="text-muted small">•</span>
+                                                    <span className="text-muted small fw-medium">{scan.durationSeconds.toFixed(1)}s</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-3 bg-light dark:bg-dark/50 p-2 rounded-3 border border-light dark:border-dark">
+                                            {formatDate(scan.scanDate)}
+                                        </div>
+
+                                        <div className="d-flex gap-2 w-100">
+                                            <AnimatedButton
+                                                onClick={() => router.push(`/history/${scan.id}`)}
+                                                variant="outline-primary"
+                                                size="sm"
+                                                className="flex-grow-1 justify-content-center"
+                                            >
+                                                <Eye size={14} className="me-2" /> View
+                                            </AnimatedButton>
+                                            <AnimatedButton
+                                                onClick={() => router.push(`/scan?id=${scan.id}`)}
+                                                variant="outline-dark"
+                                                size="sm"
+                                                className="flex-grow-1 justify-content-center"
+                                            >
+                                                <Play size={14} />
+                                            </AnimatedButton>
+                                            <AnimatedButton
+                                                onClick={() => setDeleteId(scan.id)}
+                                                variant="outline-danger"
+                                                size="sm"
+                                                className="flex-grow-1 justify-content-center"
+                                            >
+                                                <Trash2 size={14} />
+                                            </AnimatedButton>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
@@ -568,6 +618,6 @@ export function HistoryClient() {
                     </p>
                 </div>
             </SimpleModal>
-        </div>
+        </div >
     );
 }

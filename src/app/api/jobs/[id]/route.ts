@@ -6,8 +6,7 @@ function serializeResults(results: any[]): any[] {
     if (!results) return [];
     return results.map(r => ({
         ...r,
-        foundOn: r.foundOn instanceof Set ? Array.from(r.foundOn) : r.foundOn,
-        htmlContexts: r.htmlContexts instanceof Map ? Object.fromEntries(r.htmlContexts) : r.htmlContexts
+        foundOn: r.foundOn instanceof Set ? Array.from(r.foundOn) : r.foundOn
     }));
 }
 

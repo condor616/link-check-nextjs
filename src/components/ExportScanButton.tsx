@@ -6,9 +6,8 @@ import { ScanResult } from '@/lib/scanner';
 import { AnimatedButton } from './AnimatedButton';
 
 // Define SerializedScanResult type to match the one in ScanResults component
-interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
+interface SerializedScanResult extends Omit<ScanResult, 'foundOn'> {
     foundOn: string[]; // Instead of Set<string>
-    htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
 }
 
 interface ExportScanButtonProps {

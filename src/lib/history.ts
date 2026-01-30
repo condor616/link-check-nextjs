@@ -32,8 +32,7 @@ export class HistoryService {
         // Serialize results to ensure Sets and Maps are converted to JSON-compatible formats
         const serializedResults = payload.results.map(r => ({
             ...r,
-            foundOn: Array.from(r.foundOn || []),
-            htmlContexts: r.htmlContexts ? Object.fromEntries(r.htmlContexts) : undefined
+            foundOn: Array.from(r.foundOn || [])
         }));
 
         const brokenLinksCount = payload.brokenLinksCount !== undefined

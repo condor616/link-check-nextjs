@@ -36,9 +36,8 @@ import ScanResults from '@/components/ScanResults';
 import { ScanResult } from '@/lib/scanner';
 
 // Define SerializedScanResult for JSON storage
-interface SerializedScanResult extends Omit<ScanResult, 'foundOn' | 'htmlContexts'> {
+interface SerializedScanResult extends Omit<ScanResult, 'foundOn'> {
   foundOn: string[]; // Instead of Set<string>
-  htmlContexts?: Record<string, string[]>; // Instead of Map<string, string[]>
 }
 
 // Define the expected structure from the saved scan
@@ -123,7 +122,7 @@ function ScanDetailsContent() {
           const jobData = await jobResponse.json();
           setJob(jobData);
 
-          if (jobData.status === 'completed' && jobData.results) {
+          if (jobData.status === 'completed') {
             // Map job to SavedScan format for display
             setScan({
               id: jobData.id,
@@ -133,7 +132,7 @@ function ScanDetailsContent() {
                 ? (new Date(jobData.completed_at).getTime() - new Date(jobData.started_at).getTime()) / 1000
                 : 0,
               config: jobData.scan_config,
-              results: jobData.results
+              results: jobData.results || []
             });
             setIsLoading(false);
             return; // Stop polling if completed
@@ -333,7 +332,7 @@ function ScanDetailsContent() {
             <>
               {scan && (
                 <AnimatedButton variant="outline-primary" size="sm" href={`/scan?id=${scanId}`}>
-                  <RefreshCw className="me-2" size={14} /> Execute New Audit
+                  <RefreshCw className="me-2" size={14} /> New scan
                 </AnimatedButton>
               )}
               <AnimatedButton variant="outline-danger" size="sm" onClick={() => setShowDeleteModal(true)} disabled={isDeleting}>
@@ -470,7 +469,7 @@ function ScanDetailsContent() {
   return (
     <main className="w-100 py-4">
       <AnimatedCard className="w-100 overflow-hidden shadow-lg border-opacity-10">
-        <DetailHeader title="Audit Detail Report" icon={Shield} />
+        <DetailHeader title="Review scan report" icon={Shield} />
 
         <div className="card-body p-4 p-md-5">
           {scan ? (
@@ -528,7 +527,7 @@ function ScanDetailsContent() {
               <div className="pt-4 border-top">
                 <div className="d-flex align-items-center gap-2 mb-4">
                   <LayoutGrid size={20} className="text-primary" />
-                  <h3 className="fs-4 fw-bold mb-0">Intel Pattern Results</h3>
+                  <h3 className="fs-4 fw-bold mb-0">Results by status</h3>
                 </div>
                 <ScanResults results={scan.results} scanUrl={scan.scanUrl} scanId={scanId} scanConfig={scan.config} searchQuery={searchQuery} />
               </div>
