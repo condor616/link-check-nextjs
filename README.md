@@ -81,27 +81,51 @@ npm start
 
 **Note**: The simplified `npm start` command will automatically apply database migrations and start both the Next.js server and the background worker.
 
-## Docker Deployment
+## Quick Start with Docker
 
-The application can be containerized using Docker for easy deployment.
-
-### Building the Docker Image
-
-```bash
-docker build -t condor616/link-check:latest .
-```
-
-### Running the Container
+### Production (Docker Hub)
+For production usage, pull the pre-built image from Docker Hub (no build required):
 
 ```bash
-# Run with persistent storage for database and history
-docker run -p 3000:3000 \
-  -v $(pwd)/prisma:/app/prisma \
+docker run -d -p 3000:3000 \
+  -e DATABASE_URL="file:/app/data/db.sqlite" \
+  -v $(pwd)/data:/app/data \
   -v $(pwd)/.scan_history:/app/.scan_history \
   condor616/link-check:latest
 ```
 
-Then access the application at [http://localhost:3000](http://localhost:3000)
+### Development (Local Build)
+For local development, build the image from source:
+
+```bash
+docker compose up --build -d
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000).
+
+- **Data Persistence**: Database and scan history are saved in `./data` and `./.scan_history` folders.
+- **Logs**: View logs with `docker compose logs -f`.
+- **Stop**: Stop with `docker compose down`.
+
+## For Project Maintainers
+
+To build and push a new version of the Docker image to Docker Hub:
+
+1. **Login to Docker Hub**:
+   ```bash
+   docker login
+   ```
+
+2. **Build the Image**:
+   ```bash
+   docker build -t condor616/link-check:latest .
+   ```
+
+3. **Push to Docker Hub**:
+   ```bash
+   docker push condor616/link-check:latest
+   ```
+
 
 ## Storage Options
 

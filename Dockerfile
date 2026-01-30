@@ -41,13 +41,14 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATABASE_URL="file:/app/data/db.sqlite"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Install OpenSSL for Prisma and Prisma CLI
 RUN apk add --no-cache openssl
-RUN npm install -g prisma@6.19.0
+RUN npm install prisma@6.19.0 dotenv
 
 COPY --from=builder /app/public ./public
 
@@ -69,6 +70,10 @@ RUN mkdir -p data && chown nextjs:nodejs data
 # Copy entrypoint script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
+
+# Ensure .app_settings.json exists and is writable
+COPY --from=builder --chown=nextjs:nodejs /app/.app_settings.template.json ./.app_settings.template.json
+RUN cp .app_settings.template.json .app_settings.json && chown nextjs:nodejs .app_settings.json
 
 USER nextjs
 

@@ -11,7 +11,9 @@ const TEMPLATE_FILE = '.app_settings.template.json';
  */
 export function getProjectRoot(): string {
     const cwd = process.cwd();
-    // If we are in .next/standalone, the root is the parent directory
+    // If we are in .next/standalone, the root is the SAME directory in Docker (WORKDIR /app)
+    // Dockerfile copies standalone content directly to /app
+    // But let's keep it robust:
     if (cwd.endsWith(path.join('.next', 'standalone'))) {
         return path.dirname(path.dirname(cwd));
     }
