@@ -23,6 +23,8 @@ export interface ScanConfig {
     processHtml?: boolean; // Whether to process HTML content for links (default: true)
     skipExternalDomains?: boolean; // Whether to skip external domains (default: true for re-scans)
     excludeSubdomains?: boolean; // Whether to exclude subdomains (default: true)
+    // Rate Limiting
+    maxScansPerMinute?: number; // Maximum number of scans per minute (default: 60)
     // TODO: Add User-Agent
 }
 
@@ -63,7 +65,7 @@ class Scanner {
     protected readonly startUrl: string;
     protected readonly baseUrl: string;
     // Use Partial for config during construction, then create required version
-    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'cssSelectorsForceExclude' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains' | 'excludeSubdomains'>> & ScanConfig;
+    protected readonly config: Required<Pick<ScanConfig, 'depth' | 'scanSameLinkOnce' | 'concurrency' | 'itemsPerPage' | 'regexExclusions' | 'wildcardExclusions' | 'cssSelectors' | 'cssSelectorsForceExclude' | 'requestTimeout' | 'useAuthForAllDomains' | 'processHtml' | 'skipExternalDomains' | 'excludeSubdomains' | 'maxScansPerMinute'>> & ScanConfig;
     protected readonly visitedLinks: Set<string>; // Tracks links whose content has been fetched/processed
     protected readonly queuedLinks: Set<string>; // Tracks links that have been added to the queue
     protected readonly results: Map<string, ScanResult>; // Stores results for all encountered links
@@ -85,6 +87,10 @@ class Scanner {
     // Domain cache to optimize hostname lookups
     protected domainCache: Map<string, string> = new Map();
     protected abortController: AbortController = new AbortController();
+
+    // Rate Limiting
+    protected lastRequestTime: number = 0;
+    protected minRequestInterval: number = 0; // In milliseconds
 
     protected callbacks: ScanCallbacks;
 
@@ -111,8 +117,14 @@ class Scanner {
             processHtml: config.processHtml ?? true,
             skipExternalDomains: config.skipExternalDomains ?? true,
             excludeSubdomains: config.excludeSubdomains ?? true,
+            maxScansPerMinute: config.maxScansPerMinute ?? 60, // Default to 60 scans/min (1 per second)
             ...config, // Include any other passed config options
         };
+
+        // Calculate minimum interval between requests
+        if (this.config.maxScansPerMinute > 0) {
+            this.minRequestInterval = 60000 / this.config.maxScansPerMinute;
+        }
 
         if (this.config.concurrency <= 0) {
             throw new Error("Concurrency must be a positive number.");
@@ -371,6 +383,18 @@ class Scanner {
                 keepalive: true
             };
 
+            // Rate Limiting: Wait if necessary
+            if (this.minRequestInterval > 0) {
+                const now = Date.now();
+                const timeSinceLastRequest = now - this.lastRequestTime;
+
+                if (timeSinceLastRequest < this.minRequestInterval) {
+                    const waitTime = this.minRequestInterval - timeSinceLastRequest;
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+                this.lastRequestTime = Date.now();
+            }
+
             const response = await fetch(urlToProcess, fetchOptions);
 
             const status = response.status;
@@ -418,7 +442,6 @@ class Scanner {
 
         // Filter out links based on CSS selectors if configured
         if (this.config.cssSelectors && this.config.cssSelectors.length > 0) {
-            // ... (CSS selector logic remains unchanged)
             this.config.cssSelectors.forEach(selector => {
                 try {
                     const selectedElements = $(selector);

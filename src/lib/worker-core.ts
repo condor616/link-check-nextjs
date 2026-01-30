@@ -1,10 +1,22 @@
 import { jobService, ScanJob } from './jobs';
 import { WebsiteScanner, ScanResult, ScanState } from './scanner';
+import { getAppSettings } from './settings';
 
 export async function processJob(job: ScanJob) {
     console.log(`Processing job ${job.id} for URL: ${job.scan_url}`);
 
     try {
+        // Get global settings to check for rate limiting
+        const appSettings = await getAppSettings();
+
+        // Merge global rate limit setting into job config if not present or override it
+        // We prioritize the global setting for safety, or we could check if job has it.
+        // For now, let's inject it.
+        if (appSettings.maxScansPerMinute) {
+            job.scan_config.maxScansPerMinute = appSettings.maxScansPerMinute;
+            console.log(`Applying global rate limit: ${appSettings.maxScansPerMinute} scans/minute`);
+        }
+
         // If we are resuming, the status might already be 'queued' (set by resumeJob)
         // We update to 'running'
         await jobService.updateJobStatus(job.id, 'running');

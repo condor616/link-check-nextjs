@@ -16,7 +16,11 @@ export function SettingsClient() {
   const [supabaseUrl, setSupabaseUrl] = useState('');
   const [supabaseKey, setSupabaseKey] = useState('');
   const [appUrl, setAppUrl] = useState('http://localhost:3000');
+  const [maxScansPerMinute, setMaxScansPerMinute] = useState(60);
+  const [savedMaxScansPerMinute, setSavedMaxScansPerMinute] = useState(60);
   const [isSaving, setIsSaving] = useState(false);
+  const [showHighRateWarning, setShowHighRateWarning] = useState(false);
+  const [pendingMaxScans, setPendingMaxScans] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isResettingDB, setIsResettingDB] = useState(false);
@@ -69,6 +73,8 @@ export function SettingsClient() {
         setSupabaseUrl(data.supabaseUrl || (type === 'supabase' ? statusData.defaults?.supabaseUrl : '') || '');
         setSupabaseKey(data.supabaseKey || (type === 'supabase' ? statusData.defaults?.supabaseKey : '') || '');
         setAppUrl(data.appUrl || 'http://localhost:3000');
+        setMaxScansPerMinute(data.maxScansPerMinute || 60);
+        setSavedMaxScansPerMinute(data.maxScansPerMinute || 60);
       } else {
         // If settings don't exist yet, we'll use defaults
         console.log('Using default settings');
@@ -80,7 +86,13 @@ export function SettingsClient() {
     }
   };
 
-  const saveSettings = async () => {
+  const saveSettings = async (skipWarning = false) => {
+    // Check for high rate limit if not skipping warning
+    if (!skipWarning && maxScansPerMinute > 120) {
+      setShowHighRateWarning(true);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -120,6 +132,7 @@ export function SettingsClient() {
       }
 
       addNotification('success', 'Settings saved successfully');
+      setSavedMaxScansPerMinute(maxScansPerMinute);
 
       // After saving, check if initialization is needed for the chosen storage
       if (storageType === 'sqlite') {
@@ -626,9 +639,33 @@ export function SettingsClient() {
                 </div>
               </div>
 
+              <div className="mb-4">
+                <label htmlFor="max-scans" className="form-label fw-medium">Max Scans Per Minute</label>
+                <div className="input-group">
+                  <span className="input-group-text bg-light border-end-0">
+                    <RefreshCw size={18} className="text-muted" />
+                  </span>
+                  <input
+                    id="max-scans"
+                    type="number"
+                    className="form-control"
+                    value={maxScansPerMinute}
+                    onChange={(e) => setMaxScansPerMinute(parseInt(e.target.value) || 0)}
+                    placeholder="60"
+                    min="1"
+                  />
+                </div>
+                <div className="form-text mt-2">
+                  Limit the number of requests per minute to avoid being blocked by servers (Rate Limiting).
+                  <br />
+                  Default: <span className="fw-bold">60</span> (1 request/second).
+                  <span className="text-warning ms-1">Values above 120 may increase risk of blocking.</span>
+                </div>
+              </div>
+
               <div className="d-flex justify-content-end">
                 <AnimatedButton
-                  onClick={saveSettings}
+                  onClick={() => saveSettings(false)}
                   disabled={isSaving}
                   size="lg"
                   className="px-4"
@@ -838,7 +875,7 @@ export function SettingsClient() {
 
               <div className="d-flex justify-content-end mt-4">
                 <AnimatedButton
-                  onClick={saveSettings}
+                  onClick={() => saveSettings(false)}
                   disabled={isSaving}
                   size="lg"
                   className="px-4"
@@ -1028,6 +1065,64 @@ export function SettingsClient() {
           </div>
         </div>
       </SimpleModal>
-    </div>
+      <SimpleModal
+        isOpen={showHighRateWarning}
+        onClose={() => setShowHighRateWarning(false)}
+        title="High Scan Rate Warning"
+        size="md"
+      >
+        <div className="p-1">
+          <div className="d-flex align-items-start gap-3 mb-4">
+            <div className="p-3 bg-warning bg-opacity-10 rounded-circle flex-shrink-0">
+              <AlertCircle className="h-6 w-6 text-warning" />
+            </div>
+            <div>
+              <h5 className="mb-2 fw-bold text-dark">Potential Blocking Risk</h5>
+              <p className="text-muted mb-0">
+                You have set the scan rate to <strong>{maxScansPerMinute} scans per minute</strong> ({Math.round(maxScansPerMinute / 60 * 10) / 10} requests/second).
+              </p>
+            </div>
+          </div>
+
+          <div className="alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 mb-4">
+            <h6 className="fw-bold mb-2 d-flex align-items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Why this might be an issue:
+            </h6>
+            <p className="mb-0 small">
+              Many servers and CDNs (like Cloudflare) construe high-frequency requests as a DDoS attack and may temporarily or permanently blacklist your IP address.
+            </p>
+          </div>
+
+          <p className="mb-4 text-muted">
+            Are you sure you want to proceed with this configuration?
+          </p>
+
+          <div className="d-flex justify-content-end gap-2">
+            <AnimatedButton
+              variant="outline-secondary"
+              onClick={() => {
+                setShowHighRateWarning(false);
+                setMaxScansPerMinute(savedMaxScansPerMinute);
+              }}
+            >
+              Cancel
+            </AnimatedButton>
+            <AnimatedButton
+              variant="warning"
+              onClick={() => {
+                setShowHighRateWarning(false);
+                saveSettings(true);
+              }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <Check className="h-4 w-4" />
+                Confirm High Rate
+              </div>
+            </AnimatedButton>
+          </div>
+        </div>
+      </SimpleModal>
+    </div >
   );
 }

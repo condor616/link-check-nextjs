@@ -8,6 +8,7 @@ export interface AppSettings {
   supabaseUrl?: string;
   supabaseKey?: string;
   appUrl?: string;
+  maxScansPerMinute?: number;
 }
 
 const SETTINGS_FILE = '.app_settings.json';
@@ -40,7 +41,8 @@ async function getSettingsPath(createIfMissing = false) {
       // Create it with default settings if requested
       const defaultSettings: AppSettings = {
         storageType: 'sqlite',
-        appUrl: 'http://localhost:3000'
+        appUrl: 'http://localhost:3000',
+        maxScansPerMinute: 60
       };
 
       await fs.writeFile(
@@ -66,13 +68,19 @@ export async function GET() {
       // Return default settings if none exist
       return NextResponse.json({
         storageType: (process.env.STORAGE_TYPE as any) || 'sqlite',
-        appUrl: 'http://localhost:3000'
+        appUrl: 'http://localhost:3000',
+        maxScansPerMinute: 60
       });
     }
 
     // Read settings from file
     const settingsData = await fs.readFile(settingsFilePath, 'utf-8');
     const settings = JSON.parse(settingsData) as AppSettings;
+
+    // Ensure maxScansPerMinute exists
+    if (settings.maxScansPerMinute === undefined) {
+      settings.maxScansPerMinute = 60;
+    }
 
     return NextResponse.json(settings);
   } catch (error) {
@@ -115,6 +123,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate maxScansPerMinute if provided
+    if (newSettings.maxScansPerMinute !== undefined) {
+      if (typeof newSettings.maxScansPerMinute !== 'number' || newSettings.maxScansPerMinute <= 0) {
+        return NextResponse.json(
+          { error: 'Max scans per minute must be a positive number' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Merge settings
     const updatedSettings = {
       ...currentSettings,
@@ -144,4 +162,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}  
