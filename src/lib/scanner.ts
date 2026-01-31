@@ -25,7 +25,15 @@ export interface ScanConfig {
     excludeSubdomains?: boolean; // Whether to exclude subdomains (default: true)
     // Rate Limiting
     maxScansPerMinute?: number; // Maximum number of scans per minute (default: 60)
+    enableLogging?: boolean; // Whether to enable debug logging
     // TODO: Add User-Agent
+}
+
+export interface LogEntry {
+    level: 'INFO' | 'WARN' | 'ERROR';
+    message: string;
+    data?: any;
+    timestamp: number;
 }
 
 // Define result structure (will evolve)
@@ -50,6 +58,7 @@ export interface ScanCallbacks {
     onResult?: (result: ScanResult) => void;
     onComplete?: (results: ScanResult[]) => void;
     onError?: (error: Error) => void;
+    onLog?: (log: LogEntry) => void;
 }
 
 // Define the structure for serialized scan state
@@ -88,6 +97,26 @@ class Scanner {
     protected domainCache: Map<string, string> = new Map();
     protected abortController: AbortController = new AbortController();
 
+    // Logging helper
+    protected log(level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) {
+        if (this.config.enableLogging && this.callbacks.onLog) {
+            this.callbacks.onLog({
+                level,
+                message,
+                data,
+                timestamp: Date.now()
+            });
+        }
+
+        // Also log to console if needed, or rely on callback
+        const timestamp = new Date().toISOString();
+        if (level === 'ERROR') {
+            console.error(`[${timestamp}] [${level}] ${message}`, data || '');
+        } else {
+            console.log(`[${timestamp}] [${level}] ${message}`, data || '');
+        }
+    }
+
     // Rate Limiting
     protected lastRequestTime: number = 0;
     protected minRequestInterval: number = 0; // In milliseconds
@@ -119,15 +148,18 @@ class Scanner {
             skipExternalDomains: config.skipExternalDomains ?? true,
             excludeSubdomains: config.excludeSubdomains ?? true,
             maxScansPerMinute: config.maxScansPerMinute ?? 60, // Default to 60 scans/min (1 per second)
+            enableLogging: config.enableLogging ?? false,
             ...config, // Include any other passed config options
         };
+
+        this.callbacks = callbacks;
 
         // Calculate minimum interval between requests
         if (this.config.maxScansPerMinute > 0) {
             this.minRequestInterval = 60000 / this.config.maxScansPerMinute;
-            console.log(`[Rate Limit Config] maxScansPerMinute: ${this.config.maxScansPerMinute}, minRequestInterval: ${this.minRequestInterval}ms`);
+            this.log('INFO', `[Rate Limit Config] maxScansPerMinute: ${this.config.maxScansPerMinute}, minRequestInterval: ${this.minRequestInterval}ms`);
         } else {
-            console.log(`[Rate Limit Config] Rate limiting disabled (maxScansPerMinute: ${this.config.maxScansPerMinute})`);
+            this.log('INFO', `[Rate Limit Config] Rate limiting disabled (maxScansPerMinute: ${this.config.maxScansPerMinute})`);
         }
 
         if (this.config.concurrency <= 0) {
@@ -153,7 +185,7 @@ class Scanner {
             };
         }
 
-        this.callbacks = callbacks;
+
 
         // Initialize state
         if (initialState) {
@@ -230,7 +262,7 @@ class Scanner {
             absoluteUrl.hash = ""; // Remove fragment
             return absoluteUrl.toString();
         } catch (error) {
-            console.warn(`Invalid URL encountered: ${url} (Base: ${baseUrl})`);
+            this.log('WARN', `Invalid URL encountered: ${url} (Base: ${baseUrl})`);
             return null;
         }
     }
@@ -337,7 +369,7 @@ class Scanner {
      * across all concurrent workers.
      */
     protected async waitForRateLimit(): Promise<void> {
-        console.log(`[Rate Limit Debug] Called waitForRateLimit() - minRequestInterval: ${this.minRequestInterval}ms`);
+        // this.log('INFO', `[Rate Limit Debug] Called waitForRateLimit() - minRequestInterval: ${this.minRequestInterval}ms`);
 
         if (this.minRequestInterval <= 0) {
             console.log(`[Rate Limit Debug] Skipping - rate limiting disabled`);
@@ -350,18 +382,18 @@ class Scanner {
             const now = Date.now();
             const timeSinceLastRequest = now - this.lastRequestTime;
 
-            console.log(`[Rate Limit Debug] timeSinceLastRequest: ${timeSinceLastRequest}ms, required: ${this.minRequestInterval}ms`);
+            // this.log('INFO', `[Rate Limit Debug] timeSinceLastRequest: ${timeSinceLastRequest}ms, required: ${this.minRequestInterval}ms`);
 
             if (timeSinceLastRequest < this.minRequestInterval) {
                 const waitTime = this.minRequestInterval - timeSinceLastRequest;
                 console.log(`[Rate Limit] Waiting ${waitTime}ms (limit: ${this.config.maxScansPerMinute}/min, interval: ${this.minRequestInterval}ms)`);
-                
+
                 // Wait in small increments to allow interruption on pause
                 const startWait = Date.now();
                 while (Date.now() - startWait < waitTime) {
                     // Check if paused and exit early if so
                     if (this.isPaused) {
-                        console.log(`[Rate Limit Debug] Wait interrupted by pause`);
+                        this.log('INFO', `[Rate Limit Debug] Wait interrupted by pause`);
                         return;
                     }
                     // Wait for 100ms or remaining time, whichever is smaller
@@ -369,7 +401,7 @@ class Scanner {
                     await new Promise(resolve => setTimeout(resolve, Math.min(100, remainingWait)));
                 }
             } else {
-                console.log(`[Rate Limit Debug] No wait needed`);
+                // this.log('INFO', `[Rate Limit Debug] No wait needed`);
             }
 
 
@@ -407,7 +439,7 @@ class Scanner {
         this.visitedLinks.add(urlToProcess);
 
         // Use optional chaining for limit properties in log
-        console.log(`[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
+        this.log('INFO', `[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
 
         // Fetch and process
         try {
@@ -462,7 +494,7 @@ class Scanner {
                 }
             }
         } catch (error: any) {
-            console.error(`Error scanning ${urlToProcess}:`, error.name, error.message);
+            this.log('ERROR', `Error scanning ${urlToProcess}: ${error.name} ${error.message}`);
 
             // Properly handle timeout errors with a specific message
             if (error.name === 'TimeoutError' || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
@@ -513,7 +545,7 @@ class Scanner {
                         }
                     });
                 } catch (error) {
-                    console.warn(`Invalid CSS selector: ${selector}`);
+                    this.log('WARN', `Invalid CSS selector: ${selector}`);
                 }
             });
             links = links.filter((_, el) => !$(el).attr('data-link-checker-exclude'));
@@ -577,7 +609,7 @@ class Scanner {
         // Schedule processing with the limiter
         if (this.limit) {
             this.limit(() => this.processUrl(url, depth)).catch(error => {
-                console.error(`Error processing ${url}:`, error);
+                this.log('ERROR', `Error processing ${url}: ${error}`);
                 this.pendingUrls.delete(url); // Ensure cleanup on error
             });
         }
@@ -682,7 +714,7 @@ class Scanner {
                         return true;
                     }
                 } catch (error) {
-                    console.warn(`Invalid regex pattern: ${pattern}`);
+                    this.log('WARN', `Invalid regex pattern: ${pattern}`);
                 }
             }
         }
@@ -779,7 +811,7 @@ export class WebsiteScanner extends Scanner {
         // Re-initialize abort controller for new run
         this.abortController = new AbortController();
 
-        console.log(`Starting scan of ${this.startUrl} with domain filtering ${this.config.skipExternalDomains ? 'enabled' : 'disabled'}`);
+        this.log('INFO', `Starting scan of ${this.startUrl} with domain filtering ${this.config.skipExternalDomains ? 'enabled' : 'disabled'}`);
 
         if (this.callbacks.onStart) {
             this.callbacks.onStart(1); // Start with 1 URL
@@ -787,7 +819,7 @@ export class WebsiteScanner extends Scanner {
 
         // If resuming, queue the pending URLs from state
         if (this.pendingUrls.size > 0 || this.abortedUrls.size > 0) {
-            console.log(`Resuming scan with ${this.abortedUrls.size} aborted and ${this.pendingUrls.size} pending URLs...`);
+            this.log('INFO', `Resuming scan with ${this.abortedUrls.size} aborted and ${this.pendingUrls.size} pending URLs...`);
 
             // First queue aborted URLs (prioritize them)
             const aborted = Array.from(this.abortedUrls.entries());
@@ -904,7 +936,7 @@ export class WebsiteScanner extends Scanner {
         // Check if it's an external domain and we should skip processing it
         // (But we still want to include the link in our results, just not fetch/analyze it)
         if (this.config.skipExternalDomains && !this.isSameDomain(urlToProcess) && urlToProcess !== this.startUrl) {
-            console.log(`Skipping external domain: ${urlToProcess} (not scanning for content)`);
+            this.log('INFO', `Skipping external domain: ${urlToProcess} (not scanning for content)`);
             currentResult.status = 'external';
             // Mark as visited to prevent queuing attempts
             this.visitedLinks.add(urlToProcess);
@@ -915,7 +947,7 @@ export class WebsiteScanner extends Scanner {
         this.visitedLinks.add(urlToProcess);
 
         // Use optional chaining for limit properties in log
-        console.log(`[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
+        this.log('INFO', `[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
 
         if (this.callbacks.onProgress) {
             this.callbacks.onProgress(this.visitedLinks.size, urlToProcess, this.brokenLinksCount, this.results.size);
@@ -930,9 +962,9 @@ export class WebsiteScanner extends Scanner {
             // Log authentication decision
             if (this.config.auth) {
                 if (shouldUseAuth) {
-                    console.log(`Using HTTP Basic Auth for ${urlToProcess} (same domain as scan URL)`);
+                    this.log('INFO', `Using HTTP Basic Auth for ${urlToProcess} (same domain as scan URL)`);
                 } else {
-                    console.log(`Skipping HTTP Basic Auth for ${urlToProcess} (different domain than scan URL)`);
+                    this.log('INFO', `Skipping HTTP Basic Auth for ${urlToProcess} (different domain than scan URL)`);
                 }
             }
 
@@ -1011,7 +1043,7 @@ export class WebsiteScanner extends Scanner {
             // We check isPaused because abortController might be nullified by scan() finally block
             // before this catch block runs in a race condition
             if (this.isPaused || this.abortController?.signal.aborted) {
-                console.log(`Aborted ${urlToProcess} due to pause`);
+                this.log('INFO', `Aborted ${urlToProcess} due to pause`);
                 // Re-queue the URL so it gets processed when resumed
                 // Add to abortedUrls so it gets prioritized
                 this.abortedUrls.set(urlToProcess, depth);
@@ -1020,7 +1052,7 @@ export class WebsiteScanner extends Scanner {
                 return;
             }
 
-            console.error(`Error scanning ${urlToProcess}:`, error.name, error.message);
+            this.log('ERROR', `Error scanning ${urlToProcess}: ${error.name} ${error.message}`);
 
             // Properly handle timeout errors with a specific message
             if (error.name === 'TimeoutError' || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {

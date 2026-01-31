@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   FileUp,
   FileCode,
+  Terminal,
 
   XCircle
 } from 'lucide-react';
@@ -220,7 +221,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
 
         // Set the parameters for the scan
         setParamUrl(data.url);
-        setParamConfigString(JSON.stringify(data.config));
+        setParamConfigString(encodeURIComponent(JSON.stringify(data.config)));
         setIsLoadingParams(false);
       } catch (err) {
         console.error('Error fetching scan parameters:', err);
@@ -565,7 +566,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
       };
 
       // Update the paramConfigString with the edited config
-      setParamConfigString(JSON.stringify(updatedConfig));
+      setParamConfigString(encodeURIComponent(JSON.stringify(updatedConfig)));
     }
     setScanConfirmed(true);
   };
@@ -711,6 +712,20 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                     />
                     <label className="form-check-label small" htmlFor="excludeSubdomains">
                       Exclude subdomains
+                    </label>
+                  </div>
+
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="enableLogging"
+                      checked={editedConfig.enableLogging === true}
+                      onChange={(e) => updateConfigField('enableLogging', e.target.checked)}
+                    />
+                    <label className="form-check-label small d-flex align-items-center gap-2" htmlFor="enableLogging">
+                      <Terminal size={14} />
+                      Debug Mode (Enable Live Logs)
                     </label>
                   </div>
                 </div>
@@ -914,8 +929,8 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
               )}
             </AnimatedButton>
           </div>
-        </AnimatedCard>
-      </div>
+        </AnimatedCard >
+      </div >
     );
   }
 

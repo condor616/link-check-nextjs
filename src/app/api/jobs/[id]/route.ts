@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jobService } from '@/lib/jobs';
+import { prisma } from '@/lib/prisma';
 
 // Helper function to serialize results for JSON (same as in scan/route.ts)
 function serializeResults(results: any[]): any[] {
@@ -111,6 +112,16 @@ export async function DELETE(
             await jobService.stopJob(id);
             // Give it a tiny bit of time to signal? 
             // Actually, deleting it will make the worker stop as soon as it checks.
+        }
+
+        // Delete associated logs from Prisma (since jobs are in Redis but logs are in DB)
+        try {
+            await prisma.scanLog.deleteMany({
+                where: { jobId: id }
+            });
+        } catch (logError) {
+            console.error('Failed to clean up logs for job', id, logError);
+            // innovative, but don't fail the job deletion if logs fail
         }
 
         await jobService.deleteJob(id);

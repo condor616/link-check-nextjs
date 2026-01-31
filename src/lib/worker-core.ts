@@ -90,8 +90,26 @@ export async function processJob(job: ScanJob) {
                     }
                 }
             },
-            onError: (error) => {
+            onError: (error: Error) => {
                 console.error(`Scan error for job ${job.id}:`, error);
+            },
+            onLog: (log) => {
+                // Determine if we should log based on config (though scanner checks too)
+                if (job.scan_config.enableLogging) {
+                    // We don't await this to avoid blocking the scan process
+                    // Using prisma.scanLog.create
+                    import('./prisma').then(({ prisma }) => {
+                        prisma.scanLog.create({
+                            data: {
+                                jobId: job.id,
+                                level: log.level,
+                                message: log.message,
+                                data: log.data ? JSON.stringify(log.data) : null,
+                                createdAt: new Date(log.timestamp)
+                            }
+                        }).catch(err => console.error('Failed to write log to DB:', err));
+                    });
+                }
             }
         }, initialState);
 

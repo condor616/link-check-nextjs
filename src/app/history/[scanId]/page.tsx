@@ -33,6 +33,7 @@ import { AnimatedButton } from '@/components/AnimatedButton';
 import { SimpleModal } from '@/components/SimpleModal';
 import { ExpandableUrl } from '@/components/ExpandableUrl';
 import ScanResults from '@/components/ScanResults';
+import TerminalLogView from '@/components/TerminalLogView';
 import { ScanResult } from '@/lib/scanner';
 
 // Define SerializedScanResult for JSON storage
@@ -51,6 +52,9 @@ interface SavedScan {
     scanSameLinkOnce: boolean;
     concurrency: number;
     itemsPerPage?: number;
+    enableLogging?: boolean;
+    excludeSubdomains?: boolean;
+    skipExternalDomains?: boolean;
   };
   results: SerializedScanResult[];
 }
@@ -519,6 +523,17 @@ function ScanDetailsContent() {
               </div>
             )}
             {/* ... other status alerts (paused, stopped) can be added here if needed ... */}
+
+            {/* Live Terminal Log */}
+            {(job.scan_config?.enableLogging === true) && (
+              <div className="mt-5">
+                <TerminalLogView
+                  scanId={scanId}
+                  isScanning={isActive || isTransient}
+                  refreshInterval={1000}
+                />
+              </div>
+            )}
           </div>
         </AnimatedCard>
       </main>
@@ -600,7 +615,15 @@ function ScanDetailsContent() {
                 </div>
               </div>
 
-
+              {/* Terminal Logs for Completed Scan */}
+              {(scan.config.enableLogging === true) && (
+                <div className="mt-4">
+                  <TerminalLogView
+                    scanId={scanId}
+                    isScanning={false}
+                  />
+                </div>
+              )}
 
               <div className="pt-4 border-top">
                 <div className="d-flex align-items-center gap-2 mb-4">

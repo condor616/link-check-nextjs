@@ -48,3 +48,15 @@ model SavedConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model ScanLog {
+  id        String   @id @default(uuid())
+  jobId     String
+  createdAt DateTime @default(now())
+  level     String   // INFO, WARN, ERROR
+  message   String
+  data      String?  // Optional JSON string
+
+  @@index([jobId])
+  @@index([createdAt])
+}

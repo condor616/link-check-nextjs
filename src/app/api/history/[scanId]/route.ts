@@ -172,6 +172,11 @@ export async function DELETE(
 
 async function deleteScanFromPrisma(scanId: string) {
   try {
+    // Delete associated logs
+    await prisma.scanLog.deleteMany({
+      where: { jobId: scanId }
+    });
+
     await prisma.scanHistory.delete({
       where: { id: scanId }
     });
