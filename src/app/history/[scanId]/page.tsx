@@ -71,6 +71,141 @@ interface ScanJob {
   results?: SerializedScanResult[];
 }
 
+interface DetailHeaderProps {
+  title: string;
+  status?: string;
+  icon: any;
+  isJob?: boolean;
+  scanId: string;
+  job: ScanJob | null;
+  scan: SavedScan | null;
+  isActive: boolean;
+  isPaused: boolean;
+  isTransient: boolean;
+  handleControl: (action: 'pause' | 'resume' | 'stop') => void;
+  isControlling: boolean;
+  showDeleteModal: boolean;
+  setShowDeleteModal: (show: boolean) => void;
+  isDeleting: boolean;
+  deleteScan: () => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  formatDate: (dateStr: string) => string;
+}
+
+const DetailHeader = ({
+  title,
+  icon: Icon,
+  isJob = false,
+  scanId,
+  job,
+  scan,
+  isActive,
+  isPaused,
+  isTransient,
+  handleControl,
+  isControlling,
+  showDeleteModal,
+  setShowDeleteModal,
+  isDeleting,
+  deleteScan,
+  searchQuery,
+  formatDate
+}: DetailHeaderProps) => (
+  <div className="card-header bg-transparent border-bottom-0 pt-4 px-4 px-md-5">
+    <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
+      <AnimatedButton variant="link" className="p-0 border-0 text-muted text-decoration-none" href="/history">
+        <div className="d-flex align-items-center">
+          <ChevronLeft className="me-2" size={18} />
+          <span className="fw-medium">Back to History</span>
+        </div>
+      </AnimatedButton>
+
+      <div className="d-flex align-items-center gap-2">
+        {isJob ? (
+          <>
+            {!isTransient && (
+              isActive ? (
+                <AnimatedButton variant="outline-secondary" size="sm" onClick={() => handleControl('pause')} disabled={isControlling}>
+                  <Pause className="me-2" size={14} /> Pause Audit
+                </AnimatedButton>
+              ) : isPaused ? (
+                <AnimatedButton variant="primary" size="sm" onClick={() => handleControl('resume')} disabled={isControlling}>
+                  <Play className="me-2" size={14} /> Resume Audit
+                </AnimatedButton>
+              ) : null
+            )}
+            <AnimatedButton variant="outline-danger" size="sm" onClick={() => setShowDeleteModal(true)} disabled={isDeleting || isControlling}>
+              {isDeleting ? <Loader2 className="me-2 animate-spin" size={14} /> : <Trash2 className="me-2" size={14} />}
+              Abort Audit
+            </AnimatedButton>
+          </>
+        ) : (
+          <>
+            {scan && (
+              <AnimatedButton variant="outline-primary" size="sm" href={`/scan?id=${scanId}`}>
+                <RefreshCw className="me-2" size={14} /> New scan
+              </AnimatedButton>
+            )}
+            <AnimatedButton variant="outline-danger" size="sm" onClick={() => setShowDeleteModal(true)} disabled={isDeleting}>
+              <Trash2 className="me-2" size={14} /> Delete Archive
+            </AnimatedButton>
+          </>
+        )}
+
+        <SimpleModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          title={isJob ? "Abort Core Intelligence Audit?" : "Sanitize Intelligence Archive?"}
+          footer={
+            <div className="d-flex gap-2">
+              <AnimatedButton variant="outline-secondary" onClick={() => setShowDeleteModal(false)}>Cancel</AnimatedButton>
+              <AnimatedButton variant="danger" onClick={deleteScan} disabled={isDeleting}>
+                {isDeleting ? <Loader2 className="me-2 animate-spin" size={14} /> : <Trash2 className="me-2" size={14} />}
+                Confirm {isJob ? "Abort" : "Deletion"}
+              </AnimatedButton>
+            </div>
+          }
+        >
+          <div className="p-2 text-muted">
+            {isJob && (job?.status === 'running' || job?.status === 'queued')
+              ? "This audit is currently active. Aborting will immediately cease all worker operations and discard any unsaved ephemeral state."
+              : "Are you sure you want to permanently delete this audit record from the intelligence archive?"}
+            <p className="mt-2 fw-bold text-danger">This action is IRREVERSIBLE.</p>
+          </div>
+        </SimpleModal>
+      </div>
+    </div>
+
+    <h1 className="fs-3 fw-bold d-flex flex-wrap align-items-center gap-2 mb-2">
+      <Icon className="text-primary" size={28} />
+      <span className="text-truncate">{title}</span>
+      <span className="fs-6 fw-normal text-muted font-monospace opacity-75">
+        [ {scanId.substring(0, 8)}... ]
+      </span>
+    </h1>
+
+    <div className="d-flex flex-wrap align-items-center gap-3 text-muted fs-6">
+      <Database size={16} />
+      <span className="text-truncate" style={{ maxWidth: '400px' }}>
+        {isJob ? job?.scan_url : scan?.scanUrl}
+      </span>
+      {scan && !isJob && (
+        <>
+          <div className="d-flex align-items-center gap-2 border-start ps-3 d-none d-sm-flex">
+            <Clock size={16} />
+            <span>{formatDate(scan.scanDate)}</span>
+          </div>
+          <div className="d-flex align-items-center gap-2 border-start ps-3 d-none d-md-flex">
+            <Zap size={16} />
+            <span>{scan.durationSeconds.toFixed(2)}s Execution</span>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+);
+
 // Loading fallback for Suspense
 function ScanDetailsLoading() {
   return (
@@ -298,101 +433,7 @@ function ScanDetailsContent() {
     );
   }
 
-  // Common Header Section
-  const DetailHeader = ({ title, status, icon: Icon, isJob = false }: { title: string, status?: string, icon: any, isJob?: boolean }) => (
-    <div className="card-header bg-transparent border-bottom-0 pt-4 px-4 px-md-5">
-      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
-        <AnimatedButton variant="link" className="p-0 border-0 text-muted text-decoration-none" href="/history">
-          <div className="d-flex align-items-center">
-            <ChevronLeft className="me-2" size={18} />
-            <span className="fw-medium">Back to History</span>
-          </div>
-        </AnimatedButton>
 
-        <div className="d-flex align-items-center gap-2">
-          {isJob ? (
-            <>
-              {!isTransient && (
-                isActive ? (
-                  <AnimatedButton variant="outline-secondary" size="sm" onClick={() => handleControl('pause')} disabled={isControlling}>
-                    <Pause className="me-2" size={14} /> Pause Audit
-                  </AnimatedButton>
-                ) : isPaused ? (
-                  <AnimatedButton variant="primary" size="sm" onClick={() => handleControl('resume')} disabled={isControlling}>
-                    <Play className="me-2" size={14} /> Resume Audit
-                  </AnimatedButton>
-                ) : null
-              )}
-              <AnimatedButton variant="outline-danger" size="sm" onClick={() => setShowDeleteModal(true)} disabled={isDeleting || isControlling}>
-                {isDeleting ? <Loader2 className="me-2 animate-spin" size={14} /> : <Trash2 className="me-2" size={14} />}
-                Abort Audit
-              </AnimatedButton>
-            </>
-          ) : (
-            <>
-              {scan && (
-                <AnimatedButton variant="outline-primary" size="sm" href={`/scan?id=${scanId}`}>
-                  <RefreshCw className="me-2" size={14} /> New scan
-                </AnimatedButton>
-              )}
-              <AnimatedButton variant="outline-danger" size="sm" onClick={() => setShowDeleteModal(true)} disabled={isDeleting}>
-                <Trash2 className="me-2" size={14} /> Delete Archive
-              </AnimatedButton>
-            </>
-          )}
-
-          <SimpleModal
-            isOpen={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            title={isJob ? "Abort Core Intelligence Audit?" : "Sanitize Intelligence Archive?"}
-            footer={
-              <div className="d-flex gap-2">
-                <AnimatedButton variant="outline-secondary" onClick={() => setShowDeleteModal(false)}>Cancel</AnimatedButton>
-                <AnimatedButton variant="danger" onClick={deleteScan} disabled={isDeleting}>
-                  {isDeleting ? <Loader2 className="me-2 animate-spin" size={14} /> : <Trash2 className="me-2" size={14} />}
-                  Confirm {isJob ? "Abort" : "Deletion"}
-                </AnimatedButton>
-              </div>
-            }
-          >
-            <div className="p-2 text-muted">
-              {isJob && (job?.status === 'running' || job?.status === 'queued')
-                ? "This audit is currently active. Aborting will immediately cease all worker operations and discard any unsaved ephemeral state."
-                : "Are you sure you want to permanently delete this audit record from the intelligence archive?"}
-              <p className="mt-2 fw-bold text-danger">This action is IRREVERSIBLE.</p>
-            </div>
-          </SimpleModal>
-        </div>
-      </div>
-
-      <h1 className="fs-3 fw-bold d-flex flex-wrap align-items-center gap-2 mb-2">
-        <Icon className="text-primary" size={28} />
-        <span className="text-truncate">{title}</span>
-        <span className="fs-6 fw-normal text-muted font-monospace opacity-75">
-          [ {scanId.substring(0, 8)}... ]
-        </span>
-      </h1>
-
-      <div className="d-flex flex-wrap align-items-center gap-3 text-muted fs-6">
-        <Database size={16} />
-        <span className="text-truncate" style={{ maxWidth: '400px' }}>
-          {isJob ? job?.scan_url : scan?.scanUrl}
-        </span>
-        {scan && !isJob && (
-          <>
-            <div className="d-flex align-items-center gap-2 border-start ps-3 d-none d-sm-flex">
-              <Clock size={16} />
-              <span>{formatDate(scan.scanDate)}</span>
-            </div>
-            <div className="d-flex align-items-center gap-2 border-start ps-3 d-none d-md-flex">
-              <Zap size={16} />
-              <span>{scan.durationSeconds.toFixed(2)}s Execution</span>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
 
   const isActive = job?.status === 'running' || job?.status === 'queued';
   const isPaused = job?.status === 'paused';
@@ -403,7 +444,26 @@ function ScanDetailsContent() {
     return (
       <main className="w-100 py-4">
         <AnimatedCard className="w-100 overflow-hidden shadow-lg border-opacity-10">
-          <DetailHeader title={`Audit ${isActive ? 'Execution' : isPaused ? 'Suspended' : job.status === 'stopped' ? 'Termination' : 'Status'}`} icon={Activity} isJob={true} />
+          <DetailHeader
+            title={`Audit ${isActive ? 'Execution' : isPaused ? 'Suspended' : job.status === 'stopped' ? 'Termination' : 'Status'}`}
+            icon={Activity}
+            isJob={true}
+            scanId={scanId}
+            job={job}
+            scan={scan}
+            isActive={isActive}
+            isPaused={isPaused}
+            isTransient={isTransient}
+            handleControl={handleControl}
+            isControlling={isControlling}
+            showDeleteModal={showDeleteModal}
+            setShowDeleteModal={setShowDeleteModal}
+            isDeleting={isDeleting}
+            deleteScan={deleteScan}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            formatDate={formatDate}
+          />
 
           <div className="card-body p-4 p-md-5">
             <div className="mb-5">
@@ -469,7 +529,25 @@ function ScanDetailsContent() {
   return (
     <main className="w-100 py-4">
       <AnimatedCard className="w-100 overflow-hidden shadow-lg border-opacity-10">
-        <DetailHeader title="Review scan report" icon={Shield} />
+        <DetailHeader
+          title="Review scan report"
+          icon={Shield}
+          scanId={scanId}
+          job={job}
+          scan={scan}
+          isActive={false}
+          isPaused={false}
+          isTransient={false}
+          handleControl={handleControl}
+          isControlling={isControlling}
+          showDeleteModal={showDeleteModal}
+          setShowDeleteModal={setShowDeleteModal}
+          isDeleting={isDeleting}
+          deleteScan={deleteScan}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          formatDate={formatDate}
+        />
 
         <div className="card-body p-4 p-md-5">
           {scan ? (

@@ -91,6 +91,7 @@ class Scanner {
     // Rate Limiting
     protected lastRequestTime: number = 0;
     protected minRequestInterval: number = 0; // In milliseconds
+    protected rateLimitQueue: Promise<void> = Promise.resolve(); // Queue for rate limiting
 
     protected callbacks: ScanCallbacks;
 
@@ -124,6 +125,9 @@ class Scanner {
         // Calculate minimum interval between requests
         if (this.config.maxScansPerMinute > 0) {
             this.minRequestInterval = 60000 / this.config.maxScansPerMinute;
+            console.log(`[Rate Limit Config] maxScansPerMinute: ${this.config.maxScansPerMinute}, minRequestInterval: ${this.minRequestInterval}ms`);
+        } else {
+            console.log(`[Rate Limit Config] Rate limiting disabled (maxScansPerMinute: ${this.config.maxScansPerMinute})`);
         }
 
         if (this.config.concurrency <= 0) {
@@ -326,6 +330,56 @@ class Scanner {
         return this._brokenLinksCount;
     }
 
+    /**
+     * Global rate limiter that ensures requests are spaced according to maxScansPerMinute.
+     * Uses a promise queue to serialize all requests and prevent race conditions.
+     * This method should be called before each fetch operation to enforce the rate limit
+     * across all concurrent workers.
+     */
+    protected async waitForRateLimit(): Promise<void> {
+        console.log(`[Rate Limit Debug] Called waitForRateLimit() - minRequestInterval: ${this.minRequestInterval}ms`);
+
+        if (this.minRequestInterval <= 0) {
+            console.log(`[Rate Limit Debug] Skipping - rate limiting disabled`);
+            return;
+        }
+
+        // Chain this request onto the existing queue
+        // This ensures requests are processed sequentially, preventing race conditions
+        this.rateLimitQueue = this.rateLimitQueue.then(async () => {
+            const now = Date.now();
+            const timeSinceLastRequest = now - this.lastRequestTime;
+
+            console.log(`[Rate Limit Debug] timeSinceLastRequest: ${timeSinceLastRequest}ms, required: ${this.minRequestInterval}ms`);
+
+            if (timeSinceLastRequest < this.minRequestInterval) {
+                const waitTime = this.minRequestInterval - timeSinceLastRequest;
+                console.log(`[Rate Limit] Waiting ${waitTime}ms (limit: ${this.config.maxScansPerMinute}/min, interval: ${this.minRequestInterval}ms)`);
+                
+                // Wait in small increments to allow interruption on pause
+                const startWait = Date.now();
+                while (Date.now() - startWait < waitTime) {
+                    // Check if paused and exit early if so
+                    if (this.isPaused) {
+                        console.log(`[Rate Limit Debug] Wait interrupted by pause`);
+                        return;
+                    }
+                    // Wait for 100ms or remaining time, whichever is smaller
+                    const remainingWait = waitTime - (Date.now() - startWait);
+                    await new Promise(resolve => setTimeout(resolve, Math.min(100, remainingWait)));
+                }
+            } else {
+                console.log(`[Rate Limit Debug] No wait needed`);
+            }
+
+
+            this.lastRequestTime = Date.now();
+        });
+
+        // Wait for our turn in the queue
+        await this.rateLimitQueue;
+    }
+
     // Function to process a single URL
     protected async processUrl(urlToProcess: string, depth: number): Promise<void> {
         // Remove from pending map as we are starting to process it
@@ -383,17 +437,8 @@ class Scanner {
                 keepalive: true
             };
 
-            // Rate Limiting: Wait if necessary
-            if (this.minRequestInterval > 0) {
-                const now = Date.now();
-                const timeSinceLastRequest = now - this.lastRequestTime;
-
-                if (timeSinceLastRequest < this.minRequestInterval) {
-                    const waitTime = this.minRequestInterval - timeSinceLastRequest;
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
-                }
-                this.lastRequestTime = Date.now();
-            }
+            // Global rate limiting - enforced across all concurrent workers
+            await this.waitForRateLimit();
 
             const response = await fetch(urlToProcess, fetchOptions);
 
@@ -924,6 +969,9 @@ export class WebsiteScanner extends Scanner {
             };
 
             let response;
+            // Global rate limiting - enforced across all concurrent workers
+            await this.waitForRateLimit();
+
             try {
                 response = await fetch(urlToProcess, fetchOptions);
             } finally {
