@@ -16,8 +16,8 @@ export function SettingsClient() {
   const [supabaseUrl, setSupabaseUrl] = useState('');
   const [supabaseKey, setSupabaseKey] = useState('');
   const [appUrl, setAppUrl] = useState('http://localhost:3000');
-  const [maxScansPerMinute, setMaxScansPerMinute] = useState(60);
-  const [savedMaxScansPerMinute, setSavedMaxScansPerMinute] = useState(60);
+  const [maxScansPerMinute, setMaxScansPerMinute] = useState(200);
+  const [savedMaxScansPerMinute, setSavedMaxScansPerMinute] = useState(200);
   const [isSaving, setIsSaving] = useState(false);
   const [showHighRateWarning, setShowHighRateWarning] = useState(false);
   const [pendingMaxScans, setPendingMaxScans] = useState<number | null>(null);
@@ -73,8 +73,8 @@ export function SettingsClient() {
         setSupabaseUrl(data.supabaseUrl || (type === 'supabase' ? statusData.defaults?.supabaseUrl : '') || '');
         setSupabaseKey(data.supabaseKey || (type === 'supabase' ? statusData.defaults?.supabaseKey : '') || '');
         setAppUrl(data.appUrl || 'http://localhost:3000');
-        setMaxScansPerMinute(data.maxScansPerMinute || 60);
-        setSavedMaxScansPerMinute(data.maxScansPerMinute || 60);
+        setMaxScansPerMinute(data.maxScansPerMinute || 200);
+        setSavedMaxScansPerMinute(data.maxScansPerMinute || 200);
       } else {
         // If settings don't exist yet, we'll use defaults
         console.log('Using default settings');
@@ -88,7 +88,7 @@ export function SettingsClient() {
 
   const saveSettings = async (skipWarning = false) => {
     // Check for high rate limit if not skipping warning
-    if (!skipWarning && maxScansPerMinute > 120) {
+    if (!skipWarning && maxScansPerMinute > 200) {
       setShowHighRateWarning(true);
       return;
     }
@@ -652,15 +652,15 @@ export function SettingsClient() {
                     className="form-control"
                     value={maxScansPerMinute}
                     onChange={(e) => setMaxScansPerMinute(parseInt(e.target.value) || 0)}
-                    placeholder="60"
+                    placeholder="200"
                     min="1"
                   />
                 </div>
                 <div className="form-text mt-2">
                   Limit the number of requests per minute to avoid being blocked by servers (Rate Limiting).
                   <br />
-                  Default: <span className="fw-bold">60</span> (1 request/second).
-                  <span className="text-warning ms-1">Values above 120 may increase risk of blocking.</span>
+                  Default: <span className="fw-bold">200</span> (approx 3.3 requests/second).
+                  <span className="text-warning ms-1">Values above 200 may increase risk of blocking.</span>
                 </div>
               </div>
 
