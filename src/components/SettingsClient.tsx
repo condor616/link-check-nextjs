@@ -123,6 +123,7 @@ export function SettingsClient() {
           supabaseUrl,
           supabaseKey,
           appUrl,
+          maxScansPerMinute,
         }),
       });
 
