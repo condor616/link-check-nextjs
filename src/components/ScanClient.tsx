@@ -913,7 +913,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
           <div className="card-footer bg-transparent border-0 d-flex flex-column flex-sm-row justify-content-between gap-3 pb-4">
             <AnimatedButton variant="outline-secondary" onClick={() => router.push('/')}>
               <ArrowLeft size={18} className="me-2" />
-              Cancel Analysis
+              Cancel
             </AnimatedButton>
             <AnimatedButton variant="primary" onClick={handleConfirmScan} disabled={isScanning}>
               {isScanning ? (
@@ -924,7 +924,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
               ) : (
                 <>
                   <Activity size={18} className="me-2" />
-                  Launch Professional Audit
+                  Start scan
                 </>
               )}
             </AnimatedButton>
@@ -1804,6 +1804,27 @@ function ScanForm() {
             </div>
 
             <div className="d-flex align-items-center gap-2">
+              <AnimatedButton
+                variant="outline-secondary"
+                size="sm"
+                onClick={toggleSaveDialog}
+                disabled={!url}
+              >
+                <Save size={16} className="me-2" /> Save to My Scans
+              </AnimatedButton>
+
+              <AnimatedButton
+                variant="primary"
+                size="sm"
+                onClick={handleScan}
+                disabled={isCreatingScan}
+              >
+                {isCreatingScan ? (
+                  <><span className="spinner-border spinner-border-sm me-2" /> Building...</>
+                ) : (
+                  <><Rocket size={16} className="me-2" /> Start Scan</>
+                )}
+              </AnimatedButton>
               <div className="dropdown">
                 <button
                   className="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2"
@@ -2185,28 +2206,7 @@ function ScanForm() {
           </div>
         </div>
 
-        <div className="card-footer bg-transparent border-0 d-flex flex-column flex-sm-row justify-content-between gap-3 p-4">
-          <AnimatedButton
-            variant="outline-secondary"
-            onClick={toggleSaveDialog}
-            disabled={!url}
-          >
-            <Save size={18} className="me-2" /> Save to My Scans
-          </AnimatedButton>
 
-          <AnimatedButton
-            variant="primary"
-            onClick={handleScan}
-            disabled={isCreatingScan}
-            className="px-5"
-          >
-            {isCreatingScan ? (
-              <><span className="spinner-border spinner-border-sm me-2" /> Building...</>
-            ) : (
-              <><Rocket size={18} className="me-2" /> Start Scan</>
-            )}
-          </AnimatedButton>
-        </div>
 
         {scanError && (
           <div className="mx-4 mb-4 alert alert-danger border-0 shadow-sm fade-in">

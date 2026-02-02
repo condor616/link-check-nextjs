@@ -220,9 +220,6 @@ export function JobsClient() {
 
                                         <h3 className="h5 fw-bold text-body d-flex align-items-center gap-2 text-truncate">
                                             <ExpandableUrl url={job.scan_url} truncateLength={40} showIcon={false} className="text-truncate" />
-                                            <a href={job.scan_url} target="_blank" rel="noopener noreferrer" className="opacity-50 hover-opacity-100 transition-opacity">
-                                                <ExternalLink size={14} className="text-primary" />
-                                            </a>
                                         </h3>
 
                                         <div className="mt-3 d-flex flex-wrap align-items-center gap-4 small w-100">
@@ -264,7 +261,7 @@ export function JobsClient() {
                                         {job.status === 'paused' ? (
                                             <button
                                                 onClick={() => handleJobAction(job.id, 'resume')}
-                                                className="btn btn-primary bg-opacity-10 text-primary border-0 p-2 rounded-3 d-flex align-items-center justify-content-center"
+                                                className="btn btn-light text-primary border-0 p-2 rounded-3 d-flex align-items-center justify-content-center hover-bg-primary hover-text-white transition-all"
                                                 style={{ width: '40px', height: '40px' }}
                                                 title="Resume Scan"
                                             >
@@ -274,7 +271,7 @@ export function JobsClient() {
                                             <button
                                                 onClick={() => handleJobAction(job.id, 'pause')}
                                                 disabled={job.status === 'pausing' || job.status === 'stopping'}
-                                                className="btn btn-warning bg-opacity-10 text-warning border-0 p-2 rounded-3 d-flex align-items-center justify-content-center"
+                                                className="btn btn-light text-warning border-0 p-2 rounded-3 d-flex align-items-center justify-content-center hover-bg-warning hover-text-white transition-all"
                                                 style={{ width: '40px', height: '40px' }}
                                                 title="Pause Scan"
                                             >
