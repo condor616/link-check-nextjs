@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { ScanConfig, ScanResult } from '@/lib/scanner';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
+import { getAppSettings } from '@/lib/settings';
 
 interface RecheckRequest {
   url: string;
@@ -222,6 +224,86 @@ async function saveScanDataToSupabase(scanId: string, scanData: any) {
   }
 }
 
+// Get scan data from Prisma (SQLite)
+async function getScanDataFromPrisma(scanId: string) {
+  try {
+    // Try to find in Job table first (new schema)
+    const job = await prisma.job.findUnique({
+      where: { id: scanId }
+    });
+
+    if (job) {
+      return {
+        id: job.id,
+        scanUrl: job.scan_url,
+        scanDate: job.created_at.toISOString(),
+        durationSeconds: 0, // Not explicitly stored in Job in the same way, or calculate from completed_at - started_at
+        results: job.results ? JSON.parse(job.results) : [],
+        config: job.scan_config ? JSON.parse(job.scan_config) : {}
+      };
+    }
+
+    // Try ScanHistory table (legacy or specific history table)
+    const history = await prisma.scanHistory.findUnique({
+      where: { id: scanId }
+    });
+
+    if (history) {
+      return {
+        id: history.id,
+        scanUrl: history.scan_url,
+        scanDate: history.scan_date.toISOString(),
+        durationSeconds: history.duration_seconds,
+        results: JSON.parse(history.results),
+        config: JSON.parse(history.config)
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching scan from Prisma:', error);
+    return null;
+  }
+}
+
+// Save updated scan data to Prisma (SQLite)
+async function saveScanDataToPrisma(scanId: string, scanData: any) {
+  try {
+    // Check which table it belongs to
+    const job = await prisma.job.findUnique({
+      where: { id: scanId }
+    });
+
+    if (job) {
+      await prisma.job.update({
+        where: { id: scanId },
+        data: {
+          results: JSON.stringify(scanData.results)
+        }
+      });
+      return;
+    }
+
+    const history = await prisma.scanHistory.findUnique({
+      where: { id: scanId }
+    });
+
+    if (history) {
+      await prisma.scanHistory.update({
+        where: { id: scanId },
+        data: {
+          results: JSON.stringify(scanData.results)
+        }
+      });
+      return;
+    }
+
+    throw new Error('Scan not found in database');
+  } catch (error: any) {
+    throw new Error(`Prisma error updating scan: ${error.message}`);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Validate request body
@@ -249,13 +331,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
     }
 
-    // Check if using Supabase
-    const useSupabase = await isUsingSupabase();
+    // Determine storage type
+    const settings = await getAppSettings();
+    const storageType = settings.storageType || (process.env.STORAGE_TYPE as any) || 'sqlite';
 
     // Get scan data
     let scanData;
-    if (useSupabase) {
+    if (storageType === 'supabase') {
       scanData = await getScanDataFromSupabase(scanId);
+    } else if (storageType === 'sqlite') {
+      scanData = await getScanDataFromPrisma(scanId);
     } else {
       scanData = await getScanDataFromFile(scanId);
     }
@@ -307,8 +392,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Save the updated scan data
-      if (useSupabase) {
+      if (storageType === 'supabase') {
         await saveScanDataToSupabase(scanId, scanData);
+      } else if (storageType === 'sqlite') {
+        await saveScanDataToPrisma(scanId, scanData);
       } else {
         await saveScanDataToFile(scanId, scanData);
       }

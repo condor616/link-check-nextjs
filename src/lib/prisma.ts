@@ -17,7 +17,7 @@ if (dbUrl.startsWith('file:')) {
         for (let i = 0; i < 3; i++) {
             const checkPath = path.resolve(currentDir, 'prisma', relativePath.replace('./', ''));
             const prismaDir = path.resolve(currentDir, 'prisma');
-            if (fs.existsSync(prismaDir)) {
+            if (fs.existsSync(prismaDir) && !currentDir.split(path.sep).includes('.next')) {
                 absolutePath = checkPath;
                 break;
             }
