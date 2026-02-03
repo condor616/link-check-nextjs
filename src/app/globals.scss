@@ -30,7 +30,8 @@
   --card-bg: var(--bg-card);
 }
 
-.dark {
+.dark,
+[data-bs-theme="dark"] {
   --bg-app: oklch(15% 0.02 260); // Dark purple-black
   --bg-card: oklch(20% 0.02 260); // Slightly lighter
   --text-main: oklch(95% 0.01 260); // White text
@@ -296,7 +297,9 @@ body {
 
   // Text Contrast Overrides
   .text-muted,
-  .text-secondary {
+  .text-secondary,
+  .text-body-secondary,
+  .form-text {
     color: var(--text-muted) !important;
   }
 
@@ -322,6 +325,10 @@ body {
     &:hover,
     &.active {
       color: var(--brand-primary);
+    }
+
+    &.active {
+      color: #fff !important;
     }
   }
 
