@@ -364,7 +364,16 @@ export function SavedScansClient() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString();
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    }) + ' - ' + date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   // Helper functions for managing exclusion patterns
@@ -484,38 +493,32 @@ export function SavedScansClient() {
             <div key={config.id} className="col-12 col-lg-6">
               <AnimatedCard delay={idx * 0.05} className="h-100 border-0 shadow-sm hover-translate-y-2 p-0 overflow-hidden bg-white dark:bg-dark">
                 <div className="p-4">
-                  <div className="d-flex justify-content-between align-items-start mb-3">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="p-3 bg-primary bg-opacity-10 text-primary rounded-4 border border-primary border-opacity-10">
-                        <Activity size={24} />
-                      </div>
-                      <div>
-                        <h4 className="h5 fw-black mb-1 text-dark dark:text-light">{config.name}</h4>
-                        <div className="text-truncate text-muted small" style={{ maxWidth: '250px' }}>{config.url}</div>
-                      </div>
+                  <div className="d-flex align-items-start gap-3 mb-3">
+                    <div className="p-3 bg-primary bg-opacity-10 text-primary rounded-4 border border-primary border-opacity-10">
+                      <Activity size={24} />
                     </div>
-                    <div className="badge rounded-pill bg-light text-muted border px-3 py-2 small fw-bold">
-                      {formatDate(config.updatedAt)}
+                    <div className="d-flex flex-column justify-content-center">
+                      <div className="x-small text-muted fw-bold mb-1">
+                        {formatDate(config.updatedAt)}
+                      </div>
+                      <h4 className="h5 fw-black mb-0 text-dark dark:text-light">{config.name}</h4>
+                      <div className="text-truncate text-muted small" style={{ maxWidth: '250px' }}>{config.url}</div>
                     </div>
                   </div>
 
-                  <div className="row g-2 mb-4">
-                    <div className="col-sm-6">
-                      <div className="p-3 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-3">
-                        <div className="text-primary"><LockIcon size={16} /></div>
-                        <div>
-                          <div className="x-small text-muted fw-bold text-uppercase opacity-75">Auth</div>
-                          <div className="small fw-bold">{config.config.auth ? 'Protected' : 'Anonymous'}</div>
-                        </div>
+                  <div className="d-flex flex-wrap gap-2 mb-4">
+                    <div className="p-2 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-2">
+                      <div className="text-primary"><LockIcon size={14} /></div>
+                      <div className="d-flex align-items-center gap-1">
+                        <div className="x-small text-muted fw-bold text-uppercase opacity-75">Auth:</div>
+                        <div className="small fw-bold">{config.config.auth ? 'Protected' : 'Anonymous'}</div>
                       </div>
                     </div>
-                    <div className="col-sm-6">
-                      <div className="p-3 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-3">
-                        <div className="text-primary"><LayoutGrid size={16} /></div>
-                        <div>
-                          <div className="x-small text-muted fw-bold text-uppercase opacity-75">Depth</div>
-                          <div className="small fw-bold">{config.config.depth === 0 ? 'Root Only' : `${config.config.depth} Levels Deep`}</div>
-                        </div>
+                    <div className="p-2 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-2">
+                      <div className="text-primary"><LayoutGrid size={14} /></div>
+                      <div className="d-flex align-items-center gap-1">
+                        <div className="x-small text-muted fw-bold text-uppercase opacity-75">Depth:</div>
+                        <div className="small fw-bold">{config.config.depth === 0 ? 'Root Only' : `${config.config.depth} Levels`}</div>
                       </div>
                     </div>
                   </div>
@@ -546,11 +549,12 @@ export function SavedScansClient() {
                       <Play size={14} className="me-2 fill-current" /> Execute
                     </AnimatedButton>
                   </div>
-                </div>
-              </AnimatedCard>
-            </div>
-          ))}
-        </div>
+                </div >
+              </AnimatedCard >
+            </div >
+          ))
+          }
+        </div >
       )}
 
       {/* Edit Dialog */}
@@ -983,6 +987,6 @@ export function SavedScansClient() {
           )}
         </div>
       </SimpleModal>
-    </div>
+    </div >
   );
 } 
