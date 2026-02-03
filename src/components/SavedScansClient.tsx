@@ -498,27 +498,27 @@ export function SavedScansClient() {
                       <Activity size={24} />
                     </div>
                     <div className="d-flex flex-column justify-content-center">
-                      <div className="x-small text-muted fw-bold mb-1">
+                      <div className="text-muted opacity-75 mb-1" style={{ fontSize: '0.7rem', lineHeight: '1' }}>
                         {formatDate(config.updatedAt)}
                       </div>
-                      <h4 className="h5 fw-black mb-0 text-dark dark:text-light">{config.name}</h4>
+                      <h4 className="h6 fw-black mb-0 text-dark dark:text-light" style={{ fontSize: '1.1rem' }}>{config.name}</h4>
                       <div className="text-truncate text-muted small" style={{ maxWidth: '250px' }}>{config.url}</div>
                     </div>
                   </div>
 
                   <div className="d-flex flex-wrap gap-2 mb-4">
-                    <div className="p-2 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-2">
-                      <div className="text-primary"><LockIcon size={14} /></div>
-                      <div className="d-flex align-items-center gap-1">
-                        <div className="x-small text-muted fw-bold text-uppercase opacity-75">Auth:</div>
-                        <div className="small fw-bold">{config.config.auth ? 'Protected' : 'Anonymous'}</div>
+                    <div className="py-1 px-2 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-2">
+                      <div className="text-primary"><LockIcon size={12} /></div>
+                      <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.7rem' }}>
+                        <span className="text-muted fw-bold text-uppercase opacity-75">Auth:</span>
+                        <span className="fw-bold text-dark dark:text-light">{config.config.auth ? 'Protected' : 'Anonymous'}</span>
                       </div>
                     </div>
-                    <div className="p-2 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-2">
-                      <div className="text-primary"><LayoutGrid size={14} /></div>
-                      <div className="d-flex align-items-center gap-1">
-                        <div className="x-small text-muted fw-bold text-uppercase opacity-75">Depth:</div>
-                        <div className="small fw-bold">{config.config.depth === 0 ? 'Root Only' : `${config.config.depth} Levels`}</div>
+                    <div className="py-1 px-2 bg-light dark:bg-dark rounded-3 border d-flex align-items-center gap-2">
+                      <div className="text-primary"><LayoutGrid size={12} /></div>
+                      <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.7rem' }}>
+                        <span className="text-muted fw-bold text-uppercase opacity-75">Depth:</span>
+                        <span className="fw-bold text-dark dark:text-light">{config.config.depth === 0 ? 'Root Only' : `${config.config.depth} Levels`}</span>
                       </div>
                     </div>
                   </div>
