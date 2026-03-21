@@ -70,16 +70,28 @@ export class HistoryService {
     // Save scan data to Prisma (SQLite)
     private async saveScanToPrisma(savedData: SavedScan) {
         try {
-            await prisma.scanHistory.create({
-                data: {
-                    id: savedData.id,
-                    scan_url: savedData.scanUrl,
-                    scan_date: new Date(savedData.scanDate),
-                    duration_seconds: savedData.durationSeconds,
-                    broken_links: savedData.brokenLinksCount || 0,
-                    total_links: savedData.totalLinksCount || 0,
-                    config: JSON.stringify(savedData.config),
-                    results: JSON.stringify(savedData.results)
+            const data = {
+                id: savedData.id,
+                scan_url: savedData.scanUrl,
+                scan_date: new Date(savedData.scanDate),
+                duration_seconds: savedData.durationSeconds,
+                broken_links: savedData.brokenLinksCount || 0,
+                total_links: savedData.totalLinksCount || 0,
+                config: JSON.stringify(savedData.config),
+                results: JSON.stringify(savedData.results)
+            };
+
+            await prisma.scanHistory.upsert({
+                where: { id: savedData.id },
+                create: data,
+                update: {
+                    scan_url: data.scan_url,
+                    scan_date: data.scan_date,
+                    duration_seconds: data.duration_seconds,
+                    broken_links: data.broken_links,
+                    total_links: data.total_links,
+                    config: data.config,
+                    results: data.results
                 }
             });
 
@@ -99,10 +111,10 @@ export class HistoryService {
                 throw new Error('Supabase client is not available');
             }
 
-            // Insert scan data into database
+            // Insert or Update scan data into database using upsert
             const { error } = await (supabase
                 .from('scan_history') as any)
-                .insert({
+                .upsert({
                     id: savedData.id,
                     scan_url: savedData.scanUrl,
                     scan_date: savedData.scanDate,
