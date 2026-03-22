@@ -14,7 +14,11 @@ import { getAppSettings } from '../src/lib/settings';
 const POLLING_INTERVAL_MS = 1000;
 const SETUP_CHECK_INTERVAL_MS = 5000;
 
+let isSetupComplete = false;
+
 async function checkSetup() {
+    if (isSetupComplete) return true;
+    
     try {
         const settings = await getAppSettings();
 
@@ -59,6 +63,8 @@ async function checkSetup() {
             // Final check: Can we actually query?
             await prisma.job.count();
         }
+        
+        isSetupComplete = true; // Cache success
         return true;
     } catch (e) {
         return false;

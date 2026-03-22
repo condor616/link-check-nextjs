@@ -91,8 +91,9 @@ class Scanner {
 
     // Use the inferred type for the limiter instance
     protected limit: LimitFunction | null = null;
-    // Cache for auth headers to avoid recomputing for each request
+    // Cache for headers to avoid recomputing for each request
     protected authHeadersCache: Record<string, string> | null = null;
+    protected defaultHeadersCache: Record<string, string> | null = null;
     // Domain cache to optimize hostname lookups
     protected domainCache: Map<string, string> = new Map();
     protected abortController: AbortController = new AbortController();
@@ -170,19 +171,20 @@ class Scanner {
             throw new Error("Request timeout must be a positive number.");
         }
 
+        this.defaultHeadersCache = {
+            'User-Agent': 'LinkCheckerProBot/1.0',
+            'Connection': 'keep-alive'
+        };
+
         // Initialize auth headers cache
         if (this.config.auth?.username && this.config.auth?.password) {
             const credentials = Buffer.from(`${this.config.auth.username}:${this.config.auth.password}`).toString('base64');
             this.authHeadersCache = {
-                'User-Agent': 'LinkCheckerProBot/1.0',
-                'Authorization': `Basic ${credentials}`,
-                'Connection': 'keep-alive'
+                ...this.defaultHeadersCache,
+                'Authorization': `Basic ${credentials}`
             };
         } else {
-            this.authHeadersCache = {
-                'User-Agent': 'LinkCheckerProBot/1.0',
-                'Connection': 'keep-alive'
-            };
+            this.authHeadersCache = this.defaultHeadersCache;
         }
 
 
@@ -453,13 +455,7 @@ class Scanner {
                 Math.min(this.config.requestTimeout, 15000); // 15s max for external domains
 
             const fetchOptions: RequestInit = {
-                headers: shouldUseAuth ? this.authHeadersCache || {
-                    'User-Agent': 'LinkCheckerProBot/1.0',
-                    'Connection': 'keep-alive'
-                } : {
-                    'User-Agent': 'LinkCheckerProBot/1.0',
-                    'Connection': 'keep-alive'
-                },
+                headers: shouldUseAuth ? this.authHeadersCache! : this.defaultHeadersCache!,
                 redirect: 'follow',
                 signal: AbortSignal.any([
                     this.abortController.signal,
@@ -515,7 +511,7 @@ class Scanner {
 
         // Get all links that are not in excluded CSS selectors
         let links = $('a[href]');
-        let skippedLinks = new Set<string>();
+        const skippedLinks = new Set<string>();
 
         // Filter out links based on CSS selectors if configured
         if (this.config.cssSelectors && this.config.cssSelectors.length > 0) {
