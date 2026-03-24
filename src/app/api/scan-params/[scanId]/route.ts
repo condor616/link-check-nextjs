@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 // Get scan parameters for restarting a scan with the same settings
 export async function GET(
@@ -18,13 +19,18 @@ export async function GET(
       );
     }
 
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      return await getScanParamsFromSupabaseHistory(scanId);
+      return await getScanParamsFromSupabaseHistory(scanId, user.id);
     } else {
-      return await getScanParamsFromPrisma(scanId);
+      return await getScanParamsFromPrisma(scanId, user.id);
     }
   } catch (err) {
     console.error('Error fetching scan parameters:', err);
@@ -36,10 +42,10 @@ export async function GET(
 }
 
 // Get scan parameters from Prisma
-async function getScanParamsFromPrisma(scanId: string) {
+async function getScanParamsFromPrisma(scanId: string, userId: string) {
   try {
-    const scan = await prisma.scanHistory.findUnique({
-      where: { id: scanId }
+    const scan = await prisma.scanHistory.findFirst({
+      where: { id: scanId, userId }
     });
 
     if (!scan) {
@@ -70,7 +76,7 @@ async function getScanParamsFromPrisma(scanId: string) {
 }
 
 // Get scan parameters from Supabase scan_history table
-async function getScanParamsFromSupabaseHistory(scanId: string) {
+async function getScanParamsFromSupabaseHistory(scanId: string, userId: string) {
   const supabase = await getSupabaseClient();
 
   if (!supabase) {
@@ -81,6 +87,7 @@ async function getScanParamsFromSupabaseHistory(scanId: string) {
     .from('scan_history')
     .select('scan_url, config')
     .eq('id', scanId)
+    .eq('user_id', userId)
     .single();
 
   if (error) {

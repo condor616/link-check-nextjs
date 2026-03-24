@@ -13,80 +13,61 @@ export async function POST() {
       );
     }
     
+    // List of tables to clear (ALL except users)
+    const tablesToClear = [
+      'scan_logs', 
+      'scan_jobs', 
+      'scan_history', 
+      'scan_configs', 
+      'verification_tokens', 
+      'sessions', 
+      'accounts'
+    ];
+    
     // Variables to track if tables exist and if data was cleared
-    let tablesExist = false;
-    let dataCleared = false;
+    let tablesFoundCount = 0;
+    let tablesClearedCount = 0;
     
     // Clear data from each table
-    try {
-      // 1. Check if scan_configs exists first
-      const { data: configData, error: configCheckError } = await supabase
-        .from('scan_configs')
-        .select('id')
-        .limit(1);
+    for (const table of tablesToClear) {
+      try {
+        // Check if table exists
+        const { error: checkError } = await supabase.from(table).select('id').limit(1);
         
-      if (!configCheckError) {
-        // Table exists, delete all data
-        tablesExist = true;
-        const { error: configsError } = await supabase
-          .from('scan_configs')
-          .delete()
-          .lt('id', 'z'); // This will match all IDs and delete them
-        
-        if (configsError) {
-          console.error('Clear Data: Error clearing scan_configs table', configsError);
-          throw new Error(`Error clearing scan_configs table: ${configsError.message}`);
+        if (!checkError) {
+          tablesFoundCount++;
+          
+          // Table exists, delete all data
+          // We use neq('id', -1) or similar as a way to match all rows
+          // This works for both string and numeric IDs
+          const { error: deleteError } = await supabase
+            .from(table)
+            .delete()
+            .neq('id', -1 as any); 
+          
+          if (deleteError) {
+            console.error(`Clear Data: Error clearing ${table} table`, deleteError);
+            // We continue with other tables even if one fails
+          } else {
+            tablesClearedCount++;
+          }
         }
-        
-        dataCleared = true;
+      } catch (err) {
+        console.error(`Clear Data: Exception checking/clearing table ${table}`, err);
       }
-      
-      // 2. Check if scan_history exists
-      const { data: historyData, error: historyCheckError } = await supabase
-        .from('scan_history')
-        .select('id')
-        .limit(1);
-        
-      if (!historyCheckError) {
-        // Table exists, delete all data
-        tablesExist = true;
-        const { error: historyError } = await supabase
-          .from('scan_history')
-          .delete()
-          .lt('id', 'z'); // This will match all IDs and delete them
-        
-        if (historyError) {
-          console.error('Clear Data: Error clearing scan_history table', historyError);
-          throw new Error(`Error clearing scan_history table: ${historyError.message}`);
-        }
-        
-        dataCleared = true;
-      }
-      
-      if (!tablesExist) {
-        return NextResponse.json({ 
-          message: 'No tables found in Supabase database', 
-          error: 'No tables exist to clear data from'
-        });
-      }
-      
-      if (!dataCleared) {
-        return NextResponse.json({ 
-          message: 'Tables exist but no data was cleared', 
-          warning: 'Tables may be empty already'
-        });
-      }
-      
-    } catch (clearError) {
-      console.error('Clear Data: Error clearing data', clearError);
-      return NextResponse.json(
-        { error: clearError instanceof Error ? clearError.message : 'Failed to clear data from Supabase tables' },
-        { status: 500 }
-      );
+    }
+    
+    if (tablesFoundCount === 0) {
+      return NextResponse.json({ 
+        message: 'No tables found in Supabase database to clear', 
+        error: 'No tables exist'
+      });
     }
     
     return NextResponse.json({ 
-      message: 'Data successfully cleared from all Supabase tables' 
+      message: `Data successfully cleared from ${tablesClearedCount} of ${tablesFoundCount} tables.`,
+      tablesCleared: tablesClearedCount,
+      tablesFound: tablesFoundCount
     });
   } catch (error) {
     console.error('Error clearing Supabase table data:', error);

@@ -9,7 +9,11 @@ import {
     ShieldCheck,
     Github,
     X,
-    Menu
+    Menu,
+    Users,
+    LogOut,
+    Loader2,
+    User
 } from 'lucide-react';
 import { TransitionLink } from "@/components/TransitionLink";
 import Link from "next/link";
@@ -17,13 +21,17 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Logo } from "@/components/Logo";
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
+import { useSession, signOut } from "next-auth/react";
 
 export function MobileNav() {
+    const { data: session } = useSession();
+    const user = session?.user;
     const [isOpen, setIsOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [hidden, setHidden] = useState(false);
     const { scrollY } = useScroll();
     const lastScrollY = useRef(0);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => {
         setMounted(true);
@@ -52,6 +60,20 @@ export function MobileNav() {
 
     const toggleMenu = () => setIsOpen(!isOpen);
     const closeMenu = () => setIsOpen(false);
+
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await signOut({ redirect: true, callbackUrl: '/login' });
+        } catch (error) {
+            console.error('Logout failed:', error);
+            setIsLoggingOut(false);
+        }
+    };
+
+    const isPublicPage = typeof window !== 'undefined' && 
+        (['/login', '/register', '/pending'].includes(window.location.pathname) || 
+         window.location.pathname.startsWith('/auth'));
 
     const menuVariants = {
         open: {
@@ -86,6 +108,8 @@ export function MobileNav() {
             }
         }
     };
+
+    if (!mounted) return null;
 
     return (
         <>
@@ -174,17 +198,47 @@ export function MobileNav() {
                             exit="closed"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="flex-grow-0">
-                                <MobileLink href="/" icon={Home} label="Dashboard" onClick={closeMenu} variants={linkVariants} />
-                                <MobileLink href="/scan" icon={Search} label="Scan" onClick={closeMenu} variants={linkVariants} />
-                                <MobileLink href="/jobs" icon={Activity} label="Active Jobs" onClick={closeMenu} variants={linkVariants} />
-                                <MobileLink href="/history" icon={History} label="History" onClick={closeMenu} variants={linkVariants} />
-                                <MobileLink href="/saved-scans" icon={ShieldCheck} label="My Scans" onClick={closeMenu} variants={linkVariants} />
-                                <MobileLink href="/settings" icon={Settings} label="Settings" onClick={closeMenu} variants={linkVariants} />
-                            </div>
+                            {!isPublicPage ? (
+                                <div className="flex-grow-0">
+                                    <MobileLink href="/" icon={Home} label="Dashboard" onClick={closeMenu} variants={linkVariants} />
+                                    <MobileLink href="/scan" icon={Search} label="Scan" onClick={closeMenu} variants={linkVariants} />
+                                    <MobileLink href="/jobs" icon={Activity} label="Active Jobs" onClick={closeMenu} variants={linkVariants} />
+                                    <MobileLink href="/history" icon={History} label="History" onClick={closeMenu} variants={linkVariants} />
+                                    <MobileLink href="/saved-scans" icon={ShieldCheck} label="My Scans" onClick={closeMenu} variants={linkVariants} />
+                                    {(user as any)?.role === 'admin' && (
+                                        <MobileLink href="/users" icon={Users} label="Users" onClick={closeMenu} variants={linkVariants} />
+                                    )}
+                                    <MobileLink href="/profile" icon={User} label="Profile" onClick={closeMenu} variants={linkVariants} />
+                                    <MobileLink href="/settings" icon={Settings} label="Settings" onClick={closeMenu} variants={linkVariants} />
+                                </div>
+                            ) : (
+                                <div className="flex-grow-0">
+                                    <MobileLink href="/login" icon={LogOut} label="Sign In" onClick={closeMenu} variants={linkVariants} />
+                                    <MobileLink href="/register" icon={User} label="Create Account" onClick={closeMenu} variants={linkVariants} />
+                                </div>
+                            )}
 
                             <div className="mt-auto pb-5 pt-4 px-4 text-center">
                                 <motion.div variants={linkVariants} className="d-flex flex-column gap-3">
+                                    {user && !isPublicPage && (
+                                        <div className="bg-light dark:bg-dark-subtle p-3 rounded-4 mb-3 border shadow-sm">
+                                            <div className="text-muted small fw-bold mb-1" style={{ fontSize: '0.65rem', textTransform: 'uppercase' }}>
+                                                Logged in as {(user as any).role}
+                                            </div>
+                                            <div className="fw-semibold text-dark dark:text-light mb-3 truncate">
+                                                {user.email}
+                                            </div>
+                                            <button 
+                                                onClick={handleLogout}
+                                                disabled={isLoggingOut}
+                                                className="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2 rounded-3 fw-bold"
+                                            >
+                                                {isLoggingOut ? <Loader2 size={18} className="spinner-border spinner-border-sm border-0" /> : <LogOut size={18} />}
+                                                {isLoggingOut ? 'Signing out...' : 'Sign Out'}
+                                            </button>
+                                        </div>
+                                    )}
+
                                     <div className="text-muted small d-flex flex-column gap-2 align-items-center">
                                         <TransitionLink href="/" className="text-decoration-none d-flex align-items-center" onClick={closeMenu}>
                                             <span className="fw-bold tracking-tight fs-5 mb-0 text-dark dark:text-light d-flex align-items-center">

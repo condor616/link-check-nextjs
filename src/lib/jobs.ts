@@ -10,6 +10,7 @@ export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'pausing
 
 export interface ScanJob {
     id: string;
+    user_id?: string;
     status: JobStatus;
     scan_url: string;
     created_at: string;
@@ -36,9 +37,10 @@ export class JobService {
     /**
      * Creates a new scan job.
      */
-    async createJob(url: string, config: ScanConfig): Promise<ScanJob> {
+    async createJob(url: string, config: ScanConfig, userId: string): Promise<ScanJob> {
         const newJob: ScanJob = {
             id: uuidv4(),
+            user_id: userId,
             status: 'queued',
             scan_url: url,
             created_at: new Date().toISOString(),
@@ -70,6 +72,7 @@ export class JobService {
             await prisma.job.create({
                 data: {
                     id: newJob.id,
+                    userId: userId,
                     status: newJob.status,
                     scan_url: newJob.scan_url,
                     created_at: new Date(newJob.created_at),
@@ -89,7 +92,7 @@ export class JobService {
     /**
      * Retrieves all jobs (minimal metadata for list views).
      */
-    async getJobsMinimal(): Promise<Partial<ScanJob>[]> {
+    async getJobsMinimal(userId?: string): Promise<Partial<ScanJob>[]> {
         const useSupabase = await isUsingSupabase();
         const supabase = await getSupabaseClient();
 
@@ -99,9 +102,13 @@ export class JobService {
                 console.error('Supabase client is not available or not configured');
                 return [];
             }
-            const { data, error } = await (supabase
-                .from('scan_jobs') as any)
-                .select('id, status, scan_url, created_at, started_at, completed_at, progress_percent, urls_scanned, total_urls, broken_links, total_links')
+            const query = supabase
+                .from('scan_jobs')
+                .select('id, user_id, status, scan_url, created_at, started_at, completed_at, progress_percent, urls_scanned, total_urls, broken_links, total_links');
+            
+            if (userId) query.eq('user_id', userId);
+            
+            const { data, error } = await query
                 .order('created_at', { ascending: false })
                 .limit(50);
 
@@ -111,9 +118,14 @@ export class JobService {
             }
             return (data as any[]).map(this.mapDatabaseRowToScanJob);
         } else {
+            const where: any = {};
+            if (userId) where.userId = userId;
+
             const jobs = await prisma.job.findMany({
+                where,
                 select: {
                     id: true,
+                    userId: true,
                     status: true,
                     scan_url: true,
                     created_at: true,
@@ -141,7 +153,7 @@ export class JobService {
     /**
      * Retrieves all jobs.
      */
-    async getJobs(): Promise<ScanJob[]> {
+    async getJobs(userId?: string): Promise<ScanJob[]> {
         const useSupabase = await isUsingSupabase();
         const supabase = await getSupabaseClient();
 
@@ -151,9 +163,10 @@ export class JobService {
                 console.error('Supabase client is not available or not configured');
                 return [];
             }
-            const { data, error } = await (supabase
-                .from('scan_jobs') as any)
-                .select('*')
+            const query = supabase.from('scan_jobs').select('*');
+            if (userId) query.eq('user_id', userId);
+            
+            const { data, error } = await query
                 .order('created_at', { ascending: false })
                 .limit(50); // Limit to 50 most recent
 
@@ -163,7 +176,11 @@ export class JobService {
             }
             return (data as any[]).map(this.mapDatabaseRowToScanJob);
         } else {
+            const where: any = {};
+            if (userId) where.userId = userId;
+
             const jobs = await prisma.job.findMany({
+                where,
                 orderBy: { created_at: 'desc' },
                 take: 50
             });
@@ -175,7 +192,7 @@ export class JobService {
     /**
      * Retrieves a job by ID.
      */
-    async getJob(id: string): Promise<ScanJob | null> {
+    async getJob(id: string, userId?: string): Promise<ScanJob | null> {
         const useSupabase = await isUsingSupabase();
 
         if (useSupabase) {
@@ -184,11 +201,9 @@ export class JobService {
                 console.error('Supabase client is not available or not configured');
                 return null;
             }
-            const { data, error } = await (supabase
-                .from('scan_jobs') as any)
-                .select('*')
-                .eq('id', id)
-                .single();
+            const query = (supabase.from('scan_jobs') as any).select('*').eq('id', id);
+            if (userId) query.eq('user_id', userId);
+            const { data, error } = await query.single();
 
             if (error) {
                 if (error.code === 'PGRST116') { // No rows found
@@ -199,8 +214,11 @@ export class JobService {
             }
             return this.mapDatabaseRowToScanJob(data);
         } else {
-            const job = await prisma.job.findUnique({
-                where: { id }
+            const where: any = { id };
+            if (userId) where.userId = userId;
+
+            const job = await prisma.job.findFirst({
+                where
             });
             return job ? this.mapDatabaseRowToScanJob(job) : null;
         }
@@ -339,7 +357,8 @@ export class JobService {
                         config: updates.scan_config || (await this.getJob(id))?.scan_config || {} as any,
                         results: finalResults,
                         brokenLinksCount: updateData.broken_links,
-                        totalLinksCount: updateData.total_links
+                        totalLinksCount: updateData.total_links,
+                        userId: (await this.getJob(id))?.user_id
                     };
 
                     // Save to history using the same ID
@@ -493,49 +512,191 @@ export class JobService {
     }
 
     /**
-     * Gets the next pending job (queued).
-     * Used by the worker.
+     * Gets the next pending job (queued) using fair scheduling.
+     * Prioritizes users with fewer currently active jobs.
+     * Optionally marks the job as 'running' atomically to prevent race conditions.
      */
-    async getNextPendingJob(): Promise<ScanJob | null> {
+    async getNextPendingJob(shouldLock: boolean = true): Promise<ScanJob | null> {
         const useSupabase = await isUsingSupabase();
         const supabase = await getSupabaseClient();
 
         if (useSupabase) {
-            const supabase = await getSupabaseClient();
-            if (!supabase) {
-                return null;
-            }
-            // Get the oldest queued job
-            const { data, error } = await (supabase
-                .from('scan_jobs') as any)
-                .select('*')
-                .eq('status', 'queued')
-                .order('created_at', { ascending: true })
-                .limit(1)
-                .single();
+            if (!supabase) return null;
 
-            if (error) {
-                if (error.code === 'PGRST116') { // No rows found
-                    return null;
-                }
-                console.error('Supabase getNextPendingJob error:', error);
-                return null;
+            // 1. Get all queued jobs
+            const { data: queuedJobs, error: qError } = await (supabase
+                .from('scan_jobs') as any)
+                .select('id, user_id, created_at')
+                .eq('status', 'queued')
+                .order('created_at', { ascending: true });
+
+            if (qError || !queuedJobs || queuedJobs.length === 0) return null;
+
+            // 2. Get counts of running jobs per user
+            const { data: runningJobs, error: rError } = await (supabase
+                .from('scan_jobs') as any)
+                .select('user_id')
+                .in('status', ['running', 'pausing', 'stopping']);
+
+            const runningCounts: Record<string, number> = {};
+            if (runningJobs) {
+                runningJobs.forEach((j: any) => {
+                    const uid = j.user_id || 'anonymous';
+                    runningCounts[uid] = (runningCounts[uid] || 0) + 1;
+                });
             }
-            return data as ScanJob;
-        } else {
-            const job = await prisma.job.findFirst({
-                where: { status: 'queued' },
-                orderBy: { created_at: 'asc' }
+
+            // 3. Find the best job to pick
+            const userIdsWithQueuedJobs = Array.from(new Set<string>(queuedJobs.map((j: any) => (j.user_id || 'anonymous') as string)));
+            
+            // Fetch max_jobs for these users from users table
+            const { data: userData, error: uError } = await supabase
+                .from('users')
+                .select('id, max_jobs')
+                .in('id', userIdsWithQueuedJobs.filter(id => id !== 'anonymous'));
+
+            const maxJobsMap: Record<string, number> = {};
+            if (userData) {
+                userData.forEach((u: any) => maxJobsMap[u.id] = u.max_jobs || 1);
+            }
+
+            const userStats = userIdsWithQueuedJobs.map(uid => {
+                const userQueuedJobs = queuedJobs.filter((j: any) => (j.user_id || 'anonymous') === uid);
+                const maxJobs = uid === 'anonymous' ? 1 : (maxJobsMap[uid] || 1);
+                const runningCount = runningCounts[uid] || 0;
+
+                return {
+                    userId: uid,
+                    runningCount,
+                    maxJobs,
+                    isEligible: runningCount < maxJobs,
+                    oldestJobCreatedAt: userQueuedJobs[0].created_at,
+                    firstJobId: userQueuedJobs[0].id
+                };
+            }).filter(stat => stat.isEligible);
+
+            if (userStats.length === 0) return null;
+
+            userStats.sort((a, b) => {
+                if (a.runningCount !== b.runningCount) return a.runningCount - b.runningCount;
+                return new Date(a.oldestJobCreatedAt).getTime() - new Date(b.oldestJobCreatedAt).getTime();
             });
 
-            return job ? this.mapDatabaseRowToScanJob(job) : null;
+            const bestJobId = userStats[0].firstJobId;
+
+            // 4. Try to lock the job by updating its status to 'running' if it's still 'queued'
+            if (shouldLock) {
+                const { data: lockedJob, error: lockError } = await (supabase
+                    .from('scan_jobs') as any)
+                    .update({ status: 'running', started_at: new Date().toISOString() })
+                    .eq('id', bestJobId)
+                    .eq('status', 'queued') // CAS (Compare And Swap) to prevent race
+                    .select()
+                    .single();
+
+                if (lockError || !lockedJob) {
+                    // Someone else picked it up or error occurred
+                    return null;
+                }
+                return this.mapDatabaseRowToScanJob(lockedJob);
+            }
+
+            // If not locking, just return the job data
+            const { data: jobData, error: fError } = await (supabase
+                .from('scan_jobs') as any)
+                .select('*')
+                .eq('id', bestJobId)
+                .single();
+
+            if (fError || !jobData) return null;
+            return this.mapDatabaseRowToScanJob(jobData);
+
+        } else {
+            // Prisma / SQLite version
+            // We use a transaction to ensure we pick and lock the job atomically
+            const result = await prisma.$transaction(async (tx) => {
+                // 1. Get all queued jobs
+                const queuedJobs = await tx.job.findMany({
+                    where: { status: 'queued' },
+                    select: { id: true, userId: true, created_at: true },
+                    orderBy: { created_at: 'asc' }
+                });
+
+                if (queuedJobs.length === 0) return null;
+
+                // 2. Get counts of running jobs per user
+                const runningJobs = await tx.job.findMany({
+                    where: { status: { in: ['running', 'pausing', 'stopping'] } },
+                    select: { userId: true }
+                });
+
+                const runningCounts: Record<string, number> = {};
+                runningJobs.forEach(j => {
+                    const uid = j.userId || 'anonymous';
+                    runningCounts[uid] = (runningCounts[uid] || 0) + 1;
+                });
+
+                // 3. Determine which user's job to pick
+                const userIdsWithQueuedJobs = Array.from(new Set(queuedJobs.map(j => j.userId || 'anonymous')));
+                
+                // Fetch maxJobs for all these users
+                const users = await (tx as any).user.findMany({
+                    where: { id: { in: userIdsWithQueuedJobs.filter(id => id !== 'anonymous') } },
+                    select: { id: true, maxJobs: true }
+                });
+
+                const maxJobsMap: Record<string, number> = {};
+                users.forEach((u: any) => maxJobsMap[u.id] = u.maxJobs);
+
+                const userStats = userIdsWithQueuedJobs.map(uid => {
+                    const userQueuedJobs = queuedJobs.filter(j => (j.userId || 'anonymous') === uid);
+                    const maxJobs = uid === 'anonymous' ? 1 : (maxJobsMap[uid] || 1);
+                    const runningCount = runningCounts[uid] || 0;
+                    
+                    return {
+                        userId: uid,
+                        runningCount,
+                        maxJobs,
+                        isEligible: runningCount < maxJobs,
+                        oldestJobCreatedAt: userQueuedJobs[0].created_at,
+                        firstJobId: userQueuedJobs[0].id
+                    };
+                }).filter(stat => stat.isEligible);
+
+                if (userStats.length === 0) return null;
+
+                userStats.sort((a, b) => {
+                    if (a.runningCount !== b.runningCount) return a.runningCount - b.runningCount;
+                    return a.oldestJobCreatedAt.getTime() - b.oldestJobCreatedAt.getTime();
+                });
+
+                const bestJobId = userStats[0].firstJobId;
+
+                // 4. Update the job status to 'running' to lock it
+                if (shouldLock) {
+                    const updatedJob = await tx.job.update({
+                        where: { id: bestJobId },
+                        data: { 
+                            status: 'running',
+                            started_at: new Date()
+                        }
+                    });
+                    return updatedJob;
+                } else {
+                    return await tx.job.findUnique({ where: { id: bestJobId } });
+                }
+            }, {
+                isolationLevel: 'Serializable', // Highest isolation to prevent phantom reads/race in SQLite
+            });
+
+            return result ? this.mapDatabaseRowToScanJob(result) : null;
         }
     }
 
     /**
      * Deletes a job.
      */
-    async deleteJob(id: string): Promise<void> {
+    async deleteJob(id: string, userId: string): Promise<void> {
         const useSupabase = await isUsingSupabase();
 
         if (useSupabase) {
@@ -546,13 +707,18 @@ export class JobService {
             const { error } = await (supabase
                 .from('scan_jobs') as any)
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('user_id', userId);
 
             if (error) {
                 console.error('Supabase deleteJob error:', error);
                 throw new Error(`Failed to delete job from Supabase: ${error.message}`);
             }
         } else {
+            // First check if it exists and belongs to user
+            const job = await prisma.job.findFirst({ where: { id, userId } });
+            if (!job) throw new Error("Job not found or unauthorized");
+
             await prisma.job.delete({
                 where: { id }
             });
@@ -585,6 +751,7 @@ export class JobService {
 
         return {
             id: row.id,
+            user_id: row.user_id || row.userId || undefined,
             status: row.status as JobStatus,
             scan_url: row.scan_url,
             created_at: typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString(),

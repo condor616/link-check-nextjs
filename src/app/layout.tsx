@@ -10,6 +10,8 @@ import BootstrapClient from "@/components/BootstrapClient";
 import { getAppUrl } from "@/lib/settings";
 import { Footer } from "@/components/Footer";
 import SetupWrapper from "@/components/SetupWrapper";
+import AuthGuard from "@/components/auth/AuthGuard";
+import NextAuthProvider from "@/components/auth/NextAuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -102,38 +104,41 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
-          enableSystem
+          enableSystem={false}
           disableTransitionOnChange
         >
-          <NotificationProvider>
-            {/* App Shell Wrapper - Natural Flow */}
-            <SetupWrapper>
-              <div className="d-flex flex-column flex-grow-1 w-100">
-                {/* Desktop Top Navigation (Sticky) */}
-                <div className="sticky-top z-3">
-                  <TopNav />
-                </div>
-
-                {/* Mobile Header & Nav (Sticky) */}
-                <div className="sticky-top z-3 d-lg-none">
-                  <MobileNav />
-                </div>
-
-                {/* Main Content Area */}
-                <div className="flex-grow-1 d-flex flex-column main-content-wrapper">
-                  {/* Page Content */}
-                  <main className="flex-grow-1 d-flex flex-column">
-                    <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0 flex-grow-1">
-                      <PageTransition>
-                        {children}
-                      </PageTransition>
+          <NextAuthProvider>
+            <AuthGuard>
+              <NotificationProvider>
+                <SetupWrapper>
+                  <div className="d-flex flex-column flex-grow-1 w-100">
+                    {/* Desktop Top Navigation (Sticky) */}
+                    <div className="sticky-top z-3">
+                      <TopNav />
                     </div>
-                    <Footer />
-                  </main>
-                </div>
-              </div>
-            </SetupWrapper>
-          </NotificationProvider>
+
+                    {/* Mobile Header & Nav (Sticky) */}
+                    <div className="sticky-top z-3 d-lg-none">
+                      <MobileNav />
+                    </div>
+
+                    {/* Main Content Area */}
+                    <div className="flex-grow-1 d-flex flex-column main-content-wrapper">
+                      {/* Page Content */}
+                      <main className="flex-grow-1 d-flex flex-column">
+                        <div className="container-fluid px-4 px-md-5 py-4 pb-5 pb-md-0 flex-grow-1">
+                          <PageTransition>
+                            {children}
+                          </PageTransition>
+                        </div>
+                        <Footer />
+                      </main>
+                    </div>
+                  </div>
+                </SetupWrapper>
+              </NotificationProvider>
+            </AuthGuard>
+          </NextAuthProvider>
         </ThemeProvider>
       </body>
     </html>

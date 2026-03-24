@@ -2,16 +2,22 @@ import { NextResponse } from 'next/server';
 import { ScanResult } from '@/lib/scanner';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      return await getLastScanFromSupabase();
+      return await getLastScanFromSupabase(user.id);
     } else {
-      return await getLastScanFromPrisma();
+      return await getLastScanFromPrisma(user.id);
     }
   } catch (error) {
     console.error('Error fetching last scan:', error);
@@ -27,11 +33,12 @@ export async function GET() {
   }
 }
 
-async function getLastScanFromPrisma() {
+async function getLastScanFromPrisma(userId: string) {
   try {
     const lastScan = await prisma.scanHistory.findFirst({
       orderBy: { scan_date: 'desc' },
       where: {
+        userId,
         id: { not: 'temp_setup_id' }
       },
       select: {
@@ -74,7 +81,7 @@ async function getLastScanFromPrisma() {
   }
 }
 
-async function getLastScanFromSupabase() {
+async function getLastScanFromSupabase(userId: string) {
   try {
     const supabase = await getSupabaseClient();
 
@@ -85,6 +92,7 @@ async function getLastScanFromSupabase() {
     const { data, error } = await supabase
       .from('scan_history')
       .select('id, scan_url, scan_date, broken_links, total_links')
+      .eq('user_id', userId)
       .neq('id', 'temp_setup_id')
       .order('scan_date', { ascending: false })
       .limit(1)

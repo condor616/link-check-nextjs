@@ -3,13 +3,15 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import { getDatabaseUrl } from '@/lib/database';
 
 const execAsync = promisify(exec);
 
 export async function POST() {
     try {
         const cwd = process.cwd();
-        console.log('[SETUP] SQLite Initialization started. CWD:', cwd);
+        const dbUrl = getDatabaseUrl();
+        console.log('[SETUP] SQLite Initialization started. CWD:', cwd, 'URL:', dbUrl.replace(/:[^:@]+@/, ':****@'));
 
         // Priority 1: Check for prisma in the local standalone node_modules (fixed by build:static)
         let prismaBinPath = path.join(cwd, 'node_modules', 'prisma', 'build', 'index.js');
@@ -65,7 +67,7 @@ export async function POST() {
         const { stdout, stderr } = await execAsync(command, {
             env: {
                 ...process.env,
-                DATABASE_URL: process.env.DATABASE_URL || 'file:./dev.db'
+                DATABASE_URL: getDatabaseUrl()
             }
         });
 

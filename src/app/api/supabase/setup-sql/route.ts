@@ -55,6 +55,21 @@ export async function POST(request: Request) {
       );
     }
 
+    // New: Handle connection test only requests
+    try {
+      const body = await request.json().catch(() => ({}));
+      if (body.connectionTestOnly) {
+        // If we reach here, the connection test above already passed or identified missing tables
+        // We can just return success for the connection itself
+        return NextResponse.json({
+          message: 'Connection to Supabase successful',
+          connected: true
+        });
+      }
+    } catch (e) {
+      // Body parsing might fail if it's empty, ignore and continue
+    }
+
     // Since we cannot directly execute SQL with the JavaScript SDK, we'll use another approach.
     // We'll try to create empty tables by inserting and then deleting a record, which will create the tables if they don't exist.
 
@@ -145,16 +160,29 @@ export async function POST(request: Request) {
           error: 'Tables do not exist in your Supabase database. Please run the provided SQL commands in the Supabase SQL editor.',
           message: 'Tables need to be created manually',
           sql_commands: [
-            `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`,
-            `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, config JSONB NOT NULL, results JSONB NOT NULL);`,
-            `CREATE TABLE IF NOT EXISTS scan_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, scan_url TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), started_at TIMESTAMP WITH TIME ZONE, completed_at TIMESTAMP WITH TIME ZONE, progress_percent NUMERIC DEFAULT 0, current_url TEXT, urls_scanned INTEGER DEFAULT 0, total_urls INTEGER DEFAULT 0, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, scan_config JSONB NOT NULL, error TEXT, results JSONB, state TEXT);`
+            `-- 1. POWER FLUSH (Drop triggers and functions that cause "Database error granting user")`,
+            `DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users CASCADE;`,
+            `DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;`,
+            `NOTIFY pgrst, 'reload schema';`,
+            `-- 2. REBUILD USERS TABLE (With standard compatibility columns)`,
+            `CREATE TABLE IF NOT EXISTS public.users (id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE, email TEXT UNIQUE NOT NULL, name TEXT, role TEXT DEFAULT 'user', has_access BOOLEAN DEFAULT false, max_jobs INTEGER DEFAULT 1, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), last_sign_in_at TIMESTAMP WITH TIME ZONE, raw_app_meta_data JSONB, raw_user_meta_data JSONB, is_super_admin BOOLEAN);`,
+            `-- 3. ENABLE RLS AND PERMISSIONS`,
+            `ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;`,
+            `DROP POLICY IF EXISTS "Allow all for service role" ON public.users;`,
+            `CREATE POLICY "Allow all for service role" ON public.users FOR ALL USING (true) WITH CHECK (true);`,
+            `-- 4. APP TABLES`,
+            `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), user_id UUID REFERENCES public.users(id) ON DELETE CASCADE);`,
+            `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, config JSONB NOT NULL, results JSONB NOT NULL, user_id UUID REFERENCES public.users(id) ON DELETE CASCADE);`,
+            `CREATE TABLE IF NOT EXISTS scan_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, scan_url TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), started_at TIMESTAMP WITH TIME ZONE, completed_at TIMESTAMP WITH TIME ZONE, progress_percent NUMERIC DEFAULT 0, current_url TEXT, urls_scanned INTEGER DEFAULT 0, total_urls INTEGER DEFAULT 0, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, scan_config JSONB NOT NULL, error TEXT, results JSONB, state TEXT, user_id UUID REFERENCES public.users(id) ON DELETE CASCADE);`,
+            `CREATE TABLE IF NOT EXISTS scan_logs (id TEXT PRIMARY KEY, job_id TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), level TEXT NOT NULL, message TEXT NOT NULL, data TEXT, user_id UUID REFERENCES public.users(id) ON DELETE CASCADE);`
           ]
         }, { status: 202 }); // Status 202 Accepted - tables need to be created manually
 
       // If we made it here without errors or "does not exist" errors, tables are ready
       return NextResponse.json({
         message: 'Supabase tables are set up and ready to use',
-        tables: ['scan_configs', 'scan_history', 'scan_jobs']
+        tables: ['scan_configs', 'scan_history', 'scan_jobs'],
+        diagnostic_sql: `SELECT tgname as trigger_name FROM pg_trigger WHERE tgrelid = 'auth.users'::regclass;`
       });
 
     } catch (sqlError) {
@@ -162,9 +190,11 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: 'Failed to set up Supabase tables. You may need to run these SQL commands manually in the Supabase dashboard SQL editor:',
         sql_commands: [
-          `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`,
-          `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, config JSONB NOT NULL, results JSONB NOT NULL);`,
-          `CREATE TABLE IF NOT EXISTS scan_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, scan_url TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), started_at TIMESTAMP WITH TIME ZONE, completed_at TIMESTAMP WITH TIME ZONE, progress_percent NUMERIC DEFAULT 0, current_url TEXT, urls_scanned INTEGER DEFAULT 0, total_urls INTEGER DEFAULT 0, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, scan_config JSONB NOT NULL, error TEXT, results JSONB, state TEXT);`
+          `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, role TEXT DEFAULT 'user', has_access BOOLEAN DEFAULT false, max_jobs INTEGER DEFAULT 1, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`,
+          `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`,
+          `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, config JSONB NOT NULL, results JSONB NOT NULL, user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`,
+          `CREATE TABLE IF NOT EXISTS scan_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, scan_url TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), started_at TIMESTAMP WITH TIME ZONE, completed_at TIMESTAMP WITH TIME ZONE, progress_percent NUMERIC DEFAULT 0, current_url TEXT, urls_scanned INTEGER DEFAULT 0, total_urls INTEGER DEFAULT 0, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, scan_config JSONB NOT NULL, error TEXT, results JSONB, state TEXT, user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`,
+          `CREATE TABLE IF NOT EXISTS scan_logs (id TEXT PRIMARY KEY, job_id TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), level TEXT NOT NULL, message TEXT NOT NULL, data TEXT, user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`
         ]
       }, { status: 500 });
     }

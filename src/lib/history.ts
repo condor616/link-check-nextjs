@@ -12,6 +12,7 @@ export interface SaveScanPayload {
     results: ScanResult[];
     brokenLinksCount?: number;
     totalLinksCount?: number;
+    userId?: string;
 }
 
 // Define the structure of the saved file
@@ -78,7 +79,8 @@ export class HistoryService {
                 broken_links: savedData.brokenLinksCount || 0,
                 total_links: savedData.totalLinksCount || 0,
                 config: JSON.stringify(savedData.config),
-                results: JSON.stringify(savedData.results)
+                results: JSON.stringify(savedData.results),
+                userId: savedData.userId // Link the history to the user
             };
 
             await prisma.scanHistory.upsert({
@@ -122,7 +124,8 @@ export class HistoryService {
                     broken_links: savedData.brokenLinksCount || 0,
                     total_links: savedData.totalLinksCount || 0,
                     config: savedData.config,
-                    results: savedData.results
+                    results: savedData.results,
+                    user_id: savedData.userId // Link the history to the user
                 });
 
             if (error) {
@@ -136,6 +139,75 @@ export class HistoryService {
         } catch (error) {
             console.error("Error saving scan to Supabase:", error);
             throw error;
+        }
+    }
+
+    /**
+     * Retrieves a scan by ID and user ID.
+     */
+    async getScan(id: string, userId: string): Promise<SavedScan | null> {
+        const useSupabase = await isUsingSupabase();
+
+        if (useSupabase) {
+            return await this.getScanFromSupabase(id, userId);
+        } else {
+            return await this.getScanFromPrisma(id, userId);
+        }
+    }
+
+    private async getScanFromPrisma(id: string, userId: string): Promise<SavedScan | null> {
+        try {
+            const scan = await prisma.scanHistory.findFirst({
+                where: { id, userId }
+            });
+
+            if (!scan) return null;
+
+            return {
+                id: scan.id,
+                scanUrl: scan.scan_url,
+                scanDate: scan.scan_date.toISOString(),
+                durationSeconds: scan.duration_seconds,
+                config: JSON.parse(scan.config),
+                results: JSON.parse(scan.results),
+                userId: scan.userId || undefined,
+                brokenLinksCount: scan.broken_links,
+                totalLinksCount: scan.total_links
+            };
+        } catch (error) {
+            console.error("Error getting scan from Prisma:", error);
+            return null;
+        }
+    }
+
+    private async getScanFromSupabase(id: string, userId: string): Promise<SavedScan | null> {
+        try {
+            const supabase = await getSupabaseClient();
+            if (!supabase) return null;
+
+            const { data, error } = await (supabase
+                .from('scan_history') as any)
+                .select('*')
+                .eq('id', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (error || !data) return null;
+
+            return {
+                id: data.id,
+                scanUrl: data.scan_url,
+                scanDate: data.scan_date,
+                durationSeconds: data.duration_seconds,
+                config: data.config,
+                results: data.results,
+                userId: data.user_id,
+                brokenLinksCount: data.broken_links,
+                totalLinksCount: data.total_links
+            };
+        } catch (error) {
+            console.error("Error getting scan from Supabase:", error);
+            return null;
         }
     }
 }

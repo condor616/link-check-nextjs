@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jobService } from '@/lib/jobs';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
+import { historyService } from '@/lib/history';
 
 // Helper function to serialize results for JSON (same as in scan/route.ts)
 function serializeResults(results: any[]): any[] {
@@ -16,8 +18,13 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await getCurrentUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const id = (await params).id;
-        const job = await jobService.getJob(id);
+        const job = await jobService.getJob(id, user.id);
 
         if (!job) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -31,15 +38,12 @@ export async function GET(
             // try to fetch them from the history table to maintain UI compatibility
             try {
                 console.log(`Fetching results from history for completed job ${id}`);
-                const historyResponse = await fetch(`${request.nextUrl.origin}/api/history/${id}`);
-                if (historyResponse.ok) {
-                    const historyData = await historyResponse.json();
-                    if (historyData && historyData.results) {
-                        job.results = historyData.results;
-                        // Also sync other metadata if missing
-                        if (!job.scan_config || Object.keys(job.scan_config).length === 0) {
-                            job.scan_config = historyData.config;
-                        }
+                const historyData = await historyService.getScan(id, user.id);
+                if (historyData && historyData.results) {
+                    job.results = historyData.results;
+                    // Also sync other metadata if missing
+                    if (!job.scan_config || Object.keys(job.scan_config).length === 0) {
+                        job.scan_config = historyData.config;
                     }
                 }
             } catch (historyError) {
@@ -62,6 +66,11 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await getCurrentUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const id = (await params).id;
         const body = await request.json();
         const { action } = body;
@@ -70,7 +79,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Action is required' }, { status: 400 });
         }
 
-        const job = await jobService.getJob(id);
+        const job = await jobService.getJob(id, user.id);
         if (!job) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });
         }
@@ -104,10 +113,15 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await getCurrentUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const id = (await params).id;
 
         // Signal worker to stop first if it's running
-        const job = await jobService.getJob(id);
+        const job = await jobService.getJob(id, user.id);
         if (job && (job.status === 'running' || job.status === 'pausing' || job.status === 'paused')) {
             await jobService.stopJob(id);
             // Give it a tiny bit of time to signal? 
@@ -124,7 +138,7 @@ export async function DELETE(
             // innovative, but don't fail the job deletion if logs fail
         }
 
-        await jobService.deleteJob(id);
+        await jobService.deleteJob(id, user.id);
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error('Error deleting job:', error);

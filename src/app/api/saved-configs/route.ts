@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { ScanConfig } from '@/lib/scanner';
-import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
+import { getSupabaseClient, isUsingSupabase, ensureUserInSupabase } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 // Define the expected structure for saved configurations
 export interface SavedScanConfig {
@@ -12,18 +13,24 @@ export interface SavedScanConfig {
   config: ScanConfig;
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
+  userId?: string;
 }
 
 // GET all saved configurations
 export async function GET() {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      return await getConfigsFromSupabase();
+      return await getConfigsFromSupabase(user.id);
     } else {
-      return await getConfigsFromPrisma();
+      return await getConfigsFromPrisma(user.id);
     }
   } catch (error) {
     console.error('Error getting saved configurations:', error);
@@ -33,9 +40,10 @@ export async function GET() {
 }
 
 // Get configs from Prisma
-async function getConfigsFromPrisma() {
+async function getConfigsFromPrisma(userId: string) {
   try {
     const configs = await prisma.savedConfig.findMany({
+      where: { userId },
       orderBy: { updatedAt: 'desc' }
     });
 
@@ -66,7 +74,7 @@ async function getConfigsFromPrisma() {
 }
 
 // Get configs from Supabase
-async function getConfigsFromSupabase() {
+async function getConfigsFromSupabase(userId: string) {
   try {
     const supabase = await getSupabaseClient();
 
@@ -77,6 +85,7 @@ async function getConfigsFromSupabase() {
     const { data, error } = await supabase
       .from('scan_configs')
       .select('*')
+      .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -115,6 +124,11 @@ async function getConfigsFromSupabase() {
 // POST to save a new configuration
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const payload = await request.json();
 
     // Validate payload
@@ -139,13 +153,16 @@ export async function POST(request: NextRequest) {
       url: payload.url,
       config: payload.config,
       createdAt: payload.createdAt || now,
-      updatedAt: now
+      updatedAt: now,
+      userId: user.id
     };
 
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
+      // Ensure user row exists in Supabase public.users before FK-referencing insert
+      await ensureUserInSupabase(user);
       return await saveConfigToSupabase(savedConfig);
     } else {
       return await saveConfigToPrisma(savedConfig);
@@ -174,7 +191,8 @@ async function saveConfigToPrisma(config: SavedScanConfig) {
         name: config.name,
         url: config.url,
         config: JSON.stringify(config.config),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        userId: config.userId! // Ensure it remains linked
       },
       create: {
         id: config.id,
@@ -182,7 +200,8 @@ async function saveConfigToPrisma(config: SavedScanConfig) {
         url: config.url,
         config: JSON.stringify(config.config),
         createdAt: new Date(config.createdAt),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        userId: config.userId!
       }
     });
 
@@ -226,9 +245,11 @@ async function saveConfigToSupabase(config: SavedScanConfig) {
           name: config.name,
           url: config.url,
           config: config.config,
-          updated_at: config.updatedAt
+          updated_at: config.updatedAt,
+          user_id: config.userId
         })
-        .eq('id', config.id);
+        .eq('id', config.id)
+        .eq('user_id', config.userId);
     } else {
       // Insert new config
       result = await (supabase
@@ -239,7 +260,8 @@ async function saveConfigToSupabase(config: SavedScanConfig) {
           url: config.url,
           config: config.config,
           created_at: config.createdAt,
-          updated_at: config.updatedAt
+          updated_at: config.updatedAt,
+          user_id: config.userId
         });
     }
 
@@ -264,6 +286,11 @@ async function saveConfigToSupabase(config: SavedScanConfig) {
 // DELETE a saved configuration
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
 
@@ -278,9 +305,9 @@ export async function DELETE(request: NextRequest) {
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      return await deleteConfigFromSupabase(id);
+      return await deleteConfigFromSupabase(id, user.id);
     } else {
-      return await deleteConfigFromPrisma(id);
+      return await deleteConfigFromPrisma(id, user.id);
     }
   } catch (error) {
     console.error('Error deleting configuration:', error);
@@ -298,8 +325,14 @@ export async function DELETE(request: NextRequest) {
 }
 
 // Delete config from Prisma
-async function deleteConfigFromPrisma(id: string) {
+async function deleteConfigFromPrisma(id: string, userId: string) {
   try {
+    // Check ownership first
+    const config = await prisma.savedConfig.findFirst({ where: { id, userId } });
+    if (!config) {
+        return NextResponse.json({ error: 'Configuration not found or unauthorized' }, { status: 404 });
+    }
+
     await prisma.savedConfig.delete({
       where: { id: id }
     });
@@ -320,7 +353,7 @@ async function deleteConfigFromPrisma(id: string) {
 }
 
 // Delete config from Supabase
-async function deleteConfigFromSupabase(id: string) {
+async function deleteConfigFromSupabase(id: string, userId: string) {
   try {
     const supabase = await getSupabaseClient();
 
@@ -331,7 +364,8 @@ async function deleteConfigFromSupabase(id: string) {
     const { error } = await supabase
       .from('scan_configs')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
 
     if (error) {
       throw new Error(`Supabase error: ${error.message}`);

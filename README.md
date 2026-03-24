@@ -14,7 +14,9 @@ A web application for scanning websites and identifying broken links. This tool 
 - **History Tracking**: Save scans for later reference
 - **Responsive Design**: Works on desktop and mobile devices
 - **Robust Storage**: Uses SQLite (via Prisma) by default, with optional Supabase support
+- **Modern Authentication**: Powered by **Auth.js (NextAuth.js v5)** for secure session management
 - **Background Processing**: Dedicated worker for handling long-running scans
+- **Per-User Concurrency**: Assign custom scan limits to users for fair resource distribution
 
 ## Getting Started
 
@@ -22,6 +24,7 @@ A web application for scanning websites and identifying broken links. This tool 
 
 - Node.js 20.x or later
 - npm or yarn
+- **NEXTAUTH_SECRET**: A secret key for Auth.js sessions (e.g., generated via `openssl rand -base64 32`)
 
 ### Installation
 
@@ -43,9 +46,12 @@ yarn install
    ```bash
    cp .env.example .env
    ```
+   - **Configure Auth.js**:
+     - Set `NEXTAUTH_SECRET` to a random string.
+     - Set `AUTH_TRUST_HOST=true` (especially for production or reverse proxies).
    - (Optional) Configure your preferred storage in `.env`:
      - Set `STORAGE_TYPE="sqlite"` (default) or `STORAGE_TYPE="supabase"`.
-     - If using Supabase, provide `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+     - If using Supabase, provide `DATABASE_URL` (for Prisma) and optionally `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
 4. Start the application (Development)
    This command starts both the Next.js web application and the background worker concurrently.
@@ -58,6 +64,14 @@ npm run dev
 ### Stopping the Application
 
 To stop the application, simply press `Ctrl+C` in the terminal where the application is running.
+
+### Cleaning / Resetting the App
+
+If you want to start fresh (delete the database and reset settings):
+```bash
+npm run reset
+```
+This will delete `.app_settings.json`, remove the local SQLite database, and re-initialize the schema.
 
 ### Managing the Worker
 
@@ -75,7 +89,7 @@ npm run build
 
 2. Start everything (Server + Worker + Migrations):
 ```bash
-# Ensure DATABASE_URL is set in your environment
+# Ensure DATABASE_URL and NEXTAUTH_SECRET are set in your environment
 npm start
 ```
 
@@ -89,6 +103,7 @@ For production usage, pull the pre-built image from Docker Hub (no build require
 ```bash
 docker run -d -p 3000:3000 \
   -e DATABASE_URL="file:/app/data/db.sqlite" \
+  -e NEXTAUTH_SECRET="your-secret-here" \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/.scan_history:/app/.scan_history \
   condor616/link-check:latest
@@ -147,7 +162,7 @@ The application's runtime settings (like storage type and Supabase credentials) 
 
 For multi-device access and cloud persistence, you can use Supabase:
 1. **Automated Setup**: Choose "Supabase" during the first-run Setup Wizard.
-2. **Schema Control**: The wizard can automatically initialize the required tables (`scan_history`, `scan_jobs`, `scan_configs`) for you.
+2. **Schema Control**: The wizard can automatically initialize the required tables for you.
 3. **Environment Sync**: You can also pre-configure Supabase credentials in your `.env` file to skip manual entry.
 
 ## Usage
@@ -181,6 +196,7 @@ For multi-device access and cloud persistence, you can use Supabase:
 - TypeScript
 - Bootstrap 5 & Sass
 - Prisma (SQLite)
+- Auth.js v5 (Authentication)
 - Cheerio (for HTML parsing)
 - Supabase (optional, for database storage)
 - Lucide React (for icons)
@@ -190,9 +206,9 @@ For multi-device access and cloud persistence, you can use Supabase:
 
 ### Common Issues
 
-#### 1. Missing `DATABASE_URL` Environment Variable
+#### 1. Missing `DATABASE_URL` or `NEXTAUTH_SECRET`
 
-**Error:** `PrismaConfigEnvError: Missing required environment variable: DATABASE_URL`
+**Error:** `PrismaConfigEnvError` or Auth.js errors on startup.
 
 **Solution:**
 Ensure you have a `.env` file in the root directory. You can create one from the example:
@@ -201,9 +217,10 @@ Ensure you have a `.env` file in the root directory. You can create one from the
 cp .env.example .env
 ```
 
-For local development with SQLite, the file should contain:
+Ensure it contains:
 ```
 DATABASE_URL="file:./dev.db"
+NEXTAUTH_SECRET="your-generated-secret"
 ```
 
 #### 2. Database Tables Missing
@@ -224,32 +241,22 @@ To deploy this application to Vercel, follow these steps:
 1. **Prerequisite**: Set up a Supabase project and obtain your `DATABASE_URL` (PostgreSQL).
 2. **Environment Variables**: Add the following to your Vercel project:
    - `DATABASE_URL`: Your Supabase connection string.
-   - `NEXT_PUBLIC_SUPABASE_URL`: (Optional, if using Supabase client).
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: (Optional, if using Supabase client).
+   - `NEXTAUTH_SECRET`: Your Auth.js secret.
+   - `NEXTAUTH_URL`: Your production URL.
+   - `NEXT_PUBLIC_SUPABASE_URL`: (Optional).
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: (Optional).
 3. **Build Command**: `npm run build`
 4. **Worker Configuration**:
    - **Persistence (Non-Serverless)**: Host the worker using `node .next/standalone/worker.js` on a platform like Render, Railway, or a VPS.
    - **Serverless (Vercel)**: 
      - Use the provided API route: `/api/worker`.
      - Set up a **Vercel Cron Job** in your `vercel.json` to call this endpoint periodically.
-     - Example `vercel.json`:
-       ```json
-       {
-         "crons": [
-           {
-             "path": "/api/worker",
-             "schedule": "*/5 * * * *"
-           }
-         ]
-       }
-       ```
 
 ## Optimizations
 
 - **Build Pipeline**: Consolidated `package.json` scripts into a single `npm run build` command that handles Prisma generation, Next.js build, and worker bundling.
 - **Database Performance**: Added indexes to `Job.status` and `Job.created_at` for efficient polling.
-- **Shared Logic**: Extracted worker processing into a shared core, enabling the same logic to run in either a persistent loop or a serverless request.
-
+- **Auth.js Integration**: Standardized authentication flow for both local and cloud environments.
 
 
 ## License
@@ -258,7 +265,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- TailwindCSS UI for design inspiration
+- NextAuth.js for secure authentication
+- Bootstrap 5 for professional UI
 - Radix UI for accessible components
 - Cheerio for HTML parsing
 - Supabase for database functionality

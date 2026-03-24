@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { ComponentPropsWithoutRef } from "react";
-import { usePageTransition } from "@/hooks/usePageTransition";
+import { usePathname } from 'next/navigation';
 import { cn } from "@/lib/utils";
 
-interface TransitionLinkProps extends ComponentPropsWithoutRef<"a"> {
+interface TransitionLinkProps extends ComponentPropsWithoutRef<typeof Link> {
   href: string;
   activeClassName?: string;
 }
@@ -17,21 +18,13 @@ export function TransitionLink({
   onClick,
   ...props
 }: TransitionLinkProps) {
-  const { navigateWithTransition, currentPath } = usePageTransition();
-  const isActive = currentPath === href;
-
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    if (onClick) {
-      onClick(e);
-    }
-    navigateWithTransition(href);
-  };
+  const pathname = usePathname();
+  const isActive = pathname === href || (pathname === '/' && href === '/');
 
   return (
-    <a
+    <Link
       href={href}
-      onClick={handleClick}
+      onClick={onClick}
       className={cn(
         className,
         isActive && activeClassName
@@ -39,6 +32,6 @@ export function TransitionLink({
       {...props}
     >
       {children}
-    </a>
+    </Link>
   );
 } 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Database, HelpCircle, Trash, RefreshCw, Eraser, AlertCircle, Check, Copy, Globe } from "lucide-react";
+import { useState, useEffect, useRef } from 'react';
+import { Database, HelpCircle, Trash, RefreshCw, Eraser, AlertCircle, Check, Copy, Globe, Shield } from "lucide-react";
 import { useNotification } from "@/components/NotificationContext";
+import { signOut } from 'next-auth/react';
 
 import { AnimatedCard } from "@/components/AnimatedCard";
 import { AnimatedButton } from "@/components/AnimatedButton";
@@ -15,6 +16,7 @@ export function SettingsClient() {
   const [storageType, setStorageType] = useState<StorageType>('sqlite');
   const [supabaseUrl, setSupabaseUrl] = useState('');
   const [supabaseKey, setSupabaseKey] = useState('');
+  const [supabaseServiceKey, setSupabaseServiceKey] = useState('');
   const [appUrl, setAppUrl] = useState('http://localhost:3000');
   const [maxScansPerMinute, setMaxScansPerMinute] = useState(200);
   const [savedMaxScansPerMinute, setSavedMaxScansPerMinute] = useState(200);
@@ -38,6 +40,14 @@ export function SettingsClient() {
   const [showConfirmClearDialog, setShowConfirmClearDialog] = useState(false);
   const [showConnectionSuccessDialog, setShowConnectionSuccessDialog] = useState(false);
   const [envDefaults, setEnvDefaults] = useState<{ supabaseUrl?: string, supabaseKey?: string } | null>(null);
+  const [hasAdminOnTarget, setHasAdminOnTarget] = useState<boolean | null>(null);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminForm, setShowAdminForm] = useState(false);
+  const [supabaseEmpty, setSupabaseEmpty] = useState(false);
+  
+  // Track initial storage type to detect switches
+  const initialStorageType = useRef<StorageType | null>(null);
 
   // Get notification context to show global notifications
   const { addNotification } = useNotification();
@@ -67,11 +77,18 @@ export function SettingsClient() {
       if (response.ok) {
         const data = await response.json();
         const type = data.storageType || 'sqlite';
-        setStorageType(type === 'file' ? 'sqlite' : type);
+        const normalizedType = type === 'file' ? 'sqlite' : type;
+        setStorageType(normalizedType);
+        
+        // Save initial type if not set yet
+        if (initialStorageType.current === null) {
+          initialStorageType.current = normalizedType;
+        }
 
         // Use saved settings if they exist, otherwise fallback to env defaults if we're in that mode
         setSupabaseUrl(data.supabaseUrl || (type === 'supabase' ? statusData.defaults?.supabaseUrl : '') || '');
         setSupabaseKey(data.supabaseKey || (type === 'supabase' ? statusData.defaults?.supabaseKey : '') || '');
+        setSupabaseServiceKey(data.supabaseServiceKey || '');
         setAppUrl(data.appUrl || 'http://localhost:3000');
         setMaxScansPerMinute(data.maxScansPerMinute || 200);
         setSavedMaxScansPerMinute(data.maxScansPerMinute || 200);
@@ -122,6 +139,7 @@ export function SettingsClient() {
           storageType,
           supabaseUrl,
           supabaseKey,
+          supabaseServiceKey,
           appUrl,
           maxScansPerMinute,
         }),
@@ -135,9 +153,31 @@ export function SettingsClient() {
       addNotification('success', 'Settings saved successfully');
       setSavedMaxScansPerMinute(maxScansPerMinute);
 
+      // Check if storage type changed
+      const storageChanged = initialStorageType.current !== null && storageType !== initialStorageType.current;
+
+      if (storageChanged) {
+        addNotification('info', 'Storage mode changed. Logging out to apply changes...');
+        setTimeout(() => {
+          signOut({ callbackUrl: '/login?storageSwitched=true' });
+        }, 1500);
+        return; // Stop further processing as we are logging out
+      }
+
       // After saving, check if initialization is needed for the chosen storage
       if (storageType === 'sqlite') {
         const initRes = await fetch('/api/setup/sqlite', { method: 'POST' });
+        
+        // Finalize admin if needed (though usually done in wizard)
+        if (showAdminForm && adminEmail && adminPassword) {
+            await fetch('/api/setup/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: adminEmail, password: adminPassword, storageType: 'sqlite' })
+            });
+            setShowAdminForm(false);
+        }
+
         if (!initRes.ok) {
           const initData = await initRes.json();
           addNotification('warning', `Settings saved, but SQLite initialization failed: ${initData.details || 'Unknown error'}. You might need to check your logs.`);
@@ -145,7 +185,23 @@ export function SettingsClient() {
           addNotification('success', 'Local database initialized successfully.');
         }
       } else if (storageType === 'supabase') {
-        checkTablesExist();
+        await checkTablesExist();
+        
+        // Create admin if needed
+        if (showAdminForm && adminEmail && adminPassword) {
+            const adminRes = await fetch('/api/setup/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: adminEmail, password: adminPassword, storageType: 'supabase' })
+            });
+            if (adminRes.ok) {
+                setShowAdminForm(false);
+                addNotification('success', 'Admin account created for Supabase.');
+            } else {
+                const adminData = await adminRes.json();
+                addNotification('error', `Failed to create admin: ${adminData.error}`);
+            }
+        }
       } else {
         // If using file storage, reset the tablesExist state
         setTablesExist(false);
@@ -242,7 +298,7 @@ export function SettingsClient() {
 
     try {
       // First check if tables already exist
-      const tableNames = ['scan_configs', 'scan_history', 'scan_jobs'];
+      const tableNames = ['users', 'accounts', 'sessions', 'scan_configs', 'scan_history', 'scan_jobs', 'scan_logs'];
       let allTablesExist = true;
 
       for (const table of tableNames) {
@@ -346,7 +402,7 @@ export function SettingsClient() {
 
     try {
       // Check if all required tables exist
-      const tableNames = ['scan_configs', 'scan_history', 'scan_jobs'];
+      const tableNames = ['users', 'accounts', 'sessions', 'scan_configs', 'scan_history', 'scan_jobs', 'scan_logs'];
       let allTablesExist = true;
 
       for (const table of tableNames) {
@@ -379,6 +435,17 @@ export function SettingsClient() {
       }
 
       setTablesExist(allTablesExist);
+
+      // New: Check if admin exists on target Supabase
+      if (allTablesExist) {
+          const statusRes = await fetch('/api/setup/status');
+          const statusData = await statusRes.json();
+          setHasAdminOnTarget(statusData.hasAdmin);
+          if (statusData.hasAdmin === false) {
+              setShowAdminForm(true);
+              addNotification('info', 'Supabase context found but no admin users detected. Please provide initial admin credentials.');
+          }
+      }
     } catch (error) {
       console.error('Error checking tables:', error);
       setTablesExist(false);
@@ -403,12 +470,13 @@ export function SettingsClient() {
 
       const data = await response.json();
 
-      if (response.status === 202) {
+      if (response.status === 202 || (data && data.sql_commands)) {
         // Tables need to be created manually
         setSqlCommands(data.sql_commands);
         setShowSqlCommands(true);
         addNotification('warning', 'Tables need to be created manually in Supabase');
-        return;
+        setIsResetting(false);
+        return; // Success showing instructions
       }
 
       if (!response.ok) {
@@ -471,18 +539,17 @@ export function SettingsClient() {
         throw new Error(data.error || 'Failed to get SQL commands');
       }
 
-      // If no tables exist
-      if (data.message && data.message.includes('No tables found')) {
-        addNotification('info', 'No tables to delete - your Supabase database is already empty');
-        setTablesExist(false);
-        return;
-      }
-
-      // Show SQL commands in popup
+      // Show SQL commands in popup (always show, but track if empty)
       if (data.sql_commands && Array.isArray(data.sql_commands)) {
         setSqlCommands(data.sql_commands);
+        setSupabaseEmpty(!data.tablesExist);
         setShowSqlCommands(true);
-        addNotification('info', 'Please run the SQL commands in your Supabase SQL Editor to delete tables');
+        
+        if (data.tablesExist) {
+          addNotification('info', 'Please run the SQL commands in your Supabase SQL Editor to delete tables');
+        } else {
+          addNotification('info', 'Supabase is already empty, but here is the SQL to purge it anyway');
+        }
       } else {
         throw new Error('No SQL commands returned');
       }
@@ -773,6 +840,26 @@ export function SettingsClient() {
                     <div className="form-text">The anon/public API key for your Supabase project</div>
                   </div>
 
+                  <div className="mb-4">
+                    <label htmlFor="supabase-service-key" className="form-label d-flex justify-content-between">
+                      <div className="d-flex align-items-center gap-2">
+                        <span>Supabase Service Role Key <span className="text-secondary small">(Optional)</span></span>
+                      </div>
+                    </label>
+                    <input
+                      id="supabase-service-key"
+                      type="password"
+                      className="form-control"
+                      value={supabaseServiceKey}
+                      onChange={(e) => setSupabaseServiceKey(e.target.value)}
+                      placeholder="Your Supabase service_role key"
+                    />
+                    <div className="form-text text-warning small">
+                        <AlertCircle size={12} className="me-1" />
+                        Required for creating initial admin account without SMTP email confirmation.
+                    </div>
+                  </div>
+
                   <div className="d-flex flex-wrap gap-2 mb-3">
                     <AnimatedButton
                       variant="outline-secondary" // Changed from outline to outline-secondary
@@ -786,11 +873,40 @@ export function SettingsClient() {
                     </AnimatedButton>
                   </div>
 
-                  {connectionTestResult && !connectionTestResult.success && (
+                    {connectionTestResult && !connectionTestResult.success && (
                     <div className="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
                       <AlertCircle className="h-5 w-5 flex-shrink-0" />
                       <div>{connectionTestResult.message}</div>
                     </div>
+                  )}
+
+                  {showAdminForm && (
+                      <div className="card border-primary border-opacity-25 bg-primary bg-opacity-5 mb-3">
+                          <div className="card-body">
+                              <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
+                                  <Shield className="h-4 w-4 text-primary" /> Create Initial Admin Account
+                              </h6>
+                              <p className="small text-muted mb-3"> This storage currently has no admin users. Please create one to manage the app.</p>
+                              <div className="mb-2">
+                                  <input
+                                    type="email"
+                                    className="form-control form-control-sm"
+                                    placeholder="Admin Email"
+                                    value={adminEmail}
+                                    onChange={(e) => setAdminEmail(e.target.value)}
+                                  />
+                              </div>
+                              <div className="mb-0">
+                                  <input
+                                    type="password"
+                                    className="form-control form-control-sm"
+                                    placeholder="Admin Password"
+                                    value={adminPassword}
+                                    onChange={(e) => setAdminPassword(e.target.value)}
+                                  />
+                              </div>
+                          </div>
+                      </div>
                   )}
 
                   <div className="border-top pt-3 mt-3">
@@ -807,10 +923,10 @@ export function SettingsClient() {
                       </AnimatedButton>
 
                       <AnimatedButton
-                        variant="danger" // Changed from destructive to danger
+                        variant="danger"
                         onClick={deleteSupabaseTables}
-                        disabled={isDeleting || !tablesExist}
-                        className={`gap-2 ${!tablesExist ? "opacity-50" : ""}`}
+                        disabled={isDeleting}
+                        className="gap-2"
                         size="sm"
                       >
                         <Trash className="h-4 w-4" />
@@ -818,13 +934,13 @@ export function SettingsClient() {
                       </AnimatedButton>
 
                       <AnimatedButton
-                        variant="outline-secondary" // Changed from outline to outline-secondary
+                        variant="outline-secondary"
                         onClick={clearTableData}
-                        disabled={isClearing || !tablesExist}
-                        className={`gap-2 ${!tablesExist ? "opacity-50" : ""}`}
+                        disabled={isClearing}
+                        className="gap-2"
                         size="sm"
                       >
-                        <Eraser className="h-4 w-4" />
+                        <Trash className="h-4 w-4" />
                         {isClearing ? "Clearing..." : "Clear All Data"}
                       </AnimatedButton>
                     </div>
@@ -971,6 +1087,17 @@ export function SettingsClient() {
         }
       >
         <div className="mb-3">
+          {supabaseEmpty && (
+            <div className="alert alert-info border-info border-opacity-25 bg-info bg-opacity-10 mb-3">
+              <div className="d-flex align-items-center gap-2 mb-1">
+                <AlertCircle className="h-4 w-4" />
+                <h6 className="fw-bold mb-0">No supabase tables</h6>
+              </div>
+              <p className="mb-0 small">
+                Hey, here is the SQL to run to purge Supabase, but anyway you don't need it because it's already empty.
+              </p>
+            </div>
+          )}
           <p className="text-secondary">Run these commands in the Supabase SQL Editor:</p>
           <div className="bg-dark text-light p-3 rounded border overflow-auto" style={{ maxHeight: '60vh' }}>
             <pre className="mb-0 small whitespace-pre-wrap break-all">{sqlCommands ? sqlCommands.join('\n\n') : ''}</pre>

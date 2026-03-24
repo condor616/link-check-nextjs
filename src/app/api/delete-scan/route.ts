@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function DELETE(request: Request) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     // Extract the scan ID from the URL query parameters
     const { searchParams } = new URL(request.url);
     const scanId = searchParams.get('id');
@@ -29,7 +34,8 @@ export async function DELETE(request: Request) {
         const { error } = await supabase
           .from('scan_history')
           .delete()
-          .eq('id', scanId);
+          .eq('id', scanId)
+          .eq('user_id', user.id);
 
         if (error) {
           throw new Error(`Supabase error: ${error.message}`);
@@ -43,9 +49,16 @@ export async function DELETE(request: Request) {
           { status: 500 }
         );
       }
-    } else {
       // Use Prisma (SQLite)
       try {
+        const scan = await prisma.scanHistory.findFirst({
+            where: { id: scanId, userId: user.id }
+        });
+
+        if (!scan) {
+            return NextResponse.json({ error: 'Scan not found or unauthorized' }, { status: 404 });
+        }
+
         await prisma.scanHistory.delete({
           where: {
             id: scanId

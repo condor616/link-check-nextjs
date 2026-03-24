@@ -7,7 +7,7 @@ async function verify() {
 
     // 1. Create a job
     console.log('Creating a test job...');
-    const job = await jobService.createJob('https://example.com', { depth: 1 });
+    const job = await jobService.createJob('https://example.com', { depth: 1 }, 'local-admin');
     console.log('Job created:', job.id);
 
     // Verify it exists in Prisma

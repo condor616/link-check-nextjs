@@ -1,4 +1,5 @@
-import fs from 'fs/promises';
+import fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import path from 'path';
 import { AppSettings } from '@/app/api/settings/route';
 
@@ -26,12 +27,12 @@ export async function getAppSettings(): Promise<AppSettings> {
     const templatePath = path.join(root, TEMPLATE_FILE);
 
     try {
-        const data = await fs.readFile(settingsPath, 'utf-8');
+        const data = await fsPromises.readFile(settingsPath, 'utf-8');
         return JSON.parse(data);
     } catch (error) {
         // If settings file doesn't exist, try to load from template
         try {
-            const templateData = await fs.readFile(templatePath, 'utf-8');
+            const templateData = await fsPromises.readFile(templatePath, 'utf-8');
             return JSON.parse(templateData);
         } catch (templateError) {
             // Default settings if template also doesn't exist
@@ -43,6 +44,33 @@ export async function getAppSettings(): Promise<AppSettings> {
             };
         }
     }
+}
+
+export function getAppSettingsSync(): AppSettings {
+    const root = getProjectRoot();
+    const settingsPath = path.join(root, SETTINGS_FILE);
+    const templatePath = path.join(root, TEMPLATE_FILE);
+
+    try {
+        if (fs.existsSync(settingsPath)) {
+            const data = fs.readFileSync(settingsPath, 'utf-8');
+            return JSON.parse(data);
+        }
+    } catch (error) {}
+
+    try {
+        if (fs.existsSync(templatePath)) {
+            const templateData = fs.readFileSync(templatePath, 'utf-8');
+            return JSON.parse(templateData);
+        }
+    } catch (templateError) {}
+
+    return {
+        storageType: (process.env.STORAGE_TYPE as any) || 'sqlite',
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        appUrl: 'http://localhost:3000'
+    };
 }
 
 export async function getAppUrl(): Promise<string> {

@@ -7,8 +7,10 @@ export interface AppSettings {
   storageType: 'file' | 'sqlite' | 'supabase';
   supabaseUrl?: string;
   supabaseKey?: string;
+  supabaseServiceKey?: string;
   appUrl?: string;
   maxScansPerMinute?: number;
+  maxConcurrentJobs?: number;
 }
 
 const SETTINGS_FILE = '.app_settings.json';

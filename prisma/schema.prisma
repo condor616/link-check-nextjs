@@ -7,6 +7,69 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  password      String?
+  role          String    @default("user") // admin | user
+  hasAccess     Boolean   @default(false) @map("has_access")
+  maxJobs       Int       @default(1) @map("max_jobs")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  jobs          Job[]
+  scanHistory   ScanHistory[]
+  savedConfigs  SavedConfig[]
+  scanLogs      ScanLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String  @map("user_id")
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+ 
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+ 
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+ 
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
 model Job {
   id              String   @id
   status          String
@@ -24,9 +87,13 @@ model Job {
   error           String?
   results         String?  // JSON string (serialized ScanResult[])
   state           String?  // Serialized state
+  userId          String?  @map("user_id")
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([created_at])
+  @@index([userId])
+  @@map("scan_jobs")
 }
 
 model ScanHistory {
@@ -38,6 +105,11 @@ model ScanHistory {
   total_links     Int      @default(0)
   config          String   // JSON string
   results         String   // JSON string
+  userId          String?  @map("user_id")
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("scan_history")
 }
 
 model SavedConfig {
@@ -45,18 +117,27 @@ model SavedConfig {
   name      String
   url       String
   config    String   // JSON string
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("scan_configs")
 }
 
 model ScanLog {
   id        String   @id @default(uuid())
-  jobId     String
-  createdAt DateTime @default(now())
+  jobId     String   @map("job_id")
+  createdAt DateTime @default(now()) @map("created_at")
   level     String   // INFO, WARN, ERROR
   message   String
   data      String?  // Optional JSON string
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
   @@index([createdAt])
+  @@index([userId])
+  @@map("scan_logs")
 }

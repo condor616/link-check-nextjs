@@ -440,9 +440,6 @@ class Scanner {
         // Mark as visited *before* fetching to prevent race conditions in queuing
         this.visitedLinks.add(urlToProcess);
 
-        // Use optional chaining for limit properties in log
-        this.log('INFO', `[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
-
         // Fetch and process
         try {
             // Only use auth headers for the same domain or when configured to use for all domains
@@ -467,6 +464,9 @@ class Scanner {
 
             // Global rate limiting - enforced across all concurrent workers
             await this.waitForRateLimit();
+
+            // Log actually starting the scan
+            this.log('INFO', `[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
 
             const response = await fetch(urlToProcess, fetchOptions);
 
@@ -942,13 +942,6 @@ export class WebsiteScanner extends Scanner {
         // Mark as visited *before* fetching to prevent race conditions in queuing
         this.visitedLinks.add(urlToProcess);
 
-        // Use optional chaining for limit properties in log
-        this.log('INFO', `[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
-
-        if (this.callbacks.onProgress) {
-            this.callbacks.onProgress(this.visitedLinks.size, urlToProcess, this.brokenLinksCount, this.results.size);
-        }
-
         // Fetch and process
         try {
             // Determine if this URL is from the same domain as the start URL
@@ -1000,6 +993,13 @@ export class WebsiteScanner extends Scanner {
             // Global rate limiting - enforced across all concurrent workers
             await this.waitForRateLimit();
 
+            // Log actually starting the scan
+            this.log('INFO', `[${this.limit?.activeCount}/${this.limit?.pendingCount}] Scanning [Depth ${depth}]: ${urlToProcess}`);
+
+            if (this.callbacks.onProgress) {
+                this.callbacks.onProgress(this.visitedLinks.size, urlToProcess, this.brokenLinksCount, this.results.size);
+            }
+
             try {
                 response = await fetch(urlToProcess, fetchOptions);
             } finally {
@@ -1028,6 +1028,8 @@ export class WebsiteScanner extends Scanner {
 
             if (shouldProcessHtml) {
                 // Check depth is within limits for recursive scanning
+                // Note: shouldSkipUrl already checks depth >= maxDepth for scanning,
+                // but we check depth < maxDepth here to decide whether to parse for MORE links.
                 const maxDepth = this.config.depth;
                 if (maxDepth === 0 || depth < maxDepth) {
                     const html = await response.text();

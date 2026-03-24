@@ -21,6 +21,8 @@
 - Configurable scan depth and concurrency
 - Advanced filtering with regex patterns and CSS selectors
 - Multiple storage backends (File-based or Supabase)
+- **Per-User Scan Limits**: Configurable concurrent scan limits per user
+- **Fair Scheduling**: Automated distribution of global worker capacity
 - Export functionality (JSON, CSV, HTML)
 - Scan configuration management (save, load, edit)
 - Comprehensive scan history tracking
@@ -201,7 +203,22 @@ The landing page provides:
 
 ---
 
-### 5. **Settings & Configuration**
+#### 5. **User & Concurrency Management**
+
+![User Management](images/user_management_max_scans.png)
+
+**Route:** `/users`
+
+**Features:**
+- **User List**: View all registered users and their details.
+- **Role Management**: Promote/demote users between 'Admin' and 'User' roles.
+- **Access Control**: Grant or revoke application access for any user.
+- **Max Concurrent Scans**: Configure the maximum number of simultaneous scans allowed for each user.
+- **Fair Resource Allocation**: The system automatically ensures that no single user can exhaust the global worker capacity while respecting individual limits.
+
+---
+
+### 6. **Settings & Configuration**
 
 ![Settings Page](images/settings_page.png)
 ![Storage Options](images/settings_storage_options.png)

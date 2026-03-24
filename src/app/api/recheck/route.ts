@@ -5,6 +5,7 @@ import { ScanConfig, ScanResult } from '@/lib/scanner';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
 import { getAppSettings } from '@/lib/settings';
+import { getCurrentUser } from '@/lib/auth';
 
 interface RecheckRequest {
   url: string;
@@ -151,7 +152,7 @@ async function getScanDataFromFile(scanId: string) {
 }
 
 // Get scan data from Supabase
-async function getScanDataFromSupabase(scanId: string) {
+async function getScanDataFromSupabase(scanId: string, userId: string) {
   const supabase = await getSupabaseClient();
 
   if (!supabase) {
@@ -162,6 +163,7 @@ async function getScanDataFromSupabase(scanId: string) {
     .from('scan_history')
     .select('*')
     .eq('id', scanId)
+    .eq('user_id', userId)
     .single();
 
   if (error) {
@@ -225,11 +227,11 @@ async function saveScanDataToSupabase(scanId: string, scanData: any) {
 }
 
 // Get scan data from Prisma (SQLite)
-async function getScanDataFromPrisma(scanId: string) {
+async function getScanDataFromPrisma(scanId: string, userId: string) {
   try {
     // Try to find in Job table first (new schema)
-    const job = await prisma.job.findUnique({
-      where: { id: scanId }
+    const job = await prisma.job.findFirst({
+      where: { id: scanId, userId }
     });
 
     if (job) {
@@ -244,8 +246,8 @@ async function getScanDataFromPrisma(scanId: string) {
     }
 
     // Try ScanHistory table (legacy or specific history table)
-    const history = await prisma.scanHistory.findUnique({
-      where: { id: scanId }
+    const history = await prisma.scanHistory.findFirst({
+      where: { id: scanId, userId }
     });
 
     if (history) {
@@ -306,6 +308,11 @@ async function saveScanDataToPrisma(scanId: string, scanData: any) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Validate request body
     let body: RecheckRequest;
     try {
@@ -338,9 +345,9 @@ export async function POST(request: NextRequest) {
     // Get scan data
     let scanData;
     if (storageType === 'supabase') {
-      scanData = await getScanDataFromSupabase(scanId);
+      scanData = await getScanDataFromSupabase(scanId, user.id);
     } else if (storageType === 'sqlite') {
-      scanData = await getScanDataFromPrisma(scanId);
+      scanData = await getScanDataFromPrisma(scanId, user.id);
     } else {
       scanData = await getScanDataFromFile(scanId);
     }

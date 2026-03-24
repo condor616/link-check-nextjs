@@ -37,7 +37,10 @@ export default function SetupWrapper({ children }: { children: React.ReactNode }
     }
 
     if (isSetup === false) {
-        return <SetupWizard onComplete={() => setIsSetup(true)} />;
+        return <SetupWizard onComplete={() => {
+            // Force a full page reload to the login page to ensure AuthGuard re-runs
+            window.location.href = '/login?setupComplete=true';
+        }} />;
     }
 
     return <>{children}</>;

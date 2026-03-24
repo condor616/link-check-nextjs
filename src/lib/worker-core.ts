@@ -17,9 +17,12 @@ export async function processJob(job: ScanJob) {
             console.log(`Applying global rate limit: ${appSettings.maxScansPerMinute} scans/minute`);
         }
 
-        // If we are resuming, the status might already be 'queued' (set by resumeJob)
-        // We update to 'running'
-        await jobService.updateJobStatus(job.id, 'running');
+        // Note: getNextPendingJob already marks the job as 'running' atomically.
+        // We only update status here if we need to ensure it's set correctly for resumes.
+        const currentJob = await jobService.getJob(job.id, job.user_id || '');
+        if (!currentJob || currentJob.status !== 'running') {
+            await jobService.updateJobStatus(job.id, 'running');
+        }
 
         let lastProgressUpdate = Date.now();
         let lastStatusCheck = Date.now();
@@ -102,6 +105,7 @@ export async function processJob(job: ScanJob) {
                         prisma.scanLog.create({
                             data: {
                                 jobId: job.id,
+                                userId: job.user_id, // Pass userId for multi-tenant logging
                                 level: log.level,
                                 message: log.message,
                                 data: log.data ? JSON.stringify(log.data) : null,

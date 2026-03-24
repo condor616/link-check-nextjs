@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(_request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      return await getHistoryFromSupabase();
+      return await getHistoryFromSupabase(user.id);
     } else {
-      return await getHistoryFromPrisma();
+      return await getHistoryFromPrisma(user.id);
     }
   } catch (err) {
     console.error('Error retrieving scan history:', err);
@@ -20,7 +26,7 @@ export async function GET(_request: NextRequest) {
 }
 
 // Get history data from Prisma (SQLite)
-async function getHistoryFromPrisma() {
+async function getHistoryFromPrisma(userId: string) {
   try {
     const scans = await prisma.scanHistory.findMany({
       select: {
@@ -33,6 +39,7 @@ async function getHistoryFromPrisma() {
         config: true
       },
       where: {
+        userId,
         NOT: {
           id: {
             startsWith: 'temp_'
@@ -70,7 +77,7 @@ async function getHistoryFromPrisma() {
 }
 
 // Get history data from Supabase
-async function getHistoryFromSupabase() {
+async function getHistoryFromSupabase(userId: string) {
   try {
     const supabase = await getSupabaseClient();
 
@@ -81,6 +88,7 @@ async function getHistoryFromSupabase() {
     const { data, error } = await supabase
       .from('scan_history')
       .select('id, scan_url, scan_date, duration_seconds, broken_links, total_links, config')
+      .eq('user_id', userId)
       .not('id', 'like', 'temp_%')
       .order('scan_date', { ascending: false });
 

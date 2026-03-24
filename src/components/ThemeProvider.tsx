@@ -7,5 +7,10 @@ export function ThemeProvider({
     children,
     ...props
 }: React.ComponentProps<typeof NextThemesProvider>) {
-    return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+    return (
+        // @ts-ignore - suppressHydrationWarning is needed for React 19 / Next 15+ theme scripts
+        <NextThemesProvider {...props}>
+            {children}
+        </NextThemesProvider>
+    )
 }

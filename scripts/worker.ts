@@ -8,6 +8,7 @@ import { jobService } from '../src/lib/jobs';
 import { processJob } from '../src/lib/worker-core';
 import { isUsingSupabase, getSupabaseClient } from '../src/lib/supabase';
 import { prisma } from '../src/lib/prisma';
+import pLimit from 'p-limit';
 
 import { getAppSettings } from '../src/lib/settings';
 
@@ -102,12 +103,27 @@ async function startWorker() {
 
     console.log('Worker ready. Polling for jobs...');
 
+    const settings = await getAppSettings();
+    const MAX_CONCURRENT_JOBS = settings.maxConcurrentJobs || 5; 
+    const limit = pLimit(MAX_CONCURRENT_JOBS);
+
     while (true) {
         try {
+            if (limit.activeCount + limit.pendingCount >= MAX_CONCURRENT_JOBS) {
+                // Wait if we're at capacity
+                await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_MS));
+                continue;
+            }
+
             const job = await jobService.getNextPendingJob();
 
             if (job) {
-                await processJob(job);
+                // Lock the job immediately so another iteration doesn't pick it up
+                await jobService.updateJobStatus(job.id, 'running');
+                
+                limit(() => processJob(job).catch(err => {
+                    console.error(`Unhandled error in job ${job.id}:`, err);
+                }));
             } else {
                 await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_MS));
             }

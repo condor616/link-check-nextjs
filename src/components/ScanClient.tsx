@@ -644,7 +644,7 @@ function ScannerContent({ scanUrl, scanConfigString, scanId }: { scanUrl?: strin
                       value={editedConfig.depth || 0}
                       onChange={(e) => updateConfigField('depth', parseInt(e.target.value) || 0)}
                     />
-                    <div className="form-text x-small">0 = current page only, higher = deeper</div>
+                    <div className="form-text x-small">0 = Unlimited, 1 = Landing Page + Links, 2+ = Deeper Audit</div>
                   </div>
 
                   <div className="col-md-4">
@@ -1920,7 +1920,7 @@ function ScanForm() {
                 value={depth}
                 onChange={(e) => setDepth(parseInt(e.target.value) || 0)}
               />
-              <div className="form-text x-small">0 = Landing Page, 1+ = Full Audit</div>
+              <div className="form-text x-small">0 = Unlimited, 1 = Landing Page + Links, 2+ = Deeper Audit</div>
             </div>
 
             <div className="col-md-4">

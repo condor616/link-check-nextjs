@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient, isUsingSupabase } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -17,13 +18,19 @@ export async function GET(
       );
     }
 
+    // Require Authentication
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      return await getScanFromSupabase(scanId);
+      return await getScanFromSupabase(scanId, user.id);
     } else {
-      return await getScanFromPrisma(scanId);
+      return await getScanFromPrisma(scanId, user.id);
     }
   } catch (err) {
     console.error('Error fetching scan:', err);
@@ -34,10 +41,10 @@ export async function GET(
   }
 }
 
-async function getScanFromPrisma(scanId: string) {
+async function getScanFromPrisma(scanId: string, userId: string) {
   try {
-    const scan = await prisma.scanHistory.findUnique({
-      where: { id: scanId }
+    const scan = await prisma.scanHistory.findFirst({
+      where: { id: scanId, userId }
     });
 
     if (!scan) {
@@ -83,7 +90,7 @@ async function getScanFromPrisma(scanId: string) {
   }
 }
 
-async function getScanFromSupabase(scanId: string) {
+async function getScanFromSupabase(scanId: string, userId: string) {
   const supabase = await getSupabaseClient();
 
   if (!supabase) {
@@ -94,6 +101,7 @@ async function getScanFromSupabase(scanId: string) {
     .from('scan_history')
     .select('*')
     .eq('id', scanId)
+    .eq('user_id', userId)
     .single();
 
   if (error) {
@@ -153,13 +161,19 @@ export async function DELETE(
       );
     }
 
+    // Require Auth
+    const user = await getCurrentUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if using Supabase
     const useSupabase = await isUsingSupabase();
 
     if (useSupabase) {
-      return await deleteScanFromSupabase(scanId);
+      return await deleteScanFromSupabase(scanId, user.id);
     } else {
-      return await deleteScanFromPrisma(scanId);
+      return await deleteScanFromPrisma(scanId, user.id);
     }
   } catch (err) {
     console.error('Error deleting scan:', err);
@@ -170,11 +184,17 @@ export async function DELETE(
   }
 }
 
-async function deleteScanFromPrisma(scanId: string) {
+async function deleteScanFromPrisma(scanId: string, userId: string) {
   try {
+    // Check ownership first
+    const scan = await prisma.scanHistory.findFirst({ where: { id: scanId, userId }});
+    if (!scan) {
+        return NextResponse.json({ error: 'Scan not found or unauthorized' }, { status: 404 });
+    }
+
     // Delete associated logs
     await prisma.scanLog.deleteMany({
-      where: { jobId: scanId }
+      where: { jobId: scanId } // scanLog isn't directly tied to userId yet? Just deleting by jobId is fine as we checked ownership
     });
 
     await prisma.scanHistory.delete({
@@ -196,7 +216,7 @@ async function deleteScanFromPrisma(scanId: string) {
   }
 }
 
-async function deleteScanFromSupabase(scanId: string) {
+async function deleteScanFromSupabase(scanId: string, userId: string) {
   const supabase = await getSupabaseClient();
 
   if (!supabase) {
@@ -206,7 +226,8 @@ async function deleteScanFromSupabase(scanId: string) {
   const { error } = await supabase
     .from('scan_history')
     .delete()
-    .eq('id', scanId);
+    .eq('id', scanId)
+    .eq('user_id', userId);
 
   if (error) {
     throw new Error(`Supabase error: ${error.message}`);

@@ -4,6 +4,7 @@ import path from 'path';
 import { prisma } from '@/lib/prisma';
 import { isUsingSupabase, getSupabaseClient } from '@/lib/supabase';
 import { getAppSettings } from '@/lib/settings';
+import { checkIsSetup } from '@/lib/setup';
 
 export async function GET() {
     try {
@@ -13,7 +14,8 @@ export async function GET() {
         const envDefaults = {
             storageType: process.env.STORAGE_TYPE || 'sqlite',
             supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
-            supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || ''
+            supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || '',
+            supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || ''
         };
 
         if (useSupabase) {
@@ -23,44 +25,51 @@ export async function GET() {
                     isSetup: false,
                     reason: 'Supabase credentials missing',
                     storageType: 'supabase',
-                    defaults: envDefaults
+                    defaults: envDefaults,
+                    hasAdmin: false
                 });
             }
 
             // Check if tables exist
-            const { error } = await supabase.from('scan_history').select('id').limit(1);
-            if (error && (error.message.includes('does not exist') || error.message.includes('schema cache'))) {
+            const { error: tableError } = await supabase.from('users').select('id').limit(1);
+            const tablesExist = !tableError || !(tableError.message.includes('does not exist') || tableError.message.includes('schema cache'));
+            
+            if (!tablesExist) {
                 return NextResponse.json({
                     isSetup: false,
                     reason: 'Supabase tables not initialized',
                     storageType: 'supabase',
-                    defaults: envDefaults
+                    defaults: envDefaults,
+                    hasAdmin: false
                 });
             }
 
-            if (error) {
-                return NextResponse.json({
-                    isSetup: false,
-                    reason: `Supabase connection error: ${error.message}`,
-                    storageType: 'supabase',
-                    defaults: envDefaults
-                });
-            }
-
-            return NextResponse.json({ isSetup: true, storageType: 'supabase', defaults: envDefaults });
+            const isSetup = await checkIsSetup();
+            
+            return NextResponse.json({ 
+                isSetup, 
+                storageType: 'supabase', 
+                defaults: envDefaults,
+                hasAdmin: isSetup
+            });
         } else {
             // Local SQLite check
             try {
-                // If we can count, it's definitely setup
-                await prisma.scanHistory.count();
-                return NextResponse.json({ isSetup: true, storageType: 'sqlite', defaults: envDefaults });
+                const isSetup = await checkIsSetup();
+                return NextResponse.json({ 
+                    isSetup, 
+                    storageType: 'sqlite', 
+                    defaults: envDefaults,
+                    hasAdmin: isSetup
+                });
             } catch (error: any) {
                 // If tables don't exist, it's NOT setup
                 return NextResponse.json({
                     isSetup: false,
                     reason: 'Local database tables not initialized',
                     storageType: 'sqlite',
-                    defaults: envDefaults
+                    defaults: envDefaults,
+                    hasAdmin: false
                 });
             }
         }

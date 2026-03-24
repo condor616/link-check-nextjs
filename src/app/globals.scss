@@ -1,3 +1,6 @@
+@use "bootstrap/scss/bootstrap";
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
 // 1. Theme Configuration (Using Professional Suite Palette)
 :root {
   // Brand Colors (OKLCH for vividness)
@@ -7,14 +10,14 @@
   --brand-danger: oklch(55% 0.2 20); // Crimson
   --brand-warning: oklch(75% 0.15 70); // Amber
   --brand-info: oklch(65% 0.15 220); // Sky
-
+  
   // Light Theme Defaults
   --bg-app: oklch(98% 0.01 260); // Lightest purple-white
   --bg-card: oklch(100% 0 0); // White
   --text-main: oklch(20% 0.02 260); // Dark text
   --text-muted: oklch(50% 0.02 260); // Muted text
   --border-subtle: oklch(90% 0.02 260); // Light border
-
+  
   // Bootstrap Override Maps
   --bs-primary: var(--brand-primary);
   --bs-secondary: var(--brand-secondary);
@@ -22,10 +25,10 @@
   --bs-danger: var(--brand-danger);
   --bs-warning: var(--brand-warning);
   --bs-info: var(--brand-info);
-
+  
   --bs-body-bg: var(--bg-app);
   --bs-body-color: var(--text-main);
-
+  
   // Custom Semantic vars
   --card-bg: var(--bg-card);
 }
@@ -37,16 +40,12 @@
   --text-main: oklch(95% 0.01 260); // White text
   --text-muted: oklch(70% 0.01 260); // Muted white
   --border-subtle: oklch(30% 0.02 260); // Dark border
-
+  
   --bs-body-bg: var(--bg-app);
   --bs-body-color: var(--text-main);
-
+  
   --card-bg: var(--bg-card);
 }
-
-// 2. Import Bootstrap
-@import "bootstrap/scss/bootstrap";
-@import "bootstrap-icons/font/bootstrap-icons.css";
 
 // 3. Global Overrides & Professional Aesthetics
 html {

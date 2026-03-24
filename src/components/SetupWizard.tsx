@@ -16,10 +16,13 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
     const [storageType, setStorageType] = useState<'sqlite' | 'supabase'>('sqlite');
     const [supabaseUrl, setSupabaseUrl] = useState('');
     const [supabaseKey, setSupabaseKey] = useState('');
+    const [supabaseServiceKey, setSupabaseServiceKey] = useState('');
     const [isInitializing, setIsInitializing] = useState(false);
     const [setupError, setSetupError] = useState<string | null>(null);
     const [sqlCommands, setSqlCommands] = useState<string[]>([]);
     const [hasDefaults, setHasDefaults] = useState(false);
+    const [adminEmail, setAdminEmail] = useState('');
+    const [adminPassword, setAdminPassword] = useState('');
     const { addNotification } = useNotification();
 
     const handleNext = () => setStep(step + 1);
@@ -41,6 +44,9 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                     if (data.defaults.supabaseKey) {
                         setSupabaseKey(data.defaults.supabaseKey);
                     }
+                    if (data.defaults.supabaseServiceKey) {
+                        setSupabaseServiceKey(data.defaults.supabaseServiceKey);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch setup defaults:', error);
@@ -51,14 +57,19 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
 
     const handleStorageSelect = (type: 'sqlite' | 'supabase') => {
         setStorageType(type);
-        setStep(2);
+        setStep(3);
 
         // Pre-fill SQL commands for Supabase
         if (type === 'supabase') {
             setSqlCommands([
-                `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`,
-                `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, config JSONB NOT NULL, results JSONB NOT NULL);`,
-                `CREATE TABLE IF NOT EXISTS scan_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, scan_url TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), started_at TIMESTAMP WITH TIME ZONE, completed_at TIMESTAMP WITH TIME ZONE, progress_percent NUMERIC DEFAULT 0, current_url TEXT, urls_scanned INTEGER DEFAULT 0, total_urls INTEGER DEFAULT 0, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, scan_config JSONB NOT NULL, error TEXT, results JSONB, state TEXT);`
+                `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, email TEXT UNIQUE NOT NULL, email_verified TIMESTAMP WITH TIME ZONE, image TEXT, password TEXT, role TEXT DEFAULT 'user', has_access BOOLEAN DEFAULT false, max_jobs INTEGER DEFAULT 1, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());`,
+                `CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, type TEXT NOT NULL, provider TEXT NOT NULL, provider_account_id TEXT NOT NULL, refresh_token TEXT, access_token TEXT, expires_at INTEGER, token_type TEXT, scope TEXT, id_token TEXT, session_state TEXT, UNIQUE(provider, provider_account_id));`,
+                `CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, session_token TEXT UNIQUE NOT NULL, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires TIMESTAMP WITH TIME ZONE NOT NULL);`,
+                `CREATE TABLE IF NOT EXISTS verification_tokens (identifier TEXT NOT NULL, token TEXT UNIQUE NOT NULL, expires TIMESTAMP WITH TIME ZONE NOT NULL, PRIMARY KEY (identifier, token));`,
+                `CREATE TABLE IF NOT EXISTS scan_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`,
+                `CREATE TABLE IF NOT EXISTS scan_history (id TEXT PRIMARY KEY, scan_url TEXT NOT NULL, scan_date TIMESTAMP WITH TIME ZONE NOT NULL, duration_seconds NUMERIC NOT NULL, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, config JSONB NOT NULL, results JSONB NOT NULL, user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`,
+                `CREATE TABLE IF NOT EXISTS scan_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, scan_url TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), started_at TIMESTAMP WITH TIME ZONE, completed_at TIMESTAMP WITH TIME ZONE, progress_percent NUMERIC DEFAULT 0, current_url TEXT, urls_scanned INTEGER DEFAULT 0, total_urls INTEGER DEFAULT 0, broken_links INTEGER DEFAULT 0, total_links INTEGER DEFAULT 0, scan_config JSONB NOT NULL, error TEXT, results JSONB, state TEXT, user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`,
+                `CREATE TABLE IF NOT EXISTS scan_logs (id TEXT PRIMARY KEY, job_id TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), level TEXT NOT NULL, message TEXT NOT NULL, data TEXT, user_id TEXT REFERENCES users(id) ON DELETE CASCADE);`
             ]);
         }
     };
@@ -76,6 +87,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                     storageType: 'supabase',
                     supabaseUrl,
                     supabaseKey,
+                    supabaseServiceKey,
                 }),
             });
 
@@ -105,8 +117,27 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 throw new Error(initData.error || 'Failed to initialize Supabase tables');
             }
 
-            addNotification('success', 'Supabase configured and tables initialized!');
-            setStep(4);
+            // 3. ALSO initialize the Prisma-managed database (local fallback or real Postgres)
+            // This is required because even in Supabase mode, our app uses Prisma for some features
+            try {
+                await fetch('/api/setup/sqlite', { method: 'POST' });
+            } catch (err) {
+                console.warn('Prisma DB auto-init skipped or failed:', err);
+            }
+
+            // 4. Create Admin Account
+            const adminRes = await fetch('/api/setup/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: adminEmail, password: adminPassword, storageType: 'supabase' })
+            });
+            if (!adminRes.ok) {
+                const adminData = await adminRes.json();
+                throw new Error(adminData.error || 'Failed to create Admin account');
+            }
+
+            addNotification('success', 'Supabase configured, tables initialized, and Admin created!');
+            setStep(5);
         } catch (error: any) {
             setSetupError(error.message);
             addNotification('error', error.message);
@@ -138,8 +169,19 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 throw new Error(data.error || 'Failed to initialize database');
             }
 
+            // 3. Create Admin Account
+            const adminRes = await fetch('/api/setup/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: adminEmail, password: adminPassword, storageType: 'sqlite' })
+            });
+            if (!adminRes.ok) {
+                const adminData = await adminRes.json();
+                throw new Error(adminData.error || 'Failed to create Admin account');
+            }
+
             addNotification('success', 'Local storage configured and database initialized!');
-            setStep(4);
+            setStep(5);
         } catch (error: any) {
             console.error('SQLite Setup Error:', error);
             setSetupError(error.message);
@@ -167,8 +209,58 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                                     <Shield size={48} />
                                 </div>
                                 <h1 className="h2 fw-bold mb-3">Welcome to Link Checker Pro</h1>
+                                <p className="text-muted mb-4">
+                                    Let&apos;s get your workspace ready. First, create your global Admin account.
+                                </p>
+                                <div className="text-start mb-4 max-w-md mx-auto" style={{ maxWidth: '400px' }}>
+                                    <div className="mb-3">
+                                        <label className="form-label small fw-bold text-muted mb-1">Admin Email</label>
+                                        <input
+                                            type="email"
+                                            required
+                                            className="form-control form-control-lg bg-light border-0"
+                                            placeholder="admin@example.com"
+                                            value={adminEmail}
+                                            onChange={(e) => setAdminEmail(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="form-label small fw-bold text-muted mb-1">Admin Password</label>
+                                        <input
+                                            type="password"
+                                            required
+                                            className="form-control form-control-lg bg-light border-0"
+                                            placeholder="••••••••"
+                                            value={adminPassword}
+                                            onChange={(e) => setAdminPassword(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleNext}
+                                    disabled={!adminEmail || adminPassword.length < 6}
+                                    className="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center gap-2"
+                                    style={{ maxWidth: '400px', margin: '0 auto' }}
+                                >
+                                    Continue <ArrowRight size={20} />
+                                </button>
+                            </motion.div>
+                        )}
+
+                        {step === 2 && (
+                            <motion.div
+                                key="step2"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                className="text-center"
+                            >
+                                <div className="mb-4 d-inline-block p-3 rounded-circle bg-primary bg-opacity-10 text-primary">
+                                    <Database size={48} />
+                                </div>
+                                <h2 className="h3 fw-bold mb-3">Choose Storage Engine</h2>
                                 <p className="text-muted mb-5">
-                                    Let&apos;s get your workspace ready. Choose where you want to store your scan results and history.
+                                    Where do you want to store your scan results and history?
                                 </p>
 
                                 <div className="row g-4">
@@ -210,7 +302,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                             </motion.div>
                         )}
 
-                        {step === 2 && storageType === 'supabase' && (
+                        {step === 3 && storageType === 'supabase' && (
                             <motion.div
                                 key="supabase-setup"
                                 initial={{ opacity: 0, x: 20 }}
@@ -236,7 +328,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                                             className="form-control form-control-lg bg-light border-0"
                                             placeholder="https://your-project.supabase.co"
                                             value={supabaseUrl}
-                                            onChange={(e) => setSupabaseUrl(e.target.value)}
+                                            onChange={(e) => setSupabaseUrl(e.target.value.trim())}
                                         />
                                     </div>
                                     <div className="mb-4">
@@ -251,8 +343,24 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                                             className="form-control form-control-lg bg-light border-0"
                                             placeholder="your-anon-key"
                                             value={supabaseKey}
-                                            onChange={(e) => setSupabaseKey(e.target.value)}
+                                            onChange={(e) => setSupabaseKey(e.target.value.trim())}
                                         />
+                                    </div>
+                                    <div className="mb-4">
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                            <label className="form-label small fw-bold text-muted mb-0">SERVICE ROLE KEY (OPTIONAL)</label>
+                                        </div>
+                                        <input
+                                            type="password"
+                                            className="form-control form-control-lg bg-light border-0"
+                                            placeholder="your-service-role-key"
+                                            value={supabaseServiceKey}
+                                            onChange={(e) => setSupabaseServiceKey(e.target.value.trim())}
+                                        />
+                                        <div className="form-text small text-warning mt-2">
+                                            <Shield size={12} className="me-1" />
+                                            Required to bypass email confirmation for the initial admin.
+                                        </div>
                                     </div>
                                 </div>
                                 <button
@@ -265,7 +373,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                             </motion.div>
                         )}
 
-                        {step === 3 && storageType === 'supabase' && (
+                        {step === 4 && storageType === 'supabase' && (
                             <motion.div
                                 key="step3-supabase"
                                 initial={{ opacity: 0, x: 20 }}
@@ -341,7 +449,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                             </motion.div>
                         )}
 
-                        {step === 2 && storageType === 'sqlite' && (
+                        {step === 3 && storageType === 'sqlite' && (
                             <motion.div
                                 key="step2-sqlite"
                                 initial={{ opacity: 0, x: 20 }}
@@ -379,7 +487,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                             </motion.div>
                         )}
 
-                        {step === 4 && (
+                        {step === 5 && (
                             <motion.div
                                 key="step4"
                                 initial={{ opacity: 0, scale: 0.9 }}

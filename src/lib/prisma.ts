@@ -1,44 +1,35 @@
 import { PrismaClient } from '@prisma/client';
-import path from 'path';
-import fs from 'fs';
+import { getDatabaseUrl } from './database';
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const globalForPrisma = global as unknown as { 
+    prisma: PrismaClient;
+    dbUrl?: string;
+};
 
-// Robustly resolve the database URL, especially for relative SQLite paths
-let dbUrl = process.env.DATABASE_URL || '';
-if (dbUrl.startsWith('file:')) {
-    const relativePath = dbUrl.replace('file:', '');
-    if (!path.isAbsolute(relativePath)) {
-        // Try to find the prisma folder in current or parent directories
-        let currentDir = process.cwd();
-        let absolutePath = '';
+// Resolve the database URL using the shared utility
+const dbUrl = getDatabaseUrl();
 
-        // Look up to 3 levels up for a 'prisma' directory
-        for (let i = 0; i < 3; i++) {
-            const checkPath = path.resolve(currentDir, 'prisma', relativePath.replace('./', ''));
-            const prismaDir = path.resolve(currentDir, 'prisma');
-            if (fs.existsSync(prismaDir) && !currentDir.split(path.sep).includes('.next')) {
-                absolutePath = checkPath;
-                break;
-            }
-            currentDir = path.dirname(currentDir);
-        }
-
-        if (absolutePath) {
-            dbUrl = `file:${absolutePath}`;
-            process.env.DATABASE_URL = dbUrl;
+// Log the current database configuration for troubleshooting in dev/prod
+if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'production') {
+        const pid = process.pid;
+        const sanitizedUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
+        if (globalForPrisma.dbUrl !== dbUrl) {
+            console.log(`[PRISMA] ${globalForPrisma.dbUrl ? 'Re-initializing' : 'Initializing'} in process ${pid} with URL: ${sanitizedUrl}`);
         }
     }
 }
 
-// Log the current database configuration for troubleshooting
-if (process.env.NODE_ENV === 'production') {
-    console.log(`[PRISMA] Initializing in ${process.pid} with URL: ${dbUrl.replace(/:[^:@]+@/, ':****@')}`);
-}
-
-export const prisma =
-    globalForPrisma.prisma ||
-    new PrismaClient({
+// Re-initialize if URL changed (e.g. storage switch in dev mode)
+if (!globalForPrisma.prisma || globalForPrisma.dbUrl !== dbUrl) {
+    if (globalForPrisma.prisma) {
+        // Attempt to disconnect old client
+        try {
+            (globalForPrisma.prisma as any).$disconnect();
+        } catch (e) {}
+    }
+    
+    globalForPrisma.prisma = new PrismaClient({
         log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error', 'warn'],
         datasources: {
             db: {
@@ -46,5 +37,7 @@ export const prisma =
             }
         }
     });
+    globalForPrisma.dbUrl = dbUrl;
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+export const prisma = globalForPrisma.prisma;

@@ -406,35 +406,85 @@ project-root/
 
 **Database Schema**:
 
-```sql
+-- Users Table (with per-user limits)
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  role TEXT DEFAULT 'user',
+  has_access BOOLEAN DEFAULT false,
+  max_jobs INTEGER DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Scan Configurations Table
 CREATE TABLE scan_configs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  url TEXT NOT NULL,
   config JSONB NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Scan History Table
 CREATE TABLE scan_history (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  scan_id TEXT UNIQUE NOT NULL,
-  url TEXT NOT NULL,
-  config JSONB,
+  id TEXT PRIMARY KEY,
+  scan_url TEXT NOT NULL,
+  scan_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  duration_seconds NUMERIC NOT NULL,
+  broken_links INTEGER DEFAULT 0,
+  total_links INTEGER DEFAULT 0,
+  config JSONB NOT NULL,
   results JSONB NOT NULL,
-  duration_seconds FLOAT,
-  results_count INTEGER,
-  created_at TIMESTAMP DEFAULT NOW()
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Scan Parameters Table
-CREATE TABLE scan_params (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  params JSONB NOT NULL,
-  updated_at TIMESTAMP DEFAULT NOW()
+-- Scan Jobs Table (for background workers)
+CREATE TABLE scan_jobs (
+  id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  scan_url TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  started_at TIMESTAMP WITH TIME ZONE,
+  completed_at TIMESTAMP WITH TIME ZONE,
+  progress_percent NUMERIC DEFAULT 0,
+  current_url TEXT,
+  urls_scanned INTEGER DEFAULT 0,
+  total_urls INTEGER DEFAULT 0,
+  broken_links INTEGER DEFAULT 0,
+  total_links INTEGER DEFAULT 0,
+  scan_config JSONB NOT NULL,
+  error TEXT,
+  results JSONB,
+  state TEXT,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Scan Logs Table
+CREATE TABLE scan_logs (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  level TEXT NOT NULL,
+  message TEXT NOT NULL,
+  data TEXT,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE
 );
 ```
+
+### 3. Fair Scheduling & Concurrency Limits
+
+The application implements a multi-tenant concurrency model to ensure fair resource distribution among users:
+
+- **Global Limit (`MAX_CONCURRENT_JOBS`)**: The maximum number of scans running across the entire system at once (default: 5).
+- **Per-User Limit (`maxJobs`)**: Each user can be assigned a specific limit for their own concurrent scans (default: 1).
+- **Fair Scheduling Algorithm**: The worker polls for the next job using a fairness-weighted query:
+  1. Identifies all users with queued jobs.
+  2. Filters out users who have already reached their `maxJobs` limit.
+  3. Among the remaining eligible users, selects the one with the **fewest currently running jobs**.
+  4. If multiple users have the same minimum count, selects the one with the **oldest queued job**.
 
 **Advantages**:
 - Cloud-based persistence
